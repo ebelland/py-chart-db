@@ -852,5 +852,8 @@
     "delim": "",
     "encoding": "auto",
     "sheet": "Sheet1"
-  }
+  },
+  "app_style": "automatic",
+  "language": "it",
+  "save_format": "PNG"
 }
