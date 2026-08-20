@@ -1,0 +1,17 @@
+PySide6==6.11.1
+matplotlib==3.11.1
+numpy==2.5.1
+pandas==3.0.5
+PyWavelets==1.9.0
+scikit-image==0.26.0
+scipy==1.18.0
+statsmodels==0.14.6
+pytest==9.1.1
+
+# macOS only: SF Symbols are drawn through AppKit.  Without it the
+# interface still works - every action also names an SVG - but the icons
+# are the shipped SVGs rather than the system ones.
+# Not below 12.2: 11.1 tagged a wheel cp314 during Python 3.14's beta,
+# and importing it on a released 3.14 kills the interpreter outright.
+pyobjc-framework-Cocoa>=12.2; sys_platform == "darwin"
+

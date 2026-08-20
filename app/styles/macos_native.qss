@@ -1,0 +1,814 @@
+/* ==========================================================
+   macOS Native – Data Hub
+   Patched: pt-based typography (was mixing px with the Windows
+   file), subtle native-style row hover, explicit selection
+   color via palette tokens, message box width, ChartPanel
+   hairline restored.
+   ========================================================== */
+
+/* ============================================================
+   PLATFORM PARITY NOTES (read together with fluent_win11.qss)
+   - Standard controls (QPushButton, QLineEdit, QComboBox,
+     QSpinBox, QMenu, QRadioButton, QScrollBar) are INTENTIONALLY
+     left unstyled here. Qt's macOS style plugin already renders
+     these as native Aqua/HIG controls; adding custom QSS would
+     fight the OS look instead of matching it. This is the macOS
+     equivalent of the Windows file's Fluent overrides — same
+     goal (platform-native feel), opposite technique (do less,
+     not do differently).
+   - The chart tab bar (#chartTabs) and activity rail
+     (#activityRail) ARE custom-styled below. Both are bespoke,
+     app-specific chrome with no native Qt/macOS counterpart —
+     Qt's generic tab bar renders as plain boxy tabs, and a
+     QToolButton column has no native macOS analog at all — so
+     leaving them unstyled doesn't yield a native look, it just
+     yields an unstyled one. The rules are scoped tightly by
+     #objectName so other QTabWidgets (e.g. inside dialogs) stay
+     fully native.
+   - Row hover uses a faint alpha overlay (rgba 0.04), not the
+     saturated accent fill used on Windows: macOS list/table
+     hover is conventionally subtle, reserving full accent color
+     for the actual :selected state.
+   - Header captions use muted palette(mid), not full-contrast
+     text, matching Apple's HIG caption convention for table
+     header labels. Don't "fix" this to match Windows.
+   - All sizes use pt, matching how AppKit/HIG specifies type
+     sizes (the previous px values were inconsistent with that
+     and with the Windows file's own pt convention).
+   ============================================================ */
+
+/* ============================================================
+   WHAT CHANGED AND WHY (parity pass)
+   The Windows sheet styled 102 selectors this file did not, and
+   the gap was not all deliberate. Three groups were separated:
+
+   1. Native controls (QPushButton, QLineEdit, QComboBox,
+      QSpinBox, QScrollBar, QRadioButton, QMenu): still NOT
+      styled here. Qt's macOS plugin draws these as real Aqua
+      controls; restyling them is what makes an app look foreign
+      on macOS. This stays as it was.
+   2. App-specific chrome that has no native counterpart
+      (cards, section titles, editor panels, icon-only buttons,
+      QToolBox headers, collapsible panels, dialog padding).
+      These were simply MISSING, so the role= / card= / iconOnly=
+      conventions the Python code sets were silently ignored on
+      macOS while working on Windows. They are added below with
+      HIG metrics rather than Fluent ones.
+   3. Structural containers (QGroupBox, QHeaderView) that need a
+      rule to avoid inheriting the wrong background.
+   ============================================================ */
+
+/* -------------------------------
+   Base
+-------------------------------- */
+
+* {
+  font-size: 13pt;
+}
+
+/* Keep QSS minimal to preserve native macOS look. */
+
+/* -------------------------------
+   Typography roles
+   The Python code marks labels with role= / muted= / sectionTitle=.
+   Sizes follow the HIG type ramp (13pt body, 11pt caption) rather
+   than the Windows sheet's values.
+-------------------------------- */
+
+QLabel[role="title"] {
+  font-size: 17pt;
+  font-weight: 600;
+}
+
+QLabel[role="subtitle"] {
+  font-size: 15pt;
+  font-weight: 500;
+}
+
+QLabel[role="caption"] {
+  font-size: 11pt;
+  color: palette(mid);
+}
+
+QLabel[muted="true"] {
+  color: palette(mid);
+}
+
+QLabel[sectionTitle="true"] {
+  font-size: 11pt;
+  font-weight: 600;
+  color: palette(mid);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 0 4px 0;
+}
+
+/* -------------------------------
+   Surfaces
+   Cards read as the grouped-box surface used by System Settings
+   and the Pages/Keynote inspectors: white fill, hairline border,
+   10px radius - the same radius already used by ChartPanel and
+   the collapsible panels, so all app surfaces agree.
+-------------------------------- */
+
+QFrame[card="true"],
+QWidget[card="true"] {
+  background: palette(base);
+  border: 1px solid rgba(@SHADOW_RGB@, 0.08);
+  border-radius: 10px;
+}
+
+QWidget[editorPanel="true"],
+QAbstractItemView[editorPanel="true"] {
+  background: palette(base);
+  border: 1px solid rgba(@SHADOW_RGB@, 0.10);
+  border-radius: 8px;
+}
+
+QGroupBox {
+  background: transparent;
+  border: 1px solid rgba(@SHADOW_RGB@, 0.08);
+  border-radius: 10px;
+  margin-top: 10px;
+  padding-top: 8px;
+}
+
+QGroupBox::title {
+  subcontrol-origin: margin;
+  subcontrol-position: top left;
+  left: 10px;
+  padding: 0 4px;
+  color: palette(mid);
+  font-size: 11pt;
+  font-weight: 600;
+}
+
+/* -------------------------------
+   Icon-only buttons
+   Set via the iconOnly property in Python. A native bezel around
+   a bare glyph looks wrong in a toolbar, so these become
+   borderless squares with the same soft highlight used by the
+   activity rail - the macOS toolbar-button idiom.
+-------------------------------- */
+
+QAbstractButton[iconOnly="true"] {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 4px;
+  min-width: 28px;
+  min-height: 28px;
+}
+
+QAbstractButton[iconOnly="true"]:hover {
+  background: rgba(@SHADOW_RGB@, 0.06);
+}
+
+QAbstractButton[iconOnly="true"]:pressed {
+  background: rgba(@SHADOW_RGB@, 0.10);
+}
+
+QAbstractButton[iconOnly="true"]:checked {
+  background: rgba(@ACCENT_RGB@, 0.16);
+}
+
+/* -------------------------------
+   Emphasis buttons
+   macOS marks the default button by filling it with the accent
+   colour, which is exactly what primary= / accent= mean here.
+   The bezel, focus ring and metrics stay native.
+-------------------------------- */
+
+QPushButton[primary="true"],
+QPushButton[accent="true"],
+QPushButton#primaryDialogButton {
+  background: palette(highlight);
+  color: palette(highlighted-text);
+  border: 1px solid palette(highlight);
+  border-radius: 6px;
+  padding: 4px 14px;
+  font-weight: 600;
+}
+
+QPushButton[primary="true"]:disabled,
+QPushButton[accent="true"]:disabled,
+QPushButton#primaryDialogButton:disabled {
+  background: rgba(@SHADOW_RGB@, 0.10);
+  border-color: rgba(@SHADOW_RGB@, 0.10);
+  color: palette(mid);
+}
+
+/* -------------------------------
+   QToolBox
+   Used for the properties inspector and the series-operation
+   dialogs. Qt draws its headers as bezeled buttons on macOS,
+   which fights the flat inspector look; these become flat,
+   taller header strips (todo.txt: "QToolBox: increase header
+   size") with a faint selected tint.
+-------------------------------- */
+
+QToolBox {
+  background: transparent;
+  border: none;
+}
+
+QToolBox::tab {
+  text-align: left;
+  padding: 12px 14px;
+  min-height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(@SHADOW_RGB@, 0.04);
+  font-weight: 600;
+  color: palette(text);
+}
+
+QToolBox::tab:hover {
+  background: rgba(@SHADOW_RGB@, 0.07);
+}
+
+QToolBox::tab:selected {
+  background: rgba(@ACCENT_RGB@, 0.12);
+  color: palette(text);
+}
+
+QToolBox::tab:disabled {
+  color: palette(mid);
+}
+
+/* -------------------------------
+   Dialog padding
+   Root layouts go through apply_dialog_shell(), which owns the
+   margins; this only guarantees a floor for dialogs Qt builds
+   itself (file pickers, message boxes).
+-------------------------------- */
+
+QDialog {
+  background: palette(window);
+}
+
+/* -------------------------------
+   Chart panel
+-------------------------------- */
+
+QFrame#ChartPanel {
+  background: palette(window);
+  /* Flush, like Finder's content area.  The chart pane is the
+     document, not a card placed on top of one: the tab strip's
+     hairline above it and the sidebar's hairline beside it are the
+     only edges it needs, and a rounded border inside a tab pane is
+     the detail that most gives a Qt app away on macOS. */
+  border: none;
+  border-radius: 0;
+}
+
+/* Palette tokens, not literal white/black: hard-coded colours make the
+   toolbar unreadable in macOS dark mode. */
+QToolBar {
+  /*background: transparent;
+  color: palette(text);*/
+  border: none;
+  spacing: 2px;
+}
+
+QToolBar::separator {
+  background: rgba(@SHADOW_RGB@, 0.10);
+  width: 1px;
+  margin: 4px 6px;
+}
+
+QToolButton#chartToolButton {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 3px;
+}
+
+QToolButton#chartToolButton:hover {
+  background: rgba(@SHADOW_RGB@, 0.06);
+}
+
+QToolButton#chartToolButton:checked {
+  background: rgba(@ACCENT_RGB@, 0.16);
+}
+
+/* "Adatta" (zoom_fit) is a plain QToolButton built by create_toolbar_button,
+   not one of the QToolBar's own actions, so it never picked up the
+   #chartToolButton objectName the loop in ChartPanel._configure_toolbar
+   assigns. Left unstyled, it fell through to the native Aqua QToolButton
+   bevel, which looks out of place sitting flat against #chartToolButton's
+   borderless siblings in the same row. Same flat/hover treatment here keeps
+   the whole top row visually consistent. */
+QToolButton#zoom_fitButton {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 3px;
+}
+
+QToolButton#zoom_fitButton:hover {
+  background: rgba(@SHADOW_RGB@, 0.06);
+}
+
+/* -------------------------------
+   Tabs — Finder document tabs.
+
+   Qt's macOS style draws segmented-control tabs, which is the
+   right look for a *settings* tab bar but not for a document tab
+   bar like Finder's or Safari's.  Finder tabs are: a full-width
+   strip the height of a toolbar row, tabs separated by single
+   hairlines with no gap and no rounded pills, the selected tab
+   reading as the window surface continuing upwards while the rest
+   sit on a slightly recessed bar, and a hairline closing the strip
+   underneath.
+
+   These rules are intentionally NOT scoped to #chartTabs: applying
+   one tab look to every QTabWidget is what makes the chart tabs
+   and the axis-properties tabs agree, which is the point.
+-------------------------------- */
+
+QTabWidget::pane {
+  border: none;
+  border-top: 1px solid rgba(@SHADOW_RGB@, 0.12);
+  top: -1px;
+}
+
+QTabBar {
+  background: rgba(@SHADOW_RGB@, 0.05);
+  qproperty-drawBase: 0;
+}
+
+QTabBar::tab {
+  background: rgba(@SHADOW_RGB@, 0.05);
+  color: palette(mid);
+  border: none;
+  /* Finder separates tabs with a single hairline rather than
+     spacing them apart, so the divider is a right border and the
+     tabs sit flush against each other. */
+  border-right: 1px solid rgba(@SHADOW_RGB@, 0.12);
+  /* 13pt text in a 28px strip is the Finder tab height.  Padding
+     is horizontal-only so the strip height stays constant however
+     long the title is. */
+  padding: 6px 16px;
+  margin: 0;
+  /* Deliberately small.  A large min-width would put a floor under
+     the whole chart pane, which is exactly the negotiation the tab
+     bar was taken out of (see _configure_tabs). */
+  min-width: 60px;
+}
+
+QTabBar::tab:first {
+  border-left: 1px solid rgba(@SHADOW_RGB@, 0.12);
+}
+
+QTabBar::tab:hover:!selected {
+  background: rgba(@SHADOW_RGB@, 0.09);
+  color: palette(text);
+}
+
+QTabBar::tab:selected {
+  /* The selected tab is the window surface continuing upwards. */
+  background: palette(base);
+  color: palette(text);
+  font-weight: 500;
+}
+
+QTabBar::tab:only-one {
+  border-left: none;
+  border-right: none;
+}
+
+QTabBar::close-button {
+  subcontrol-position: right;
+  margin: 0 2px;
+}
+
+/* The scroll arrows that appear when the titles do not fit: Finder
+   shows them as bare chevrons on the strip, not as bezelled
+   buttons. */
+QTabBar QToolButton {
+  background: rgba(@SHADOW_RGB@, 0.05);
+  border: none;
+  border-left: 1px solid rgba(@SHADOW_RGB@, 0.12);
+}
+
+QTabBar QToolButton:hover {
+  background: rgba(@SHADOW_RGB@, 0.09);
+}
+/* -------------------------------
+   Activity rail (#activityRail)
+   A narrow icon sidebar has no native macOS widget to defer to,
+   so this gets explicit treatment: a faint tint to read as a
+   distinct chrome strip (like Mail/Finder sidebars), tool
+   buttons as borderless squares that pick up a soft rounded
+   highlight on hover, and a tinted accent capsule for the
+   active section — matching the translucent (not solid-fill)
+   selection look of macOS sidebar items.
+-------------------------------- */
+
+QFrame#activityRail {
+  background: rgba(@SHADOW_RGB@, 0.025);
+  border: none;
+  border-right: 1px solid rgba(@SHADOW_RGB@, 0.08);
+}
+
+QToolButton#activityButton {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+}
+
+QToolButton#activityButton:hover {
+  background: rgba(@SHADOW_RGB@, 0.06);
+}
+
+QToolButton#activityButton:checked {
+  background: rgba(@ACCENT_RGB@, 0.16);
+}
+
+QToolButton#activityButton:checked:hover {
+  background: rgba(@ACCENT_RGB@, 0.22);
+}
+
+QToolButton#activityButton::menu-indicator {
+  image: none;
+}
+
+/* -------------------------------
+   Chart navigation toolbar (#chartToolbar)
+   NavigationToolbar2QT is built by Matplotlib, not us — its
+   buttons, separators, and coordinate label come in as bare,
+   unstyled Qt controls (native bezel buttons, a grooved
+   separator line, plain label text). Tagged in chart_panel.py
+   so they can be flattened to match the rest of the app's
+   chrome: borderless icon buttons, translucent accent capsule
+   for the active Pan/Zoom tool (same recipe as the activity
+   rail), a hairline separator instead of a native groove, and
+   a muted caption-sized coordinate readout.
+-------------------------------- */
+
+QLabel#chartCoordLabel {
+  color: palette(mid);
+  font-size: 11pt;
+  padding: 0 6px;
+}
+
+/* -------------------------------
+   Properties split control
+   Each CollapsiblePanel reads as a single rounded card (same
+   language as ChartPanel/TableListPanel below), with a flat
+   disclosure-triangle header — like the Format inspector in
+   Pages/Keynote — instead of a bezeled push button. The toggle
+   button is set autoRaise=True in Python so macOS doesn't draw
+   its native button bezel/font over this; the rules below just
+   add the rounded-card chrome and hover feedback.
+-------------------------------- */
+
+QFrame#collapsiblePanel {
+  background: palette(base);
+  border: 1px solid rgba(@SHADOW_RGB@, 0.08);
+  border-radius: 10px;
+}
+
+QToolButton#panelToggleButton {
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-weight: 600;
+}
+
+QToolButton#panelToggleButton:hover {
+  background: rgba(@SHADOW_RGB@, 0.05);
+}
+
+QToolButton#panelToggleButton:pressed {
+  background: rgba(@SHADOW_RGB@, 0.09);
+}
+
+QWidget#panelBody {
+  background: transparent;
+}
+
+/* -------------------------------
+   The sidebar — Finder's, not a card.
+
+   This is the largest departure from the Windows sheet, and it is
+   deliberate.  Finder's sidebar is not a panel sitting inside the
+   window: it *is* the left edge of the window.  It has no border,
+   no corner radius and no card fill; it is a faintly recessed
+   surface separated from the content by a single hairline, and its
+   selection is a rounded capsule inset from both edges rather than
+   a full-bleed accent row.
+
+   Object-name rules, so they win over the QWidget[card="true"]
+   block above: the Python code builds these with the same
+   create_card_widget() helper as every other surface, and on
+   Windows a card is the right answer.
+-------------------------------- */
+
+QWidget#leftPanelCard,
+QWidget#dataPageCard,
+QFrame#leftPanelCard,
+QFrame#dataPageCard {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+
+QWidget#leftPanelCard {
+  /* Faintly recessed against the content, which is what makes the
+     sidebar read as a sidebar without drawing a box around it. */
+  background: rgba(@SHADOW_RGB@, 0.02);
+  /* The hairline that divides sidebar from content.  The splitter
+     handle sits on top of it and is transparent, so the line does
+     not double up while dragging. */
+  border-right: 1px solid rgba(@SHADOW_RGB@, 0.10);
+}
+
+/* Finder's divider is a hairline you aim at, not a visible bar. */
+QSplitter::handle {
+  background: transparent;
+}
+
+QSplitter::handle:horizontal {
+  width: 6px;
+}
+
+QSplitter::handle:vertical {
+  height: 6px;
+  /* The one divider that is drawn: between the file list and the
+     preview underneath it, as in a Finder column split. */
+  border-top: 1px solid rgba(@SHADOW_RGB@, 0.08);
+}
+
+/* -------------------------------
+   TableListPanel — the sidebar list
+
+   No frame, no grid, no alternating rows: a Finder sidebar is a
+   plain list on the sidebar surface.  Selection is the capsule.
+-------------------------------- */
+
+TableListPanel QTableView {
+  background: transparent;
+  color: palette(text);
+  border: none;
+  border-radius: 0;
+  gridline-color: transparent;
+  /* Finder's sidebar rows are taller than a data grid's. */
+  show-decoration-selected: 1;
+  /* The capsule below is the only thing that paints a selected row.  Left at
+     the default, the view fills the whole row rect with the highlight colour
+     and the capsule sits on top of it, so the 6px margin either side shows as
+     a second, darker blue. */
+  selection-background-color: transparent;
+  selection-color: palette(highlighted-text);
+}
+
+TableListPanel QTableView::item {
+  padding: 4px 8px;
+  border-radius: 6px;
+  margin: 1px 6px;
+}
+
+/* Subtle native-style hover: a faint wash, not an accent fill */
+TableListPanel QTableView::item:hover {
+  background: rgba(@SHADOW_RGB@, 0.05);
+}
+
+/* One colour across the whole row: every cell of the selected row gets the
+   same capsule, so the name column and the columns beside it read as one
+   selection rather than a light field inside a darker band. */
+TableListPanel QTableView::item:selected,
+TableListPanel QTableView::item:selected:active,
+TableListPanel QTableView::item:selected:!active {
+  background: palette(highlight);
+  color: palette(highlighted-text);
+}
+
+/* Finder's sidebar section captions: small, semibold, muted, and
+   *not* uppercase - "Favorites", not "FAVORITES". */
+TableListPanel QHeaderView::section {
+  background: transparent;
+  color: palette(mid);
+  font-size: 11pt;
+  font-weight: 600;
+  letter-spacing: 0;
+  padding: 4px 10px;
+  border: none;
+}
+
+/* -------------------------------
+   TablePreviewPanel — the file list
+
+   The content side of Finder: alternating rows, no vertical grid,
+   a flat header with hairline dividers that reads as a column
+   header rather than as a button strip.
+-------------------------------- */
+
+TablePreviewPanel QTableView {
+  background: palette(base);
+  alternate-background-color: rgba(@SHADOW_RGB@, 0.03);
+  color: palette(text);
+  border: none;
+  border-top: 1px solid rgba(@SHADOW_RGB@, 0.08);
+  border-radius: 0;
+  gridline-color: transparent;
+  /* Same fix as TableListPanel above, and for the same reason: left at the
+     default, Aqua paints the whole row rect with the highlight colour and
+     ::item:selected's background paints again on top of it, so a selected
+     row here read as a visibly different, two-tone blue next to
+     TableListPanel's flat one - the two tables looked selection-inconsistent
+     side by side even though both QSS blocks were "styled". */
+  selection-background-color: transparent;
+  selection-color: palette(highlighted-text);
+}
+
+TablePreviewPanel QTableView::item {
+  padding: 2px 8px;
+}
+
+TablePreviewPanel QTableView::item:hover {
+  background: rgba(@SHADOW_RGB@, 0.04);
+}
+
+TablePreviewPanel QTableView::item:selected {
+  background: palette(highlight);
+  color: palette(highlighted-text);
+}
+
+TablePreviewPanel QHeaderView::section {
+  background: palette(window);
+  color: palette(mid);
+  font-size: 11pt;
+  font-weight: 500;
+  letter-spacing: 0;
+  padding: 4px 8px;
+  border: none;
+  border-bottom: 1px solid rgba(@SHADOW_RGB@, 0.10);
+  border-right: 1px solid rgba(@SHADOW_RGB@, 0.06);
+}
+
+TablePreviewPanel QHeaderView::section:last {
+  border-right: none;
+}
+
+/* -------------------------------
+   Message boxes / dialogs
+   Same Qt-wide wrapping issue as Windows, not platform-specific
+-------------------------------- */
+
+QMessageBox QLabel {
+  min-width: 0px;
+  max-width: 360px;
+}
+
+/* -------------------------------
+   Log viewer
+   A log is columns, not prose: monospaced, not wrapped, and inset
+   in a card so the text does not run into the window edge.  The
+   fixed-width font is set in Python (the system fixed font differs
+   per platform); this only supplies the surface.
+-------------------------------- */
+
+QPlainTextEdit#logViewerText {
+  background: palette(base);
+  border: 1px solid rgba(@SHADOW_RGB@, 0.10);
+  border-radius: 8px;
+  padding: 6px 8px;
+  selection-background-color: palette(highlight);
+}
+
+/* -------------------------------
+   Chart notes pane
+   The report a series operation leaves under its chart.  A hairline
+   above it, and nothing else: it is part of the chart tab, not a
+   card floating inside one.
+-------------------------------- */
+
+HtmlResultsView#chartNotesView {
+  background: palette(base);
+  border: none;
+  border-top: 1px solid rgba(@SHADOW_RGB@, 0.10);
+}
+
+/* ==========================================================
+   Fluent 2 / macOS Command List
+   SeriesOperationWidget
+   ========================================================== */
+
+/* Command rows */
+
+QFrame#operationRow {
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+}
+
+/* Fluent hover */
+
+QFrame#operationRow:hover {
+    background: rgba(@SHADOW_RGB@, 0.045);
+}
+
+/* Pressed */
+
+QFrame#operationRow:pressed {
+    background: rgba(@SHADOW_RGB@, 0.08);
+}
+
+/* Keyboard focus */
+
+QFrame#operationRow:focus {
+    background: rgba(@ACCENT_RGB@, 0.05);
+    border-left: 3px solid palette(highlight);
+}
+
+/* ----------------------------------------------------------
+   Section headers
+   Styled once already, up in "Typography roles" (11pt,
+   palette(mid), same uppercase/letter-spacing treatment). This
+   block used to redeclare the selector at 9pt with a hardcoded
+   rgba() grey copied straight from fluent_win11.qss - a size no
+   other caption in this file uses, and a colour that doesn't
+   track the palette the way palette(mid) does. Removed rather
+   than "converted": the earlier rule already renders this label
+   correctly, so a second definition only risked drifting out of
+   sync with it again.
+   ---------------------------------------------------------- */
+
+/* ----------------------------------------------------------
+   Command title
+   HIG list rows keep the primary label at body size in the
+   normal text colour; only the selection state (below) gets an
+   accent tint. palette(highlight) here was copied from the
+   Windows sheet's identical block without updating it - Windows
+   uses palette(window-text) - so every row title rendered in the
+   accent blue, permanently, like a hyperlink. That is the "not
+   very macOS" look: fixed to plain text colour at the file's
+   13pt body size instead of the Fluent list's denser 10pt.
+   ---------------------------------------------------------- */
+
+QLabel[operationTitle="true"] {
+
+    font-size: 13pt;
+
+    font-weight: 600;
+
+    color: palette(text);
+
+    background: transparent;
+}
+
+/* ----------------------------------------------------------
+   Description
+   Same copy-paste issue as the title: a hardcoded rgba() grey
+   and a 9pt size, instead of the palette(mid) + 11pt caption
+   convention every other secondary label in this file uses.
+   ---------------------------------------------------------- */
+
+QLabel[operationDescription="true"] {
+
+    background: transparent;
+
+    color: palette(mid);
+
+    font-size: 11pt;
+}
+
+/* ----------------------------------------------------------
+   Operation Icon
+   ---------------------------------------------------------- */
+
+QLabel#operationIcon {
+
+    min-width: 20px;
+    max-width: 20px;
+
+    min-height: 20px;
+    max-height: 20px;
+
+    background: transparent;
+}
+
+/* ----------------------------------------------------------
+   Compact row variant
+   ---------------------------------------------------------- */
+
+QFrame#operationRow[compact="true"] {
+
+    border-radius: 6px;
+}
+
+/* ----------------------------------------------------------
+   Selected operation
+   ---------------------------------------------------------- */
+
+QFrame#operationRow[selected="true"] {
+
+    background: rgba(@ACCENT_RGB@, 0.08);
+
+    border-left: 3px solid palette(highlight);
+}
+`

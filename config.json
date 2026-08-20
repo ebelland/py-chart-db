@@ -1,0 +1,856 @@
+{
+  "actions": {
+    "add": {
+      "icon": "add",
+      "text": "Add",
+      "description": "Add an item",
+      "SFSymbol": "plus",
+      "SegoeFluent": "E710"
+    },
+    "add_series": {
+      "icon": "add",
+      "text": "Add series",
+      "description": "Add a series to the selected axis",
+      "SFSymbol": "plus.circle",
+      "SegoeFluent": "E710"
+    },
+    "apply": {
+      "icon": "",
+      "text": "OK",
+      "description": "Apply the changes",
+      "SFSymbol": "",
+      "SegoeFluent": ""
+    },
+    "clear": {
+      "icon": "clear",
+      "text": "Clear",
+      "description": "Clear the content",
+      "SFSymbol": "xmark.circle",
+      "SegoeFluent": "E894"
+    },
+    "close": {
+      "icon": "",
+      "text": "Cancel",
+      "description": "Close the current window",
+      "shortcut": "Ctrl+W",
+      "SFSymbol": "",
+      "SegoeFluent": ""
+    },
+    "copy": {
+      "icon": "copy",
+      "text": "Copy",
+      "description": "Copy to the clipboard",
+      "shortcut": "Ctrl+C",
+      "SFSymbol": "doc.on.doc",
+      "SegoeFluent": "E8C8"
+    },
+    "delete": {
+      "icon": "delete",
+      "text": "Delete",
+      "description": "Delete the selection",
+      "SFSymbol": "trash",
+      "SegoeFluent": "E74D"
+    },
+    "down": {
+      "icon": "down",
+      "text": "Down",
+      "description": "Down",
+      "SFSymbol": "chevron.down",
+      "SegoeFluent": "e70d"
+    },
+    "edit": {
+      "icon": "edit",
+      "text": "Edit",
+      "description": "Edit",
+      "shortcut": "Ctrl+X",
+      "SFSymbol": "pencil",
+      "SegoeFluent": "E70F"
+    },
+    "export_csv": {
+      "icon": "csv",
+      "text": "Export CSV",
+      "description": "Export as a CSV file",
+      "SFSymbol": "tablecells",
+      "SegoeFluent": "E8EC"
+    },
+    "export_xlsx": {
+      "icon": "excel",
+      "text": "Export Excel",
+      "description": "Export as an Excel workbook",
+      "SFSymbol": "tablecells.badge.ellipsis",
+      "SegoeFluent": "E8EC"
+    },
+    "import": {
+      "icon": "import",
+      "text": "Import",
+      "description": "Import data into the database",
+      "SFSymbol": "square.and.arrow.down",
+      "SegoeFluent": "E8B5"
+    },
+    "infer_params": {
+      "icon": "preview",
+      "text": "Infer from expr",
+      "description": "Detect the parameter count from the expression",
+      "SFSymbol": "wand.and.stars",
+      "SegoeFluent": "e721"
+    },
+    "info": {
+      "icon": "info",
+      "text": "Info",
+      "description": "Show details",
+      "SFSymbol": "info.circle",
+      "SegoeFluent": "E946"
+    },
+    "insert": {
+      "icon": "add",
+      "text": "Insert",
+      "description": "Insert at the cursor",
+      "SFSymbol": "plus",
+      "SegoeFluent": "e710"
+    },
+    "log_viewer": {
+      "icon": "log",
+      "text": "Log viewer",
+      "description": "Open the application log viewer",
+      "SFSymbol": "doc.text.magnifyingglass",
+      "SegoeFluent": "F000"
+    },
+    "multi_peak": {
+      "icon": "add",
+      "text": "Multi-peak...",
+      "description": "Build a multi-peak expression",
+      "SFSymbol": "chart.xyaxis.line",
+      "SegoeFluent": "e710"
+    },
+    "nav_chart_options": {
+      "icon": "options",
+      "text": "Chart Options",
+      "description": "Show chart options",
+      "SFSymbol": "gearshape",
+      "SegoeFluent": "E713"
+    },
+    "nav_data": {
+      "icon": "data",
+      "text": "Data",
+      "description": "Show data tables",
+      "SFSymbol": "table",
+      "SegoeFluent": "f232"
+    },
+    "nav_menu": {
+      "icon": "menu",
+      "text": "Menu",
+      "description": "Show main menu",
+      "SFSymbol": "line.horizontal.3",
+      "SegoeFluent": "e700"
+    },
+    "nav_series_operations": {
+      "icon": "",
+      "text": "Series Operations",
+      "description": "Show series operations",
+      "SFSymbol": "",
+      "SegoeFluent": ""
+    },
+    "new": {
+      "icon": "new",
+      "text": "New",
+      "description": "Create a new database",
+      "shortcut": "Ctrl+N",
+      "SFSymbol": "doc.badge.plus",
+      "SegoeFluent": "e8a5"
+    },
+    "new_plot": {
+      "icon": "",
+      "text": "Plot",
+      "description": "Create a new plot tab",
+      "SFSymbol": "",
+      "SegoeFluent": ""
+    },
+    "open": {
+      "icon": "open",
+      "text": "Open",
+      "description": "Open a database",
+      "shortcut": "Ctrl+O",
+      "SFSymbol": "folder",
+      "SegoeFluent": "E8E5"
+    },
+    "optimize_db": {
+      "icon": "optimize",
+      "text": "Optimize DB",
+      "description": "Check the database, report problems, and compact it",
+      "SFSymbol": "wrench.and.screwdriver",
+      "SegoeFluent": "EA99"
+    },
+    "settings": {
+      "icon": "settings",
+      "text": "Settings",
+      "description": "Open the application settings",
+      "SFSymbol": "gearshape",
+      "SegoeFluent": "E713"
+    },
+    "paste": {
+      "icon": "paste",
+      "text": "Paste",
+      "description": "Paste from the clipboard",
+      "shortcut": "Ctrl+V",
+      "SFSymbol": "doc.on.clipboard",
+      "SegoeFluent": "E77F"
+    },
+    "preview": {
+      "icon": "preview",
+      "text": "Preview",
+      "description": "Preview the result",
+      "SFSymbol": "eye",
+      "SegoeFluent": "E890"
+    },
+    "query_builder": {
+      "icon": "query",
+      "text": "Query Builder",
+      "description": "Write, validate and save SQL queries",
+      "SFSymbol": "text.magnifyingglass",
+      "SegoeFluent": "F003"
+    },
+    "rcparam_add": {
+      "icon": "add",
+      "text": "Add",
+      "description": "Insert the selected rcParam into the editor",
+      "SFSymbol": "plus",
+      "SegoeFluent": "E710"
+    },
+    "rcparam_delete": {
+      "icon": "delete",
+      "text": "Remove",
+      "description": "Remove the selected property",
+      "SFSymbol": "trash",
+      "SegoeFluent": "E74D"
+    },
+    "rcparam_open": {
+      "icon": "open",
+      "text": "Open",
+      "description": "Load a .mplstyle file into the editor",
+      "SFSymbol": "folder",
+      "SegoeFluent": "E8E5"
+    },
+    "rcparam_reset": {
+      "icon": "reload",
+      "text": "Reset",
+      "description": "Reset the selected property to the Matplotlib default",
+      "SFSymbol": "arrow.clockwise",
+      "SegoeFluent": "E72C"
+    },
+    "rcparam_save": {
+      "icon": "save",
+      "text": "Save",
+      "description": "Save the overrides as a .mplstyle file",
+      "SFSymbol": "square.and.arrow.down",
+      "SegoeFluent": "E74E"
+    },
+    "reload": {
+      "icon": "redo",
+      "text": "Reload",
+      "description": "Reload from the source",
+      "SFSymbol": "arrow.clockwise",
+      "SegoeFluent": "E72C"
+    },
+    "rename": {
+      "icon": "rename",
+      "text": "Rename",
+      "description": "Rename the selection",
+      "SFSymbol": "pencil",
+      "SegoeFluent": "E70F"
+    },
+    "run": {
+      "icon": "",
+      "text": "Run",
+      "description": "Run the query",
+      "shortcut": "Ctrl+R",
+      "SFSymbol": "play.circle",
+      "SegoeFluent": "e768"
+    },
+    "run_fit": {
+      "icon": "fit",
+      "text": "Fit",
+      "description": "Optimise the parameters and preview the result",
+      "SFSymbol": "function",
+      "SegoeFluent": "e9d9"
+    },
+    "save": {
+      "icon": "save",
+      "text": "Save",
+      "description": "Save to a file",
+      "SFSymbol": "square.and.arrow.down",
+      "SegoeFluent": "E74E"
+    },
+    "select_all": {
+      "icon": "select_all",
+      "text": "Select all",
+      "description": "Select all items",
+      "shortcut": "Ctrl+A",
+      "SFSymbol": "checkmark",
+      "SegoeFluent": "e73e"
+    },
+    "sql_filter": {
+      "icon": "options",
+      "text": "Filter",
+      "description": "WHERE with the comparisons spelled out",
+      "SFSymbol": "line.3.horizontal.decrease.circle",
+      "SegoeFluent": "E71C"
+    },
+    "sql_join": {
+      "icon": "link",
+      "text": "Join",
+      "description": "LEFT JOIN keeping every row of the chosen table",
+      "SFSymbol": "link",
+      "SegoeFluent": "E71B"
+    },
+    "sql_order": {
+      "icon": "down",
+      "text": "Order",
+      "description": "ORDER BY with an explicit direction",
+      "SFSymbol": "arrow.up.arrow.down",
+      "SegoeFluent": "E8CB"
+    },
+    "sql_select": {
+      "icon": "query",
+      "text": "Select",
+      "description": "SELECT over the chosen table",
+      "SFSymbol": "line.3.horizontal.decrease",
+      "SegoeFluent": "E71C"
+    },
+    "sql_summary": {
+      "icon": "sum",
+      "text": "Summary",
+      "description": "Count, average, min and max, grouped by a column",
+      "SFSymbol": "sum",
+      "SegoeFluent": "E9D9"
+    },
+    "sql_union": {
+      "icon": "sum",
+      "text": "Union",
+      "description": "UNION ALL of two tables with the same columns",
+      "SFSymbol": "arrow.triangle.merge",
+      "SegoeFluent": "E8F1"
+    },
+    "up": {
+      "icon": "",
+      "text": "Up",
+      "description": "Up",
+      "SFSymbol": "chevron.up",
+      "SegoeFluent": "e70e"
+    },
+    "zoom_fit": {
+      "icon": "zoom_fit",
+      "text": "Zoom to fit",
+      "description": "Fit the whole chart in the panel",
+      "SFSymbol": "arrow.up.left.and.arrow.down.right",
+      "SegoeFluent": "E9A6"
+    }
+  },
+  "messages": {
+    "chart.confirm_delete": {
+      "level": "question",
+      "title": "Delete chart",
+      "text": "Delete this chart?"
+    },
+    "chart.no_series": {
+      "level": "warning",
+      "title": "Series",
+      "text": "Add at least one series before applying."
+    },
+    "chart.renderer_not_found": {
+      "level": "warning",
+      "title": "Series",
+      "text": "Series '{series}': the renderer could not be loaded."
+    },
+    "chart.role_missing": {
+      "level": "warning",
+      "title": "Roles",
+      "text": "Series '{series}': select the required role '{role}'."
+    },
+    "chart.save_failed": {
+      "level": "warning",
+      "title": "Save failed",
+      "text": "Could not save the chart."
+    },
+    "chart.series_empty_sql": {
+      "level": "warning",
+      "title": "Series",
+      "text": "Series '{series}' has no SQL."
+    },
+    "database.check_found_problems": {
+      "level": "warning",
+      "title": "Database check",
+      "text": "{report}"
+    },
+    "database.create_failed": {
+      "level": "error",
+      "title": "New database",
+      "text": "Could not create the database:\n{error}"
+    },
+    "database.open_failed": {
+      "level": "error",
+      "title": "Open database",
+      "text": "Could not open the database:\n{error}"
+    },
+    "import.clipboard_empty": {
+      "level": "info",
+      "title": "Clipboard",
+      "text": "Clipboard is empty or not tabular text."
+    },
+    "import.clipboard_failed": {
+      "level": "error",
+      "title": "Clipboard",
+      "text": "Could not read the clipboard:\n{error}"
+    },
+    "import.failed": {
+      "level": "error",
+      "title": "Import",
+      "text": "Import failed:\n{error}"
+    },
+    "import.no_columns_selected": {
+      "level": "warning",
+      "title": "Import",
+      "text": "All columns are empty or set to Ignore."
+    },
+    "import.no_table_name": {
+      "level": "warning",
+      "title": "Import",
+      "text": "Please enter a table name."
+    },
+    "import.nothing_to_import": {
+      "level": "info",
+      "title": "Import",
+      "text": "Nothing to import."
+    },
+    "import.preview_failed": {
+      "level": "error",
+      "title": "Preview",
+      "text": "Could not build the preview:\n{error}"
+    },
+    "preview.add_column_failed": {
+      "level": "error",
+      "title": "Add computed column failed",
+      "text": "{error}"
+    },
+    "preview.confirm_delete_column": {
+      "level": "question",
+      "title": "Delete column",
+      "text": "Delete the column '{column}'? This cannot be undone."
+    },
+    "preview.delete_column_failed": {
+      "level": "error",
+      "title": "Delete column failed",
+      "text": "{error}"
+    },
+    "preview.hide_rows_failed": {
+      "level": "error",
+      "title": "Hide rows failed",
+      "text": "{error}"
+    },
+    "preview.rows_hidden": {
+      "level": "info",
+      "title": "Hide rows",
+      "text": "{count} rows are now hidden."
+    },
+    "query.confirm_delete": {
+      "level": "question",
+      "title": "Delete query",
+      "text": "Delete the saved query '{name}'?\n\nCharts built on it will stop finding their data."
+    },
+    "query.confirm_overwrite": {
+      "level": "question",
+      "title": "Save query",
+      "text": "A query named '{name}' already exists. Replace it?"
+    },
+    "query.invalid": {
+      "level": "warning",
+      "title": "Query Builder",
+      "text": "The query is not valid and was not saved:\n\n{error}"
+    },
+    "query.name_is_a_table": {
+      "level": "warning",
+      "title": "Query Builder",
+      "text": "'{name}' is already a table name.\n\nA query with that name could never be selected, because a table of the same name always wins."
+    },
+    "query.needs_a_name": {
+      "level": "warning",
+      "title": "Query Builder",
+      "text": "A query needs a name."
+    },
+    "query.save_failed": {
+      "level": "error",
+      "title": "Query Builder",
+      "text": "Could not save the query:\n{error}"
+    },
+    "series.estimate_failed": {
+      "level": "warning",
+      "title": "Series operation",
+      "text": "{series}: {error}"
+    },
+    "series.needs_two_series": {
+      "level": "info",
+      "title": "Series operation",
+      "text": "{method} needs two series.\n\nSelect the reference series first, then the one to compare it with."
+    },
+    "series.no_axis_selected": {
+      "level": "info",
+      "title": "Series operation",
+      "text": "No axis selected."
+    },
+    "series.no_expression_parameters": {
+      "level": "info",
+      "title": "Infer",
+      "text": "No p[i] parameters found in expression."
+    },
+    "series.no_fit_results": {
+      "level": "info",
+      "title": "No fit results",
+      "text": "Run Fit first, then use this button to update the initial parameters."
+    },
+    "series.no_parameters": {
+      "level": "info",
+      "title": "No parameters",
+      "text": "The latest fit has no parameters to copy."
+    },
+    "series.no_series_selected": {
+      "level": "info",
+      "title": "Series operation",
+      "text": "No series selected."
+    },
+    "series.open_docs_failed": {
+      "level": "info",
+      "title": "Documentation",
+      "text": "Could not open a browser. The documentation is at:\n{url}"
+    },
+    "series.outliers_need_a_table": {
+      "level": "warning",
+      "title": "Series operation",
+      "text": "Outlier detection needs a table, and these series read from a saved query:\n\n{series}\n\nHiding an outlier marks a row in the source table, which a query result does not have. Import the query result as a table first."
+    },
+    "series.preview_failed": {
+      "level": "error",
+      "title": "Preview failed",
+      "text": "{error}"
+    },
+    "series.roles_missing": {
+      "level": "warning",
+      "title": "Series operation",
+      "text": "This operation needs both an x and a y role.\n\nThese series cannot be processed:\n\n{series}\n\nSet the missing roles in Series properties, then try again."
+    },
+    "series.some_failed": {
+      "level": "warning",
+      "title": "Series operation",
+      "text": "Some series could not be processed:\n\n{errors}"
+    },
+    "style.apply_callback_failed": {
+      "level": "warning",
+      "title": "Apply",
+      "text": "The apply callback failed:\n{error}"
+    },
+    "style.apply_failed": {
+      "level": "warning",
+      "title": "Apply",
+      "text": "Could not build the temporary style:\n{error}"
+    },
+    "style.invalid_entries": {
+      "level": "warning",
+      "title": "Invalid entries",
+      "text": "{entries} invalid row(s) will be skipped."
+    },
+    "style.load_failed": {
+      "level": "error",
+      "title": "Load error",
+      "text": "Could not load the style:\n{error}"
+    },
+    "style.no_property_selected": {
+      "level": "info",
+      "title": "Reset",
+      "text": "Select a property first."
+    },
+    "style.preview_failed": {
+      "level": "error",
+      "title": "Preview error",
+      "text": "Could not render the preview:\n{error}"
+    },
+    "style.save_failed": {
+      "level": "error",
+      "title": "Save error",
+      "text": "Could not save the style:\n{error}"
+    },
+    "style.stack_empty": {
+      "level": "info",
+      "title": "Style stack",
+      "text": "The style stack is empty."
+    },
+    "style.stack_failed": {
+      "level": "error",
+      "title": "Style stack",
+      "text": "Could not compute the stacked parameters:\n{error}"
+    },
+    "table.confirm_delete": {
+      "level": "question",
+      "title": "Delete table",
+      "text": "Delete the table '{table}'?"
+    },
+    "table.confirm_delete_many": {
+      "level": "question",
+      "title": "Delete tables",
+      "text": "Delete {count} selected tables?\n\n{tables}"
+    },
+    "series.confirm_delete": {
+      "level": "question",
+      "title": "Delete series",
+      "text": "Delete the series '{series}'?"
+    },
+    "axis.confirm_delete": {
+      "level": "question",
+      "title": "Delete axis",
+      "text": "Delete the axis '{axis}'?"
+    }
+  },
+  "chart_panel": {
+    "resize_mode": "FIT_PROPORTIONAL",
+    "initial_zoom_percent": 60,
+    "background_color": "#ffffff",
+    "figure_width_cm": 16.26,
+    "figure_height_cm": 12.19,
+    "figure_dpi": 75.0
+  },
+  "last_database": "/Users/ebelland/Desktop/py-chart-db/Demo Project.dhub",
+  "window_geometry": {
+    "main_window": {
+      "x": 424,
+      "y": 139,
+      "width": 1196,
+      "height": 882,
+      "maximized": false
+    },
+    "SeriesInterpolateDialog": {
+      "x": 449,
+      "y": 287,
+      "width": 731,
+      "height": 640,
+      "maximized": false
+    },
+    "SeriesClusterDialog": {
+      "x": 434,
+      "y": 329,
+      "width": 760,
+      "height": 680,
+      "maximized": false
+    },
+    "SeriesSmoothingDialog": {
+      "x": 449,
+      "y": 226,
+      "width": 731,
+      "height": 640,
+      "maximized": false
+    },
+    "SeriesStatisticsDialog": {
+      "x": 821,
+      "y": 206,
+      "width": 1060,
+      "height": 720,
+      "maximized": false
+    },
+    "SeriesFitDialog": {
+      "x": 624,
+      "y": 231,
+      "width": 882,
+      "height": 632,
+      "maximized": false
+    },
+    "log_viewer": {
+      "x": 563,
+      "y": 201,
+      "width": 900,
+      "height": 640,
+      "maximized": false
+    },
+    "SeriesSpectralDialog": {
+      "x": 651,
+      "y": 256,
+      "width": 900,
+      "height": 680,
+      "maximized": false
+    }
+  },
+  "main_window_splitters": {
+    "main": [
+      370,
+      820
+    ],
+    "data_page": [
+      282,
+      566
+    ]
+  },
+  "dialog_state": {
+    "SeriesInterpolateDialog": {
+      "model_combo": "SciPy Akima",
+      "degree_spin": 2,
+      "points_spin": 600,
+      "spacing_combo": "linspace",
+      "range_edit": "",
+      "integer_step_spin": 1.0,
+      "custom_x_edit": "",
+      "extend_spin": 0.0,
+      "extrap_check": true,
+      "spline_type_combo": "UnivariateSpline",
+      "spline_degree_spin": 3,
+      "cubic_bc_combo": "not-a-knot",
+      "smoothing_spin": 0.0,
+      "guess_check": true,
+      "params_edit": "{}",
+      "preview_button": false,
+      "copy_html_button": false,
+      "apply_button": false,
+      "close_button": false
+    },
+    "SeriesClusterDialog": {
+      "model_combo": "",
+      "cluster_count_spin": 4,
+      "whiten_check": true,
+      "kmeans_iter_spin": 50,
+      "kmeans_thresh_spin": 0.0,
+      "max_runtime_spin": 15.0,
+      "linkage_method_combo": "ward",
+      "metric_combo": "euclidean",
+      "hierarchy_criterion_combo": "maxclust",
+      "distance_threshold_spin": 0.0,
+      "sklearn_eps_spin": 0.5,
+      "sklearn_min_samples_spin": 5,
+      "method_combo": "K-means / vector quantization",
+      "scipy_tool_combo": "vq.whiten + kmeans2",
+      "feature_combo": "X and Y",
+      "render_mode_combo": "Single series colored by ClusterId",
+      "preview_button": false,
+      "copy_html_button": false,
+      "apply_button": false,
+      "close_button": false
+    },
+    "SeriesSmoothingDialog": {
+      "model_combo": "",
+      "window_spin": 7,
+      "centered_check": true,
+      "polyorder_spin": 2,
+      "deriv_spin": 0,
+      "delta_spin": 1.0,
+      "sigma_spin": 2.0,
+      "sigma_x_spin": 1.5,
+      "sigma_y_spin": 1.5,
+      "sigma_z_spin": 1.5,
+      "truncate_spin": 4.0,
+      "kernel_spin": 5,
+      "kernel_x_spin": 3,
+      "kernel_y_spin": 3,
+      "kernel_z_spin": 3,
+      "noise_spin": 0.0,
+      "spline_s_spin": 10.0,
+      "spline_k_spin": 3,
+      "kx_spin": 3,
+      "ky_spin": 3,
+      "lowess_frac_spin": 0.25,
+      "lowess_it_spin": 3,
+      "fft_cutoff_spin": 0.2,
+      "butter_fs_spin": 1.0,
+      "butter_cutoff_spin": 0.2,
+      "butter_high_cutoff_spin": 0.4,
+      "butter_order_spin": 4,
+      "butter_type_combo": "lowpass",
+      "mode_combo": "nearest",
+      "savgol_mode_combo": "interp",
+      "wavelet_combo": "db2",
+      "wavelet_level_spin": 0,
+      "wavelet_threshold_factor_spin": 1.0,
+      "wavelet_threshold_mode_combo": "soft",
+      "whittaker_lambda_spin": 1000.0,
+      "whittaker_order_spin": 2,
+      "hp_lambda_spin": 1600.0,
+      "tv_weight_spin": 0.15,
+      "kalman_process_variance_spin": 0.0,
+      "kalman_measurement_variance_spin": 0.01,
+      "kalman_initial_covariance_spin": 1.0,
+      "rbf_kernel_combo": "thin_plate_spline",
+      "rbf_smoothing_spin": 0.1,
+      "rbf_epsilon_spin": 0.0,
+      "rbf_neighbors_spin": 0,
+      "preview_check": true,
+      "dimension_combo": "1D series",
+      "method_combo": "Moving Average",
+      "preview_button": false,
+      "copy_html_button": false,
+      "apply_button": false,
+      "close_button": false
+    },
+    "SeriesStatisticsDialog": {
+      "model_combo": "Descriptive statistics",
+      "create_chart_check": true,
+      "chart_type_combo": "Histogram",
+      "distribution_combo": "None",
+      "rank_combo": "AIC (penalises free parameters)",
+      "exhaustive_check": false,
+      "popmean_spin": 0.0,
+      "alternative_combo": "Two-sided",
+      "trim_percent_spin": 10,
+      "anderson_method_combo": "Anderson p-value: interpolated",
+      "monte_carlo_resamples_spin": 9999,
+      "monte_carlo_batch_spin": 0,
+      "preview_button": false,
+      "copy_html_button": false,
+      "apply_button": false,
+      "close_button": false
+    },
+    "SeriesFitDialog": {
+      "model_combo": "",
+      "model_search": "",
+      "multi_family_combo": "Gaussian",
+      "multi_count_spin": 2,
+      "multi_tie_width": false,
+      "multi_tie_eta": false,
+      "multi_apply_btn": false,
+      "spin_params": 4,
+      "output_table_edit": "_Fit_Selected_series_y_Linear",
+      "max_nfev_edit": "8000",
+      "weighted_check": false,
+      "btn_use_fit_params": false,
+      "spin_degree": 4,
+      "spin_knots": 5,
+      "combo_knot_spacing": "Quantiles",
+      "preview_button": false,
+      "fit_button": false,
+      "copy_html_button": false,
+      "apply_button": false,
+      "close_button": false
+    },
+    "SeriesSpectralDialog": {
+      "model_combo": "Power spectral density (Welch)",
+      "fs_auto_check": true,
+      "fs_spin": 1.0,
+      "nperseg_spin": 256,
+      "overlap_spin": 0.5,
+      "window_combo": "hann",
+      "detrend_combo": "constant",
+      "scaling_combo": "density",
+      "onesided_check": true,
+      "db_check": false,
+      "maxlags_spin": 0,
+      "sigma_spin": 0.0,
+      "wavelet_w0_spin": 6.0,
+      "wavelet_scales_spin": 64,
+      "corr_norm_combo": "unbiased",
+      "preview_button": false,
+      "copy_html_button": false,
+      "apply_button": false,
+      "close_button": false
+    }
+  },
+  "import_data_dialog": {
+    "table": "Book1",
+    "header": true,
+    "skip_rows": 0,
+    "skip_last": 0,
+    "delim": "",
+    "encoding": "auto",
+    "sheet": "Sheet1"
+  }
+}

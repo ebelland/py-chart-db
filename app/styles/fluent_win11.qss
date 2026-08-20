@@ -1,0 +1,1126 @@
+/* ==========================================================
+   Fluent Win11 – Data Hub (SYSTEM PALETTE VERSION)
+   Patched: SpinBox, item hover contrast, message box width
+   ========================================================== */
+
+
+/* ==========================================================
+   Global Base
+   ========================================================== */
+
+* {
+    font-family: "Segoe UI Variable", "Segoe UI", "Inter", "Arial", sans-serif;
+    font-size: 10pt;
+    outline: none;
+}
+
+QWidget {
+    background: palette(window);
+    color: palette(window-text);
+    selection-background-color: palette(highlight);
+    selection-color: palette(highlighted-text);
+}
+
+QWidget:disabled {
+    color: rgba(@NEUTRAL_RGB@, 0.70);
+}
+
+
+/* ==========================================================
+   Fluent Surfaces / Cards / Acrylic
+   ========================================================== */
+
+QFrame,
+QGroupBox {
+    background: transparent;
+}
+
+/* Standard card surface */
+QFrame#Card,
+QFrame#card,
+QWidget#Card,
+QWidget#card,
+QFrame#ChartPanel {
+    background: palette(base);
+    border: 1px solid rgba(@SHADOW_RGB@, 0.07);
+    border-radius: 12px;
+}
+
+/* Elevated card surface */
+QFrame[elevated="true"],
+QWidget[elevated="true"] {
+    background: palette(base);
+    border: 1px solid rgba(@SHADOW_RGB@, 0.08);
+    border-radius: 14px;
+}
+
+/* Acrylic-style panels.
+   For best effect, enable translucent background in Python. */
+QFrame#acrylicPanel,
+QWidget#acrylicPanel,
+QFrame[acrylic="true"],
+QWidget[acrylic="true"] {
+    background: rgba(@GLOW_RGB@, 0.72);
+    border: 1px solid rgba(@GLOW_RGB@, 0.42);
+    border-radius: 14px;
+}
+
+/* Dark acrylic variant */
+QFrame[acrylicDark="true"],
+QWidget[acrylicDark="true"] {
+    background: rgba(32, 32, 32, 0.68);
+    /* Literal white, not @GLOW_RGB@: this panel is dark in every theme, so
+       its own overlays must not follow the theme's light/dark direction. */
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 14px;
+    color: rgba(255, 255, 255, 0.92);
+}
+
+/* Sidebar acrylic */
+QFrame#activityRail,
+QFrame#sideBar,
+QWidget#sideBar,
+
+
+/* Transparent main containers */
+QWidget#centralWidget,
+QWidget#contentView,
+QFrame#contentView,
+QFrame#collapsiblePanel,
+QFrame#CollapsiblePanel,
+QWidget#panelBody {
+    background: transparent;
+    border: none;
+}
+
+
+/* ==========================================================
+   Labels / Typography
+   ========================================================== */
+
+QLabel {
+    background: transparent;
+    color: palette(window-text);
+}
+
+QLabel[role="title"] {
+    font-size: 20px;
+    font-weight: 600;
+}
+
+QLabel[role="subtitle"] {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+QLabel[role="caption"] {
+    font-size: 9pt;
+    color: rgba(@NEUTRAL_RGB@, 0.95);
+}
+
+QLabel[muted="true"] {
+    color: rgba(@NEUTRAL_RGB@, 0.95);
+}
+
+
+/* ==========================================================
+   Fluent Icon Styling
+   ========================================================== */
+
+/* General icon labels */
+QLabel[icon="true"],
+QLabel[fluentIcon="true"] {
+    background: transparent;
+    color: palette(window-text);
+    min-width: 20px;
+    min-height: 20px;
+    qproperty-alignment: AlignCenter;
+}
+
+/* Icon-only buttons */
+QPushButton[iconOnly="true"],
+QToolButton[iconOnly="true"],
+QAbstractButton[iconOnly="true"] {
+    min-width: 32px;
+    min-height: 32px;
+    max-width: 32px;
+    max-height: 32px;
+    padding: 0;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    icon-size: 20px;
+}
+
+QPushButton[iconOnly="true"]:hover,
+QToolButton[iconOnly="true"]:hover,
+QAbstractButton[iconOnly="true"]:hover {
+    background: rgba(@SHADOW_RGB@, 0.045);
+    border: 1px solid rgba(@SHADOW_RGB@, 0.04);
+}
+
+QPushButton[iconOnly="true"]:pressed,
+QToolButton[iconOnly="true"]:pressed,
+QAbstractButton[iconOnly="true"]:pressed {
+    background: rgba(@SHADOW_RGB@, 0.085);
+}
+
+QPushButton[iconOnly="true"]:checked,
+QToolButton[iconOnly="true"]:checked,
+QAbstractButton[iconOnly="true"]:checked {
+    background: rgba(@ACCENT_RGB@, 0.12);
+    color: palette(highlight);
+}
+
+/* Accent icon buttons */
+QToolButton[accent="true"],
+QPushButton[accent="true"] {
+    color: palette(highlight);
+}
+
+/* Remove menu indicator from icon buttons */
+QToolButton::menu-indicator {
+    image: none;
+    width: 0;
+}
+/* ==========================================================
+   Fluent Command Bar
+   ========================================================== */
+
+QToolBar {
+    spacing: 4px;
+    padding: 4px;
+    border: none;
+}
+
+QToolBar::separator {
+    width: 1px;
+    background: rgba(@SHADOW_RGB@,0.06);
+    margin: 6px 8px;
+}
+
+QToolButton {
+    min-width: 36px;
+    min-height: 36px;
+
+    padding: 0 8px;
+
+    border-radius: 8px;
+    border: 1px solid transparent;
+
+    color: palette(window-text);
+
+    icon-size: 20px;
+}
+
+QToolButton:hover {
+    background: rgba(@SHADOW_RGB@,0.045);
+}
+
+QToolButton:pressed {
+    background: rgba(@SHADOW_RGB@,0.08);
+}
+
+QToolButton:checked {
+    background: rgba(@ACCENT_RGB@,0.12);
+    color: palette(highlight);
+}
+
+QToolButton::menu-indicator {
+    image: none;
+}
+
+/* -------------------------------
+   Menus
+-------------------------------- */
+
+QMenu {
+  background: palette(base);
+  border: 1px solid rgba(@SHADOW_RGB@, 0.12);
+  border-radius: 8px;
+  padding: 6px;
+}
+
+QMenu::item {
+  padding: 6px 16px;
+  border-radius: 6px;
+}
+
+QMenu::item:selected {
+  background: palette(highlight);
+  color: palette(highlighted-text);
+}
+
+QMenu::separator {
+  height: 1px;
+  background: rgba(@SHADOW_RGB@, 0.08);
+  margin: 6px 0;
+}
+
+/* ==========================================================
+   Tabs
+   ========================================================== */
+/* ==========================================================
+   Fluent 2 TabList
+   Based on Microsoft Fluent 2 TabList behavior:
+   - transparent tab surface
+   - subtle hover
+   - selected tab uses accent underline, not blue fill
+   - compact but readable 36px touch target
+   ========================================================== */
+
+QTabWidget::pane {
+    border: none;
+    background: transparent;
+    margin: 0;
+    padding: 0;
+}
+
+QTabWidget {
+    background: transparent;
+}
+
+QTabBar {
+    background: transparent;
+    border: none;
+}
+
+/* Base tab */
+QTabBar::tab {
+    background: transparent;
+
+    min-height: 36px;
+
+    padding: 0 16px;
+    margin-right: 2px;
+
+    border: single transparent;
+    border-bottom: 3px solid transparent;
+
+    /*color: palette(window-text);*/
+
+    font-weight: 400;
+}
+QTabBar QToolButton {
+    min-width: 5px;
+    min-height: 5px;
+    /*background: #3c3c3c;*/
+}
+/* Hover state */
+QTabBar::tab:hover {
+    background: rgba(@SHADOW_RGB@, 0.045);
+
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+
+    color: palette(window-text);
+}
+
+/* Selected tab */
+QTabBar::tab:selected {
+    background: transparent;
+
+    color: palette(window-text);
+
+    font-weight: 600;
+
+    border-bottom: 3px solid palette(highlight);
+}
+
+/* Selected hover */
+QTabBar::tab:selected:hover {
+    background: rgba(@SHADOW_RGB@, 0.035);
+
+    border-bottom: 3px solid palette(highlight);
+
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+}
+
+/* Pressed */
+QTabBar::tab:pressed {
+    background: rgba(@SHADOW_RGB@, 0.075);
+}
+
+/* Disabled */
+QTabBar::tab:disabled {
+    color: rgba(@NEUTRAL_RGB@, 0.65);
+    background: transparent;
+    border-bottom: 3px solid transparent;
+}
+
+/* Focus approximation.
+   Qt QSS cannot draw Fluent's true keyboard focus outline cleanly
+   around tab text, so this uses a stronger underline. */
+QTabBar::tab:focus {
+    border-bottom: 3px solid palette(highlight);
+}
+
+/* First / last tab cleanup */
+QTabBar::tab:first {
+    margin-left: 0;
+}
+
+QTabBar::tab:last {
+    margin-right: 0;
+}
+
+QTabBar::tab:selected {
+    background: rgba(@ACCENT_RGB@, 0.055);
+
+    color: palette(window-text);
+
+    font-weight: 600;
+
+    border-bottom: 3px solid palette(highlight);
+
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+}QTabBar::tab:selected {
+    background: rgba(@ACCENT_RGB@, 0.055);
+
+    color: palette(window-text);
+
+    font-weight: 600;
+
+    border-bottom: 3px solid palette(highlight);
+
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+}
+/* -------------------------------
+   Buttons
+-------------------------------- */
+
+QPushButton {
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: palette(button);
+  border: 1px solid rgba(@SHADOW_RGB@, 0.12);
+}
+
+QPushButton:hover {
+  background: rgba(@SHADOW_RGB@, 0.05);
+}
+
+QPushButton:pressed {
+  background: rgba(@SHADOW_RGB@, 0.08);
+}
+
+QPushButton:disabled {
+  opacity: 0.5;
+}
+
+/* -------------------------------
+   Inputs
+-------------------------------- */
+
+QLineEdit,
+QSpinBox,
+QDoubleSpinBox,
+QComboBox,
+QDateEdit,
+QPlainTextEdit,
+QTextEdit {
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: palette(base);
+  color: palette(text);
+  border: 1px solid rgba(@SHADOW_RGB@, 0.14);
+}
+
+QLineEdit:focus,
+QSpinBox:focus,
+QDoubleSpinBox:focus,
+QComboBox:focus,
+QDateEdit:focus {
+  border: 1px solid palette(highlight);
+}
+
+/* -------------------------------
+   ComboBox
+-------------------------------- */
+
+QComboBox {
+  padding: 6px 30px 6px 10px;
+}
+
+QComboBox::drop-down {
+  subcontrol-origin: padding;
+  subcontrol-position: top right;
+  width: 26px;
+  border: none;
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+QComboBox::drop-down:hover {
+  background: rgba(@SHADOW_RGB@, 0.04);
+}
+
+QComboBox::down-arrow {
+  image: url(@ICON_CHEVRON_DOWN@);
+  width: 16px;
+  height: 16px;
+}
+
+/* Popup */
+QComboBox QAbstractItemView {
+  background: palette(base);
+  color: palette(text);
+  border-radius: 8px;
+  border: 1px solid rgba(@SHADOW_RGB@, 0.12);
+  padding: 6px;
+}
+
+QComboBox QAbstractItemView::item {
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+QComboBox QAbstractItemView::item:hover,
+QComboBox QAbstractItemView::item:selected {
+  background: palette(highlight);
+  color: white;
+}
+
+/* ==========================================================
+   Fluent SpinBox
+   ========================================================== */
+
+QSpinBox,
+QDoubleSpinBox {
+    min-height: 30px;
+
+    padding: 0 30px 0 10px;
+
+    border-radius: 8px;
+
+    background: palette(base);
+    color: palette(text);
+
+    border: 1px solid rgba(@SHADOW_RGB@,0.10);
+}
+
+QSpinBox:hover,
+QDoubleSpinBox:hover {
+    border: 1px solid rgba(@ACCENT_RGB@,0.25);
+}
+
+QSpinBox:focus,
+QDoubleSpinBox:focus {
+    border: 1px solid palette(highlight);
+}
+
+QSpinBox::up-button,
+QSpinBox::down-button,
+QDoubleSpinBox::up-button,
+QDoubleSpinBox::down-button {
+    width: 22px;
+
+    border: none;
+    background: transparent;
+}
+
+QSpinBox::up-button:hover,
+QSpinBox::down-button:hover,
+QDoubleSpinBox::up-button:hover,
+QDoubleSpinBox::down-button:hover {
+    background: rgba(@ACCENT_RGB@,0.06);
+}
+
+QSpinBox::up-arrow,
+QDoubleSpinBox::up-arrow {
+    image: url(@ICON_CHEVRON_UP@);
+    width: 10px;
+    height: 10px;
+}
+
+QSpinBox::down-arrow,
+QDoubleSpinBox::down-arrow {
+    image: url(@ICON_CHEVRON_DOWN@);
+    width: 10px;
+    height: 10px;
+}
+
+
+
+/* -------------------------------
+   Table / Lists
+-------------------------------- */
+
+QTableView,
+QListView,
+QTreeView {
+  background: palette(base);
+  color: palette(text);
+  border: 1px solid rgba(@SHADOW_RGB@, 0.08);
+  border-radius: 8px;
+}
+
+/* Hover must stay readable on accent backgrounds */
+QTableView::item:hover,
+QListView::item:hover,
+QTreeView::item:hover,
+QAbstractItemView::item:hover {
+  background: palette(highlight);
+  color: white;
+}
+
+/* Selected items */
+QAbstractItemView::item:selected,
+QAbstractItemView::item:selected:active,
+QTableView::item:selected,
+QListView::item:selected,
+QTreeView::item:selected {
+  background: palette(highlight);
+  color: white;
+}
+
+QHeaderView::section {
+  background: transparent;
+  padding: 6px;
+}
+
+/* -------------------------------
+   Scrollbars (clean Fluent)
+-------------------------------- */
+
+QScrollBar:vertical {
+  width: 10px;
+  background: transparent;
+  margin: 0;
+}
+
+QScrollBar::handle:vertical {
+  background: rgba(@SHADOW_RGB@, 0.25);
+  min-height: 40px;
+  border-radius: 5px;
+}
+
+QScrollBar::handle:vertical:hover {
+  background: rgba(@SHADOW_RGB@, 0.35);
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+  height: 0px;
+  width: 0px;
+  border: none;
+  background: none;
+}
+
+QScrollBar::up-arrow,
+QScrollBar::down-arrow {
+  width: 0px;
+  height: 0px;
+}
+
+QScrollBar::add-page,
+QScrollBar::sub-page {
+  background: transparent;
+}
+
+QScrollBar:horizontal {
+  height: 10px;
+  background: transparent;
+  margin: 0;
+}
+
+QScrollBar::handle:horizontal {
+  background: rgba(@SHADOW_RGB@, 0.25);
+  min-width: 40px;
+  border-radius: 5px;
+}
+
+QScrollBar::handle:horizontal:hover {
+  background: rgba(@SHADOW_RGB@, 0.35);
+}
+
+QScrollBar::add-line:horizontal,
+QScrollBar::sub-line:horizontal {
+  width: 0px;
+  height: 0px;
+  border: none;
+  background: none;
+}
+
+QScrollBar::left-arrow,
+QScrollBar::right-arrow {
+  width: 0px;
+  height: 0px;
+}
+
+QScrollBar::add-page:horizontal,
+QScrollBar::sub-page:horizontal {
+  background: transparent;
+}
+
+/* -------------------------------
+   Message boxes / dialogs
+-------------------------------- */
+
+QMessageBox {
+  background: palette(window);
+}
+
+/* Reduce forced width to avoid overly wide message boxes */
+QMessageBox QLabel {
+  min-width: 0px;
+  max-width: 360px;
+}
+
+/* -------------------------------
+   Status bar
+-------------------------------- */
+
+QStatusBar {
+  background: transparent;
+  border-top: 1px solid rgba(@SHADOW_RGB@, 0.06);
+}
+
+/* -------------------------------
+   Radio buttons
+-------------------------------- */
+
+QRadioButton {
+  border: none;
+  background: transparent;
+  spacing: 6px;
+  color: palette(text);
+}
+
+QRadioButton::indicator {
+  width: 14px;
+  height: 14px;
+}
+
+QRadioButton::indicator:unchecked {
+  border: 1px solid palette(mid);
+  border-radius: 7px;
+  background: palette(base);
+}
+
+QRadioButton::indicator:checked {
+  border: 1px solid palette(mid);
+  border-radius: 7px;
+  background: palette(highlight);
+}
+
+/* -------------------------------
+   TableListPanel
+-------------------------------- */
+
+TableListPanel QTableView {
+  border: 1px solid rgba(@SHADOW_RGB@, 0.08);
+  border-radius: 8px;
+  background: palette(base);
+  color: palette(text);
+  gridline-color: rgba(@SHADOW_RGB@, 0.06);
+}
+
+TableListPanel QTableView::item {
+  padding: 2px 8px;
+}
+
+/* One colour across the whole row.  The view's own selection fill and the
+   item's fill have to name the same colour, or the cells and the gaps between
+   them come out as two different blues. */
+TableListPanel QTableView {
+  selection-background-color: palette(highlight);
+  selection-color: palette(highlighted-text);
+}
+
+TableListPanel QTableView::item:selected,
+TableListPanel QTableView::item:selected:active,
+TableListPanel QTableView::item:selected:!active {
+  background: palette(highlight);
+  color: palette(highlighted-text);
+}
+
+TableListPanel QHeaderView::section {
+  background: palette(window);
+  color: palette(window-text);
+  font-size: 8pt;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 5px 8px;
+  border: none;
+  border-bottom: 1px solid rgba(@SHADOW_RGB@, 0.08);
+  border-right: 1px solid rgba(@SHADOW_RGB@, 0.06);
+}
+
+TableListPanel QHeaderView::section:last {
+  border-right: none;
+}
+
+/* -------------------------------
+   TablePreviewPanel
+-------------------------------- */
+
+TablePreviewPanel QTableView {
+  border: 1px solid rgba(@SHADOW_RGB@, 0.08);
+  border-radius: 8px;
+  background: palette(base);
+  color: palette(text);
+  gridline-color: rgba(@SHADOW_RGB@, 0.06);
+}
+
+TablePreviewPanel QTableView::item {
+  padding: 2px 8px;
+}
+
+TablePreviewPanel QHeaderView::section {
+  background: palette(window);
+  color: palette(window-text);
+  font-size: 8pt;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 5px 8px;
+  border: none;
+  border-bottom: 1px solid rgba(@SHADOW_RGB@, 0.08);
+  border-right: 1px solid rgba(@SHADOW_RGB@, 0.06);
+}
+
+TablePreviewPanel QHeaderView::section:last {
+  border-right: none;
+}
+
+/* -------------------------------
+   Activity rail / navigation
+-------------------------------- */
+/* ==========================================================
+   Fluent 2 Navigation Rail
+   ========================================================== */
+
+QFrame#activityRail,
+QFrame#sideBar,
+QWidget#sideBar,
+QWidget#navigationPane {
+
+    /*background: #103B6D;*/
+    border-right: 1px solid rgba(@GLOW_RGB@,0.08);
+
+    color: white;
+}
+
+/* ==========================================================
+   Navigation Buttons
+   ========================================================== */
+
+QToolButton#railMenuButton,
+QToolButton#activityButton {
+
+    min-width: 36px;
+    min-height: 36px;
+
+    max-width: 36px;
+    max-height: 36px;
+
+    margin: 2px;
+
+    border: none;
+    border-radius: 8px;
+
+    background: transparent;
+
+    color: rgba(@GLOW_RGB@,0.92);
+
+    font-family: "Segoe Fluent Icons";
+    font-size: 16px;
+}
+
+QToolButton#railMenuButton:hover,
+QToolButton#activityButton:hover {
+
+    background: rgba(@GLOW_RGB@,0.10);
+}
+
+QToolButton#activityButton:pressed,
+QToolButton#railMenuButton:pressed {
+
+    background: rgba(@GLOW_RGB@,0.20);
+}
+
+QToolButton#activityButton:checked {
+
+    background: rgba(@GLOW_RGB@,0.18);
+
+    border-left: 3px solid rgba(@ACCENT_RGB@, 1.0);
+
+    padding-left: 3px;
+
+    color: white;
+
+    font-weight: 600;
+}
+
+QToolButton::menu-indicator {
+    image: none;
+}
+
+  /* ==========================================================
+   Fluent Primary Buttons
+   ========================================================== */
+
+QPushButton[primary="true"],
+QPushButton[accent="true"] {
+    background: palette(highlight);
+    color: palette(highlighted-text);
+    border: 1px solid palette(highlight);
+    font-weight: 600;
+}
+
+QPushButton[primary="true"]:hover,
+QPushButton[accent="true"]:hover {
+    background: rgba(@ACCENT_RGB@,0.92);
+}
+
+QPushButton[primary="true"]:pressed,
+QPushButton[accent="true"]:pressed {
+    background: rgba(@ACCENT_RGB@,0.82);
+}
+
+QPushButton[primary="true"]:disabled,
+QPushButton[accent="true"]:disabled {
+    background: rgba(@NEUTRAL_RGB@,0.18);
+    color: rgba(@NEUTRAL_RGB@,0.70);
+    border: 1px solid rgba(@NEUTRAL_RGB@,0.15);
+}
+/* ==========================================================
+   Dialog ButtonBox Primary Buttons
+   ========================================================== */
+
+QDialogButtonBox QPushButton {
+    min-width: 88px;
+}
+
+/* Explicit selector for dialog buttons */
+QDialogButtonBox QPushButton[primary="true"],
+QMessageBox QPushButton[primary="true"],
+QPushButton[primary="true"] {
+    background: palette(highlight);
+    color: palette(highlighted-text);
+    border: 1px solid palette(highlight);
+    font-weight: 600;
+}
+
+QDialogButtonBox QPushButton[primary="true"]:hover,
+QMessageBox QPushButton[primary="true"]:hover,
+QPushButton[primary="true"]:hover {
+    background: rgba(@ACCENT_RGB@, 0.92);
+    border: 1px solid rgba(@ACCENT_RGB@, 0.92);
+    color: white;
+}
+
+QDialogButtonBox QPushButton[primary="true"]:pressed,
+QMessageBox QPushButton[primary="true"]:pressed,
+QPushButton[primary="true"]:pressed {
+    background: rgba(@ACCENT_RGB@, 0.82);
+    border: 1px solid rgba(@ACCENT_RGB@, 0.82);
+    color: white;
+}
+
+/* ==========================================================
+   Fluent Dialog Primary Button
+   Must be at the very end of the stylesheet
+   ========================================================== */
+
+QPushButton#primaryDialogButton {
+    background: palette(highlight);
+    color: palette(highlighted-text);
+    border: 1px solid palette(highlight);
+    border-radius: 8px;
+    padding: 6px 14px;
+    min-width: 88px;
+    min-height: 30px;
+    font-weight: 600;
+}
+
+QPushButton#primaryDialogButton:hover {
+    background: rgba(@ACCENT_RGB@, 0.92);
+    border: 1px solid rgba(@ACCENT_RGB@, 0.92);
+    color: white;
+}
+
+QPushButton#primaryDialogButton:pressed {
+    background: rgba(@ACCENT_RGB@, 0.82);
+    border: 1px solid rgba(@ACCENT_RGB@, 0.82);
+    color: white;
+}
+
+QPushButton#primaryDialogButton:disabled {
+    background: rgba(@NEUTRAL_RGB@, 0.18);
+    color: rgba(@NEUTRAL_RGB@, 0.70);
+    border: 1px solid rgba(@NEUTRAL_RGB@, 0.15);
+    font-weight: 400;
+}
+
+QDialogButtonBox QPushButton {
+    min-width: 88px;
+}
+/* ==========================================================
+   Fluent 2 ToolBox
+   ========================================================== */
+
+QToolBox {
+    background: transparent;
+    border: none;
+}
+
+QToolBox::tab 
+{
+    text-align: left;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: 6px;
+    background: rgba(@NEUTRAL_RGB@, 0.08);
+    font-weight: 600;
+}
+/* Hover */
+QToolBox::tab:hover {
+    background: rgba(@SHADOW_RGB@, 0.045);
+}
+
+/* Selected */
+QToolBox::tab:selected {
+    background: rgba(@ACCENT_RGB@, 0.055);
+    font-weight: 600;
+    color: palette(window-text);
+}
+
+/* Pressed */
+QToolBox::tab:pressed {
+    background: rgba(@ACCENT_RGB@, 0.08);
+}
+
+/* Disabled */
+QToolBox::tab:disabled {
+    color: rgba(@NEUTRAL_RGB@, 0.70);
+}
+
+QDialog
+{
+  padding: 6px 8px;
+}
+
+/* ==========================================================
+   Fluent 2 / macOS Command List
+   SeriesOperationWidget
+   ========================================================== */
+
+/* Command rows */
+
+QFrame#operationRow {
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+}
+
+/* Fluent hover */
+
+QFrame#operationRow:hover {
+    background: rgba(@SHADOW_RGB@, 0.045);
+}
+
+/* Pressed */
+
+QFrame#operationRow:pressed {
+    background: rgba(@SHADOW_RGB@, 0.08);
+}
+
+/* Keyboard focus */
+
+QFrame#operationRow:focus {
+    background: rgba(@ACCENT_RGB@, 0.05);
+    border-left: 3px solid palette(highlight);
+}
+
+/* ----------------------------------------------------------
+   Section headers
+   ---------------------------------------------------------- */
+
+QLabel[sectionTitle="true"] {
+
+    font-size: 9pt;
+
+    font-weight: 600;
+
+    color: rgba(@NEUTRAL_RGB@, 0.9);
+
+    letter-spacing: 0.04em;
+
+    text-transform: uppercase;
+
+    padding-top: 8px;
+    padding-bottom: 4px;
+}
+
+/* ----------------------------------------------------------
+   Command title
+   ---------------------------------------------------------- */
+
+QLabel[operationTitle="true"] {
+
+    font-size: 10pt;
+
+    font-weight: 600;
+
+    color: palette(window-text);
+
+    background: transparent;
+}
+
+
+
+
+/* ----------------------------------------------------------
+   Description
+   ---------------------------------------------------------- */
+
+QLabel[operationDescription="true"] {
+
+    background: transparent;
+
+    color: rgba(@NEUTRAL_RGB@, 0.92);
+
+    font-size: 9pt;
+}
+
+/* ----------------------------------------------------------
+   Operation Icon
+   ---------------------------------------------------------- */
+
+QLabel#operationIcon {
+
+    min-width: 20px;
+    max-width: 20px;
+
+    min-height: 20px;
+    max-height: 20px;
+
+    background: transparent;
+}
+
+/* ----------------------------------------------------------
+   Compact row variant
+   ---------------------------------------------------------- */
+
+QFrame#operationRow[compact="true"] {
+
+    border-radius: 6px;
+}
+
+/* ----------------------------------------------------------
+   Selected operation
+   ---------------------------------------------------------- */
+
+QFrame#operationRow[selected="true"] {
+
+    background: rgba(@ACCENT_RGB@, 0.08);
+
+    border-left: 3px solid palette(highlight);
+}
+`

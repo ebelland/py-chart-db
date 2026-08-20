@@ -1,0 +1,44 @@
+BUGS:
+
+series operations: 
+     check if the data are ok
+     change spectral and plot incons
+     plot: after apply move to new ChartPanel
+
+plot:
+     default to scatterplot
+
+properties:
+     mplstyle: load instead of dropdown list or folders are not shown
+     neither marker nor line style is enabled --> use rcParams!
+     draw figure frame dowes not work
+     
+global:
+     local must be set to current platform locale
+     split config.json in user and config
+
+ChartPanel:
+     picker errors
+     fit to zoom button design inconsistent on MacOS
+     when changing panel and Axis:Kwargs is selected, a modal window is shown!
+
+renderers:
+     check if colorby works for all renderers
+
+improve dialog loading speed
+
+
+NEW STUFF
+
+general:
+     table view: data coloring by value
+     external database link
+     ChartPlot "virtuale": contiene solo una lista di queries senza alcuna figura tracciata
+     custom function table generation
+     localization helper dialog
+     add other layouts to figure
+
+axis_properties:
+     Axis options and drawings kwargs: make more homogeneous
+
+Chart Panel: remove default toolbar icons for configuring subplots and editing axis_properties

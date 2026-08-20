@@ -1,0 +1,35 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+logs/
+*.dhub
+*.7z
+*.zip
+.DS_Store
+sample data/
+.vscode/
+app/test_results/
+*.dhub-wal
+*.dhub-shm
+.fuse_hidden*
+
+# Demo project is generated, not tracked
+sample data/Demo Project.dhub
+
+# Compiled gettext catalogues (rebuilt from the .po on load)
+app/locales/**/*.mo
+
+# Sync-conflict duplicates ("file 2.py") left by iCloud/OneDrive-style tools.
+# They are not edits: a stray "scatter_axis 2.py" under app/charts would be
+# read by the renderer scanner as a second, stale renderer.
+* 2.*
+* 2
+* [0-9].*
+*.7z
+
+# Staging area for files awaiting deletion, and the tarballs left in it.
+_to_delete/
+
+# Screenshots are committed; anything else generated under docs is not.
+docs/**/*.tmp

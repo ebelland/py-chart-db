@@ -1,0 +1,1147 @@
+/* ==========================================================
+   Fluent WinUI 3 Inspired QSS for PySide6 Qt Widgets
+   Drop-in stylesheet
+   Supports:
+   - Fluent surfaces
+   - Acrylic-style translucent panels
+   - Fluent icon buttons
+   - Navigation rail
+   - Modern inputs, tables, menus, dialogs
+   Notes:
+   - Real acrylic blur requires Python/native window support.
+   - QSS can only provide translucent/material-like visuals.
+   ========================================================== */
+
+
+/* ==========================================================
+   Global Base
+   ========================================================== */
+
+* {
+    font-family: "Segoe UI Variable", "Segoe UI", "Inter", "Arial", sans-serif;
+    font-size: 10pt;
+    outline: none;
+}
+
+QWidget {
+    background: palette(window);
+    color: palette(window-text);
+    selection-background-color: palette(highlight);
+    selection-color: palette(highlighted-text);
+}
+
+QWidget:disabled {
+    color: rgba(127, 127, 127, 0.70);
+}
+
+
+/* ==========================================================
+   Fluent Surfaces / Cards / Acrylic
+   ========================================================== */
+
+QFrame,
+QGroupBox {
+    background: transparent;
+}
+
+/* Standard card surface */
+QFrame#Card,
+QFrame#card,
+QWidget#Card,
+QWidget#card,
+QFrame#ChartPanel {
+    background: palette(base);
+    border: 1px solid rgba(0, 0, 0, 0.07);
+    border-radius: 12px;
+}
+
+/* Elevated card surface */
+QFrame[elevated="true"],
+QWidget[elevated="true"] {
+    background: palette(base);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 14px;
+}
+
+/* Acrylic-style panels.
+   For best effect, enable translucent background in Python. */
+QFrame#acrylicPanel,
+QWidget#acrylicPanel,
+QFrame[acrylic="true"],
+QWidget[acrylic="true"] {
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.42);
+    border-radius: 14px;
+}
+
+/* Dark acrylic variant */
+QFrame[acrylicDark="true"],
+QWidget[acrylicDark="true"] {
+    background: rgba(32, 32, 32, 0.68);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 14px;
+    color: rgba(255, 255, 255, 0.92);
+}
+
+/* Sidebar acrylic */
+QFrame#activityRail,
+QFrame#sideBar,
+QWidget#sideBar,
+QWidget#navigationPane {
+    background: rgba(255, 255, 255, 0.58);
+    border-right: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* Transparent main containers */
+QWidget#centralWidget,
+QWidget#contentView,
+QFrame#contentView,
+QFrame#collapsiblePanel,
+QFrame#CollapsiblePanel,
+QWidget#panelBody {
+    background: transparent;
+    border: none;
+}
+
+
+/* ==========================================================
+   Labels / Typography
+   ========================================================== */
+
+QLabel {
+    background: transparent;
+    color: palette(window-text);
+}
+
+QLabel[role="title"] {
+    font-size: 20px;
+    font-weight: 600;
+}
+
+QLabel[role="subtitle"] {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+QLabel[role="caption"] {
+    font-size: 9pt;
+    color: rgba(127, 127, 127, 0.95);
+}
+
+QLabel[muted="true"] {
+    color: rgba(127, 127, 127, 0.95);
+}
+
+
+/* ==========================================================
+   Fluent Icon Styling
+   ========================================================== */
+
+/* General icon labels */
+QLabel[icon="true"],
+QLabel[fluentIcon="true"] {
+    background: transparent;
+    color: palette(window-text);
+    min-width: 20px;
+    min-height: 20px;
+    qproperty-alignment: AlignCenter;
+}
+
+/* Icon-only buttons */
+QPushButton[iconOnly="true"],
+QToolButton[iconOnly="true"],
+QAbstractButton[iconOnly="true"] {
+    min-width: 32px;
+    min-height: 32px;
+    max-width: 32px;
+    max-height: 32px;
+    padding: 0;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    icon-size: 20px;
+}
+
+QPushButton[iconOnly="true"]:hover,
+QToolButton[iconOnly="true"]:hover,
+QAbstractButton[iconOnly="true"]:hover {
+    background: rgba(0, 0, 0, 0.045);
+    border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+QPushButton[iconOnly="true"]:pressed,
+QToolButton[iconOnly="true"]:pressed,
+QAbstractButton[iconOnly="true"]:pressed {
+    background: rgba(0, 0, 0, 0.085);
+}
+
+QPushButton[iconOnly="true"]:checked,
+QToolButton[iconOnly="true"]:checked,
+QAbstractButton[iconOnly="true"]:checked {
+    background: rgba(0, 120, 212, 0.12);
+    color: palette(highlight);
+}
+
+/* Accent icon buttons */
+QToolButton[accent="true"],
+QPushButton[accent="true"] {
+    color: palette(highlight);
+}
+
+/* Remove menu indicator from icon buttons */
+QToolButton::menu-indicator {
+    image: none;
+    width: 0;
+}
+
+
+/* ==========================================================
+   Toolbars
+   ========================================================== */
+
+QToolBar {
+    spacing: 4px;
+    padding: 4px;
+    border: none;
+    background: transparent;
+}
+
+QToolBar::separator {
+    width: 1px;
+    height: 22px;
+    background: rgba(0, 0, 0, 0.08);
+    margin: 4px 6px;
+}
+
+QToolButton {
+    min-width: 32px;
+    min-height: 32px;
+    padding: 5px 8px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: palette(window-text);
+    icon-size: 20px;
+}
+
+QToolButton:hover {
+    background: rgba(0, 0, 0, 0.045);
+    border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+QToolButton:pressed {
+    background: rgba(0, 0, 0, 0.085);
+}
+
+QToolButton:checked {
+    background: rgba(0, 120, 212, 0.12);
+    color: palette(highlight);
+}
+
+
+/* ==========================================================
+   Buttons
+   ========================================================== */
+
+QPushButton {
+    min-height: 32px;
+    padding: 6px 16px;
+    border-radius: 8px;
+    background: palette(button);
+    color: palette(button-text);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+QPushButton:hover {
+    background: rgba(0, 0, 0, 0.045);
+    border: 1px solid rgba(0, 0, 0, 0.16);
+}
+
+QPushButton:pressed {
+    background: rgba(0, 0, 0, 0.085);
+}
+
+QPushButton:disabled {
+    background: rgba(127, 127, 127, 0.12);
+    color: rgba(127, 127, 127, 0.70);
+    border: 1px solid rgba(127, 127, 127, 0.15);
+}
+
+/* Primary button */
+QPushButton[primary="true"] {
+    background: palette(highlight);
+    color: palette(highlighted-text);
+    border: 1px solid palette(highlight);
+}
+
+QPushButton[primary="true"]:hover {
+    background: rgba(0, 120, 212, 0.88);
+    border: 1px solid rgba(0, 120, 212, 0.88);
+}
+
+QPushButton[primary="true"]:pressed {
+    background: rgba(0, 90, 158, 0.95);
+    border: 1px solid rgba(0, 90, 158, 0.95);
+}
+
+/* Subtle button */
+QPushButton[subtle="true"] {
+    background: transparent;
+    border: 1px solid transparent;
+}
+
+QPushButton[subtle="true"]:hover {
+    background: rgba(0, 0, 0, 0.045);
+}
+
+/* Danger button */
+QPushButton[danger="true"] {
+    color: rgb(196, 43, 28);
+}
+
+QPushButton[danger="true"]:hover {
+    background: rgba(196, 43, 28, 0.08);
+    border: 1px solid rgba(196, 43, 28, 0.18);
+}
+
+QPushButton[danger="true"]:pressed {
+    background: rgba(196, 43, 28, 0.14);
+}
+
+
+/* ==========================================================
+   Inputs
+   ========================================================== */
+
+QLineEdit,
+QSpinBox,
+QDoubleSpinBox,
+QComboBox,
+QDateEdit,
+QTimeEdit,
+QDateTimeEdit,
+QPlainTextEdit,
+QTextEdit {
+    min-height: 32px;
+    padding: 5px 10px;
+    border-radius: 8px;
+    background: palette(base);
+    color: palette(text);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    selection-background-color: palette(highlight);
+    selection-color: palette(highlighted-text);
+}
+
+QPlainTextEdit,
+QTextEdit {
+    padding: 8px;
+}
+
+QLineEdit:hover,
+QSpinBox:hover,
+QDoubleSpinBox:hover,
+QComboBox:hover,
+QDateEdit:hover,
+QTimeEdit:hover,
+QDateTimeEdit:hover,
+QPlainTextEdit:hover,
+QTextEdit:hover {
+    border: 1px solid rgba(0, 120, 212, 0.30);
+}
+
+QLineEdit:focus,
+QSpinBox:focus,
+QDoubleSpinBox:focus,
+QComboBox:focus,
+QDateEdit:focus,
+QTimeEdit:focus,
+QDateTimeEdit:focus,
+QPlainTextEdit:focus,
+QTextEdit:focus {
+    border: 2px solid palette(highlight);
+    padding: 4px 9px;
+}
+
+QPlainTextEdit:focus,
+QTextEdit:focus {
+    padding: 7px;
+}
+
+QLineEdit:disabled,
+QSpinBox:disabled,
+QDoubleSpinBox:disabled,
+QComboBox:disabled,
+QDateEdit:disabled,
+QTimeEdit:disabled,
+QDateTimeEdit:disabled,
+QPlainTextEdit:disabled,
+QTextEdit:disabled {
+    background: rgba(127, 127, 127, 0.08);
+    color: rgba(127, 127, 127, 0.70);
+    border: 1px solid rgba(127, 127, 127, 0.14);
+}
+
+
+/* ==========================================================
+   ComboBox
+   ========================================================== */
+
+QComboBox {
+    padding: 5px 34px 5px 10px;
+}
+
+QComboBox:focus {
+    padding: 4px 33px 4px 9px;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: border;
+    subcontrol-position: top right;
+    width: 30px;
+    border: none;
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+    background: transparent;
+}
+
+QComboBox::drop-down:hover {
+    background: rgba(0, 0, 0, 0.045);
+}
+
+QComboBox::down-arrow {
+    image: url(@ICON_CHEVRON_DOWN@);
+    width: 16px;
+    height: 16px;
+}
+
+/* Combo popup */
+QComboBox QAbstractItemView {
+    background: palette(base);
+    color: palette(text);
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    padding: 6px;
+    outline: none;
+    selection-background-color: rgba(0, 120, 212, 0.14);
+    selection-color: palette(text);
+}
+
+QComboBox QAbstractItemView::item {
+    min-height: 28px;
+    padding: 6px 10px;
+    border-radius: 6px;
+}
+
+QComboBox QAbstractItemView::item:hover {
+    background: rgba(0, 0, 0, 0.045);
+    color: palette(text);
+}
+
+QComboBox QAbstractItemView::item:selected {
+    background: rgba(0, 120, 212, 0.14);
+    color: palette(text);
+}
+
+
+/* ==========================================================
+   SpinBox / DoubleSpinBox
+   ========================================================== */
+
+QSpinBox,
+QDoubleSpinBox {
+    min-height: 32px;
+    padding: 5px 36px 5px 10px;
+}
+
+QSpinBox:focus,
+QDoubleSpinBox:focus {
+    padding: 4px 35px 4px 9px;
+}
+
+QSpinBox::up-button,
+QDoubleSpinBox::up-button {
+    subcontrol-origin: border;
+    subcontrol-position: top right;
+    width: 28px;
+    border: none;
+    border-top-right-radius: 8px;
+    background: transparent;
+}
+
+QSpinBox::down-button,
+QDoubleSpinBox::down-button {
+    subcontrol-origin: border;
+    subcontrol-position: bottom right;
+    width: 28px;
+    border: none;
+    border-bottom-right-radius: 8px;
+    background: transparent;
+}
+
+QSpinBox::up-button:hover,
+QSpinBox::down-button:hover,
+QDoubleSpinBox::up-button:hover,
+QDoubleSpinBox::down-button:hover {
+    background: rgba(0, 0, 0, 0.045);
+}
+
+QSpinBox::up-button:pressed,
+QSpinBox::down-button:pressed,
+QDoubleSpinBox::up-button:pressed,
+QDoubleSpinBox::down-button:pressed {
+    background: rgba(0, 120, 212, 0.14);
+}
+
+QSpinBox::up-arrow,
+QDoubleSpinBox::up-arrow {
+    image: url(@ICON_CHEVRON_UP@);
+    width: 10px;
+    height: 10px;
+}
+
+QSpinBox::down-arrow,
+QDoubleSpinBox::down-arrow {
+    image: url(@ICON_CHEVRON_DOWN@);
+    width: 10px;
+    height: 10px;
+}
+
+
+/* ==========================================================
+   Menus
+   ========================================================== */
+
+QMenu {
+    background: rgba(255, 255, 255, 0.94);
+    color: palette(text);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 10px;
+    padding: 6px;
+}
+
+QMenu::item {
+    min-height: 28px;
+    padding: 6px 28px 6px 12px;
+    border-radius: 6px;
+    background: transparent;
+}
+
+QMenu::item:selected {
+    background: rgba(0, 0, 0, 0.045);
+    color: palette(text);
+}
+
+QMenu::item:pressed {
+    background: rgba(0, 120, 212, 0.12);
+}
+
+QMenu::separator {
+    height: 1px;
+    background: rgba(0, 0, 0, 0.08);
+    margin: 6px 8px;
+}
+
+QMenu::icon {
+    padding-left: 6px;
+}
+
+
+/* ==========================================================
+   Tabs
+   ========================================================== */
+
+QTabWidget::pane {
+    border: none;
+    background: transparent;
+}
+
+QTabBar {
+    background: transparent;
+}
+
+QTabBar::tab {
+    min-height: 32px;
+    padding: 6px 14px;
+    margin-right: 4px;
+    border-radius: 8px;
+    background: transparent;
+    color: palette(window-text);
+}
+
+QTabBar::tab:hover {
+    background: rgba(0, 0, 0, 0.045);
+}
+
+QTabBar::tab:selected {
+    background: rgba(0, 120, 212, 0.12);
+    color: palette(window-text);
+}
+
+QTabBar::tab:disabled {
+    color: rgba(127, 127, 127, 0.70);
+}
+
+
+/* ==========================================================
+   Tables / Lists / Trees
+   ========================================================== */
+
+QTableView,
+QListView,
+QTreeView,
+QAbstractItemView {
+    background: palette(base);
+    color: palette(text);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    outline: none;
+    gridline-color: rgba(0, 0, 0, 0.06);
+    selection-background-color: rgba(0, 120, 212, 0.14);
+    selection-color: palette(text);
+}
+
+QTableView::item,
+QListView::item,
+QTreeView::item,
+QAbstractItemView::item {
+    min-height: 26px;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+QTableView::item:hover,
+QListView::item:hover,
+QTreeView::item:hover,
+QAbstractItemView::item:hover {
+    background: rgba(0, 0, 0, 0.045);
+    color: palette(text);
+}
+
+QTableView::item:selected,
+QListView::item:selected,
+QTreeView::item:selected,
+QAbstractItemView::item:selected {
+    background: rgba(0, 120, 212, 0.14);
+    color: palette(text);
+}
+
+QTableView::item:selected:active,
+QListView::item:selected:active,
+QTreeView::item:selected:active,
+QAbstractItemView::item:selected:active {
+    background: rgba(0, 120, 212, 0.20);
+    color: palette(text);
+}
+
+QHeaderView {
+    background: transparent;
+}
+
+QHeaderView::section {
+    min-height: 28px;
+    background: palette(window);
+    color: palette(window-text);
+    font-size: 9pt;
+    font-weight: 600;
+    padding: 6px 8px;
+    border: none;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    border-right: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+QHeaderView::section:hover {
+    background: rgba(0, 0, 0, 0.035);
+}
+
+
+/* Specific data panels */
+
+TableListPanel QTableView,
+TablePreviewPanel QTableView {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    background: palette(base);
+    color: palette(text);
+    gridline-color: rgba(0, 0, 0, 0.06);
+}
+
+TableListPanel QTableView::item,
+TablePreviewPanel QTableView::item {
+    padding: 3px 8px;
+}
+
+TableListPanel QHeaderView::section,
+TablePreviewPanel QHeaderView::section {
+    background: palette(window);
+    color: palette(window-text);
+    font-size: 9pt;
+    font-weight: 600;
+    padding: 6px 8px;
+    border: none;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    border-right: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+
+/* ==========================================================
+   Scrollbars
+   ========================================================== */
+
+QScrollBar:vertical {
+    width: 10px;
+    background: transparent;
+    margin: 0;
+}
+
+QScrollBar::handle:vertical {
+    background: rgba(0, 0, 0, 0.22);
+    min-height: 42px;
+    border-radius: 5px;
+    margin: 2px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: rgba(0, 0, 0, 0.34);
+}
+
+QScrollBar::handle:vertical:pressed {
+    background: rgba(0, 0, 0, 0.42);
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    height: 0;
+    width: 0;
+    border: none;
+    background: transparent;
+}
+
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: transparent;
+}
+
+QScrollBar:horizontal {
+    height: 10px;
+    background: transparent;
+    margin: 0;
+}
+
+QScrollBar::handle:horizontal {
+    background: rgba(0, 0, 0, 0.22);
+    min-width: 42px;
+    border-radius: 5px;
+    margin: 2px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background: rgba(0, 0, 0, 0.34);
+}
+
+QScrollBar::handle:horizontal:pressed {
+    background: rgba(0, 0, 0, 0.42);
+}
+
+QScrollBar::add-line:horizontal,
+QScrollBar::sub-line:horizontal {
+    height: 0;
+    width: 0;
+    border: none;
+    background: transparent;
+}
+
+QScrollBar::add-page:horizontal,
+QScrollBar::sub-page:horizontal {
+    background: transparent;
+}
+
+
+/* ==========================================================
+   CheckBox / RadioButton
+   ========================================================== */
+
+QCheckBox,
+QRadioButton {
+    background: transparent;
+    border: none;
+    spacing: 8px;
+    color: palette(window-text);
+}
+
+QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 0, 0, 0.26);
+    background: palette(base);
+}
+
+QCheckBox::indicator:hover {
+    border: 1px solid rgba(0, 120, 212, 0.55);
+}
+
+QCheckBox::indicator:checked {
+    background: palette(highlight);
+    border: 1px solid palette(highlight);
+    image: url(@ICON_CHECK@);
+}
+
+QCheckBox::indicator:checked:hover {
+    background: rgba(0, 120, 212, 0.88);
+    border: 1px solid rgba(0, 120, 212, 0.88);
+}
+
+QCheckBox::indicator:disabled {
+    background: rgba(127, 127, 127, 0.10);
+    border: 1px solid rgba(127, 127, 127, 0.18);
+}
+
+QRadioButton::indicator {
+    width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    border: 1px solid rgba(0, 0, 0, 0.26);
+    background: palette(base);
+}
+
+QRadioButton::indicator:hover {
+    border: 1px solid rgba(0, 120, 212, 0.55);
+}
+
+QRadioButton::indicator:checked {
+    border: 5px solid palette(highlight);
+    background: palette(base);
+}
+
+QRadioButton::indicator:disabled {
+    background: rgba(127, 127, 127, 0.10);
+    border: 1px solid rgba(127, 127, 127, 0.18);
+}
+
+
+/* ==========================================================
+   Sliders / Progress
+   ========================================================== */
+
+QSlider {
+    background: transparent;
+}
+
+QSlider::groove:horizontal {
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(127, 127, 127, 0.28);
+}
+
+QSlider::sub-page:horizontal {
+    height: 4px;
+    border-radius: 2px;
+    background: palette(highlight);
+}
+
+QSlider::handle:horizontal {
+    width: 18px;
+    height: 18px;
+    margin: -7px 0;
+    border-radius: 9px;
+    background: palette(highlight);
+    border: 3px solid palette(base);
+}
+
+QSlider::groove:vertical {
+    width: 4px;
+    border-radius: 2px;
+    background: rgba(127, 127, 127, 0.28);
+}
+
+QSlider::sub-page:vertical {
+    width: 4px;
+    border-radius: 2px;
+    background: palette(highlight);
+}
+
+QSlider::handle:vertical {
+    width: 18px;
+    height: 18px;
+    margin: 0 -7px;
+    border-radius: 9px;
+    background: palette(highlight);
+    border: 3px solid palette(base);
+}
+
+QProgressBar {
+    min-height: 8px;
+    border: none;
+    border-radius: 4px;
+    background: rgba(127, 127, 127, 0.22);
+    text-align: center;
+    color: transparent;
+}
+
+QProgressBar::chunk {
+    border-radius: 4px;
+    background: palette(highlight);
+}
+
+
+/* ==========================================================
+   Splitters
+   ========================================================== */
+
+QSplitter {
+    background: transparent;
+}
+
+QSplitter::handle {
+    background: transparent;
+}
+
+QSplitter::handle:horizontal {
+    width: 6px;
+}
+
+QSplitter::handle:vertical {
+    height: 6px;
+}
+
+QSplitter::handle:hover {
+    background: rgba(0, 120, 212, 0.16);
+}
+
+
+/* ==========================================================
+   GroupBox
+   ========================================================== */
+
+QGroupBox {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 10px;
+    margin-top: 12px;
+    padding: 12px;
+    background: palette(base);
+    font-weight: 600;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    padding: 0 6px;
+    left: 10px;
+    color: palette(window-text);
+    background: palette(window);
+}
+
+
+/* ==========================================================
+   Message Boxes / Dialogs
+   ========================================================== */
+
+QDialog,
+QMessageBox {
+    background: palette(window);
+    color: palette(window-text);
+}
+
+QMessageBox QLabel {
+    background: transparent;
+    min-width: 0px;
+    max-width: 420px;
+    padding: 2px;
+}
+
+QMessageBox QPushButton {
+    min-width: 84px;
+}
+
+
+/* ==========================================================
+   Status Bar
+   ========================================================== */
+
+QStatusBar {
+    background: transparent;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    color: rgba(127, 127, 127, 0.95);
+}
+
+QStatusBar QLabel {
+    color: rgba(127, 127, 127, 0.95);
+}
+
+
+/* ==========================================================
+   Activity Rail / Navigation
+   ========================================================== */
+
+QFrame#activityRail {
+    background: rgba(255, 255, 255, 0.58);
+    border-right: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+QToolButton#railMenuButton,
+QToolButton#activityButton {
+    min-width: 36px;
+    min-height: 36px;
+    max-width: 36px;
+    max-height: 36px;
+    margin: 2px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    icon-size: 20px;
+}
+
+QToolButton#railMenuButton {
+    font-size: 22px;
+    font-weight: 600;
+}
+
+QToolButton#railMenuButton:hover,
+QToolButton#activityButton:hover {
+    background: rgba(0, 0, 0, 0.045);
+}
+
+QToolButton#activityButton:checked {
+    background: rgba(0, 120, 212, 0.10);
+    border-left: 3px solid palette(highlight);
+    color: palette(highlight);
+}
+
+QToolButton#activityButton:pressed,
+QToolButton#railMenuButton:pressed {
+    background: rgba(0, 120, 212, 0.16);
+}
+
+
+/* ==========================================================
+   Collapsible Panel
+   ========================================================== */
+
+QFrame#collapsiblePanel,
+QFrame#CollapsiblePanel {
+    background: transparent;
+    border: none;
+}
+
+QToolButton#panelToggleButton {
+    min-height: 32px;
+    text-align: left;
+    padding: 6px 10px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: rgba(127, 127, 127, 0.08);
+    font-weight: 600;
+}
+
+QToolButton#panelToggleButton:hover {
+    background: rgba(0, 0, 0, 0.045);
+}
+
+QToolButton#panelToggleButton:pressed {
+    background: rgba(0, 120, 212, 0.12);
+}
+
+QWidget#panelBody {
+    background: transparent;
+    border: none;
+}
+
+
+/* ==========================================================
+   ToolTips
+   ========================================================== */
+
+QToolTip {
+    background: rgba(32, 32, 32, 0.95);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    padding: 6px 8px;
+}
+
+
+/* ==========================================================
+   Optional Dark Mode Overrides
+   Apply by setting a parent property:
+   widget.setProperty("theme", "dark")
+   ========================================================== */
+
+QWidget[theme="dark"] {
+    background: rgb(32, 32, 32);
+    color: rgba(255, 255, 255, 0.92);
+}
+
+QWidget[theme="dark"] QFrame#Card,
+QWidget[theme="dark"] QFrame#card,
+QWidget[theme="dark"] QWidget#Card,
+QWidget[theme="dark"] QWidget#card,
+QWidget[theme="dark"] QFrame#ChartPanel {
+    background: rgb(43, 43, 43);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+QWidget[theme="dark"] QLineEdit,
+QWidget[theme="dark"] QSpinBox,
+QWidget[theme="dark"] QDoubleSpinBox,
+QWidget[theme="dark"] QComboBox,
+QWidget[theme="dark"] QDateEdit,
+QWidget[theme="dark"] QTimeEdit,
+QWidget[theme="dark"] QDateTimeEdit,
+QWidget[theme="dark"] QPlainTextEdit,
+QWidget[theme="dark"] QTextEdit,
+QWidget[theme="dark"] QTableView,
+QWidget[theme="dark"] QListView,
+QWidget[theme="dark"] QTreeView,
+QWidget[theme="dark"] QAbstractItemView {
+    background: rgb(38, 38, 38);
+    color: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+QWidget[theme="dark"] QPushButton {
+    background: rgb(50, 50, 50);
+    color: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+QWidget[theme="dark"] QPushButton:hover,
+QWidget[theme="dark"] QToolButton:hover,
+QWidget[theme="dark"] QAbstractItemView::item:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+QWidget[theme="dark"] QMenu {
+    background: rgba(42, 42, 42, 0.96);
+    color: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+QWidget[theme="dark"] QMenu::item:selected {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+QWidget[theme="dark"] QHeaderView::section {
+    background: rgb(32, 32, 32);
+    color: rgba(255, 255, 255, 0.92);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+QWidget[theme="dark"] QScrollBar::handle:vertical,
+QWidget[theme="dark"] QScrollBar::handle:horizontal {
+    background: rgba(255, 255, 255, 0.24);
+}
+
+QWidget[theme="dark"] QScrollBar::handle:vertical:hover,
+QWidget[theme="dark"] QScrollBar::handle:horizontal:hover {
+    background: rgba(255, 255, 255, 0.36);
+}
+
+QWidget[theme="dark"] QFrame#activityRail,
+QWidget[theme="dark"] QFrame#sideBar,
+QWidget[theme="dark"] QWidget#sideBar,
+QWidget[theme="dark"] QWidget#navigationPane {
+    background: rgba(32, 32, 32, 0.68);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
