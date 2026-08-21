@@ -3,16 +3,26 @@ Ranked by priority. P0 = wrong results or blocked work, P3 = nice to have.
 Items marked [was:] came from the original list; the rest are from the
 codebase review. Ready-to-paste Claude commands are at the bottom.
 
+DONE so far: P0-1, P1-1, P1-2, P1-3, P1-4, P1-5, P1-6, and the localization
+and documentation items (P2-14, and §5.1/5.2/7.2/7.4 of docs/DEVELOPMENT.md).
+Completed entries are kept below, marked [DONE], with what was actually built
+and anything learned that changes a neighbouring item - deleting them loses
+the reason the next item is shaped the way it is.
+
 
 ================================================================
 P0 - BUGS: wrong output, or work that cannot proceed
 ================================================================
 
-P0-1  series operations: verify input data before running
-      [was: "check if the data are ok"]
-      Operations run on whatever the series holds. NaNs, non-monotonic x,
-      duplicate x and single-point series each fail differently and some
-      fail silently with plausible-looking output.
+P0-1  [DONE] series operations: verify input data before running
+      app/utils/series_validation.py + INPUT_* declarations on all eight
+      dialogs. Wired into all six materialization sites: Interpolation, Fit,
+      Spectral and Smoothing repair via prepare_input_xy; Outlier and Cluster
+      report only, because both map results back to source rows and
+      reordering would move each mark onto a different row.
+      Interpolation and Fit each had their own silent clean/sort/average
+      code, now deleted - a series with two readings at one x was fitted
+      through neither and nothing said so.
 
 P0-4  ChartPanel: picker errors
       [was: "picker errors"]
@@ -50,7 +60,7 @@ P0-10 global: locale must follow the platform locale
 P1 - HIGH LEVERAGE: do these before piling on features
 ================================================================
 
-P1-1  series operations: declarative parameter spec  <-- DO THIS FIRST
+P1-1  [DONE] series operations: declarative parameter spec
       The eight operations run 775-1705 lines each, ~10,000 lines total,
       against a 964-line base. Most of it is form building, signal wiring
       and state persistence repeated eight times. Let an operation declare
@@ -62,20 +72,35 @@ P1-1  series operations: declarative parameter spec  <-- DO THIS FIRST
               ChoiceParam("mode", label="Method", choices=(...)),
           )
 
-      Discovery is already drop-in (series_operation_scanner AST-scans for
-      SeriesOperationDialogBase subclasses and reads Name/Description/Icon),
-      so this is the missing half. Every item in P1-3 and P2-2 gets cheaper
-      afterwards - which is why it goes first.
+      Built as parameter_spec.py (plain data, no Qt) + parameter_form.py
+      (the widgets). Outlier converted as proof.
+      CORRECTION to the estimate above: it did NOT collapse the file. Outlier
+      went 790 -> 794 lines. For a three-parameter dialog a declaration with
+      tooltips and visibility rules costs about what the imperative version
+      cost. The gain is in the invariants - visibility rules and widgets are
+      the same data so they cannot drift, a parameter cannot be added without
+      its signal connection, values() always returns every declared name, and
+      odd-window rounding happens in one place. Judge the remaining seven
+      conversions on that, not on line count.
 
-P1-2  ChartPanel: hover readout
-      No motion_notify_event is connected anywhere; the chart is inert until
-      clicked. Biggest perceived-quality win. Two things that matter: throttle
-      it, and blit rather than full-draw or it will feel terrible on large
-      series.
+P1-2  [DONE] ChartPanel: hover readout
+      Throttled to 40ms and blitted. Measured 8x5in @100dpi, mean of 25:
+        1k x1   full 12.03ms  blit 2.54ms + hit 0.03ms  = 4.7x
+        100k x1 full 14.50ms  blit 2.55ms + hit 0.91ms  = 4.2x
+        50k x10 full 26.33ms  blit 2.58ms + hit 4.63ms  = 3.7x
+      The blit is flat at ~2.55ms whatever the data size. What grows is the
+      hit test, and at 500k points it is already the larger half - which is
+      the argument for P2-5, not for a bigger throttle.
 
-P1-3  series operation: Calculus (derivative + integral)
-      Confirmed absent - no np.gradient, no scipy.integrate, no find_peaks
-      anywhere in the codebase.
+P1-3  [DONE] series operation: Calculus (derivative + integral)
+      app/series_operations/series_calculus_dialog.py. Verified against
+      analytic results: d/dx sin = cos to 1.7e-07 (spline), integral of sin
+      over [0,pi] = 2.0000000007 (Simpson).
+      Both design claims measured, not assumed:
+       - Savitzky-Golay beats raw np.gradient by ~8x RMS on noisy data, which
+         is why smoothing is inside the derivative rather than a step before.
+       - A gaussian peak (true area 1.7725) on an offset of 5 integrates to
+         51.77 without baseline subtraction. 97% of the answer was baseline.
         derivative: np.gradient (handles non-uniform x), Savitzky-Golay with
           deriv=1,2 (savgol_filter is already imported in the smoothing
           dialog), UnivariateSpline.derivative()
@@ -86,23 +111,31 @@ P1-3  series operation: Calculus (derivative + integral)
       expected to remember first. Baseline subtraction likewise belongs inside
       the integral, or peak areas are meaningless.
 
-P1-4  series operation: peak finding
-      scipy.signal.find_peaks + peak_prominences + peak_widths. Very little
-      code, large payoff, and it pairs directly with P1-3: find a peak, then
-      integrate between its bounds. Given a calibration table and a spectral
-      dialog, this may be worth more than the derivative.
+P1-4  [DONE] series operation: peak finding
+      app/series_operations/series_peaks_dialog.py. Reports each peak with
+      its prominence, width at half prominence, and the x bounds of that
+      width - which are what P1-3's integral wants.
+      Prominence is the default filter, not height, and the test data shows
+      why: on three gaussians over a sloping baseline, prominence finds
+      exactly the 3 true peaks while height returns 50 spurious ones, because
+      on a rising baseline everything late in the series is "high".
 
-P1-5  ChartPanel: bars and wedges are unpickable, so clicking them does nothing
+P1-5  [DONE] ChartPanel: bars and wedges are unpickable
       chart_panel_widget.py:385 arms only axes.lines and axes.collections. The
       docstring's reasoning is sound - a patch has no per-point index, so it
       would report "1 point" and mean the whole shape - but the consequence is
       that bar and pie charts are entirely inert. Fix by giving patches their
       own readout reporting category and value, not by arming them into the
       existing point path.
+      Done via _describe_patch. Bar orientation is read from the
+      BarContainer, not guessed from geometry: a tall thin barh bar and a
+      tall thin bar bar are the same rectangle, and the first attempt at
+      guessing got barh wrong.
 
-P1-6  ChartPanel: legend picking to toggle series visibility
-      Standard Matplotlib recipe, roughly 20 lines, constantly wanted on
-      multi-series plots.
+P1-6  [DONE] ChartPanel: legend picking to toggle series visibility
+      Handles matched to artists by label, not by position, so a series drawn
+      as several artists (a line plus its error bars) toggles as one. Hidden
+      series are skipped by the P1-2 hover hit test.
 
 
 ================================================================
@@ -132,8 +165,12 @@ P2-4  ChartPanel: rubber-band region selection (RectangleSelector)
       on screen, hand its limits to the integrator.
 
 P2-5  ChartPanel: downsample large series for display (LTTB) above ~50k points
-      Preserves visual shape at a fraction of the draw cost. bench_render.py
-      and the perf tests suggest this already matters.
+      Preserves visual shape at a fraction of the draw cost.
+      PROMOTED IN VALUE by the P1-2 measurements: with blitting in place the
+      repaint is flat at ~2.55ms, so the hover hit test is now the dominant
+      cost at scale - 4.63ms of a 7.21ms budget at 500k points. Downsampling
+      shrinks the hit test and the draw together. This is the next
+      interactivity item worth doing.
 
 P2-6  table list widget + table preview widget: inconsistent look on macOS
 
@@ -162,7 +199,15 @@ P2-12 series operations: inline preview plot beside the numeric results
 P2-13 style.py: read presentation straight from config.json
       [was: "simplify style.py"]
 
-P2-14 render plugins: localize their descriptions
+P2-14 [DONE] localization
+      All 58 untranslated strings now have Italian; the catalogue is 626
+      entries and app/tests/test_localization.py passes (12/12, previously
+      failing). Every format placeholder verified to survive translation - a
+      mangled one crashes at runtime rather than showing English.
+      Still open: renderer/operation Description attributes are class data,
+      so the _() sweep cannot see them. They need naming by hand in
+      test_labels_held_in_tables_are_translated_too, as the settings dialog
+      tables already are.
 
 
 ================================================================
@@ -222,36 +267,40 @@ P3-12 note: statsmodels, scikit-image and PyWavelets are each used by exactly
 ================================================================
 CLAUDE COMMANDS
 Paste into the terminal from the project root.
+Requires ~/.local/bin on PATH:
+  echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
 ================================================================
 
-# --- P0 ---
+# --- P0, all still open ---
 
 claude "Fix P0-6 in todo.txt: _insert_snippet in app/dialogs/query_builder_dialog.py glues SQL together when inserting at position 0 of a non-empty editor. Separate the snippet from the text on both sides of the cursor, and test the text at the cursor rather than the whole document. Add a test."
 
 claude "Fix P0-7 in todo.txt: five actions in config.json name SVG files that were deleted. Either clear their icon fields for consistency with the rest of the SFSymbol/Fluent migration, or restore the SVGs as a fallback for platforms that are neither macOS nor Windows. Recommend which and explain the tradeoff before changing anything."
 
-claude "Fix P0-2 and P0-3 in todo.txt: in the figure and series properties panels, 'Draw figure frame' has no effect and the marker and line style pickers are never enabled. Find the root cause of each before changing anything, and tell me what it was."
+claude "Fix P0-3 in todo.txt: the marker and line style pickers are never enabled. Find the root cause before changing anything, and tell me what it was."
 
-claude "Fix P0-4 and P0-5 in todo.txt: picker errors in ChartPanel, and a modal window appearing when panels are switched while Axis:Kwargs is selected. Reproduce each first and show me the traceback."
+claude "Fix P0-4 and P0-5 in todo.txt: picker errors in ChartPanel, and a modal window appearing when panels are switched while Axis:Kwargs is selected. Reproduce each first and show me the traceback. Note that ChartPanel picking changed recently - see section 7.4 of docs/DEVELOPMENT.md."
 
-claude "Fix P0-1 in todo.txt: series operations run on whatever the series holds. Add input validation for NaNs, non-monotonic x, duplicate x and too-few-points, reporting clearly instead of failing silently. Put it in the shared base so every operation gets it."
+claude "Fix P0-8, P0-9 and P0-10 in todo.txt: colorby across all renderers, the mplstyle picker not showing folders, and the locale not following the platform."
 
-# --- P1 ---
+# --- Finishing what is started ---
 
-claude "Implement P1-1 in todo.txt: a declarative parameter spec for series operations. Design it first and show me the shape before writing anything. Then convert ONE dialog to prove it works, on a branch, and report the line-count change before we touch the other seven."
+claude "Convert the remaining seven series operation dialogs to the PARAMS declaration described in section 7.2 of docs/DEVELOPMENT.md. The outlier dialog is the worked example. Do them ONE AT A TIME, committing each separately, and report the line-count change for each - the outlier conversion did not shrink the file and I want to know whether the larger dialogs do."
 
-claude "Implement P1-3 and P1-4 in todo.txt: a Calculus series operation (derivative and integral) and a peak-finding operation. Read app/series_operations/series_smoothing_dialog.py first for the established pattern. Smoothing must be built into the derivative and baseline subtraction into the integral, for the reasons in the todo."
+claude "Add tests for the two new operations: app/series_operations/series_calculus_dialog.py and series_peaks_dialog.py. They were verified interactively against analytic results (d/dx sin = cos, integral of sin over [0,pi] = 2, three gaussians of known position and width) but that verification is not in the test suite. Turn it into one."
 
-claude "Implement P1-2 in todo.txt: hover readout in ChartPanel via motion_notify_event. Throttle it and use blitting rather than a full draw. Benchmark against a large series with app/tests/bench_render.py and show me the numbers."
+# --- P2, in the order I would do them ---
 
-claude "Implement P1-5 and P1-6 in todo.txt: make bars and wedges report category and value on click via their own readout path, and add legend picking to toggle series visibility. Read the docstring at app/widgets/chart_panel_widget.py:385 first - it explains why patches are currently excluded."
-
-# --- P2 ---
+claude "Implement P2-5 in todo.txt: downsample large series for display. Read the benchmark under P1-2 first - blitting made the repaint flat, so the hover hit test is now the dominant cost at scale and this shrinks both."
 
 claude "Implement P2-1 in todo.txt: add Q-Q and residual renderers. Read app/charts/ecdf_axis.py and app/utils/distribution_fit.py first; both should reuse the existing fitting infrastructure rather than recomputing."
 
-claude "Implement P2-2 in todo.txt: a resample-onto-common-x helper, then a series arithmetic operation built on it. The helper is the real deliverable; several other planned features need it."
+claude "Implement P2-2 in todo.txt: a resample-onto-common-x helper, then a series arithmetic operation built on it. The helper is the real deliverable; several other planned features need it. Put it beside app/utils/series_validation.py, which already owns the clean/sort/merge logic it will build on."
+
+claude "Implement P2-3 in todo.txt: baseline correction as a series operation. app/series_operations/series_calculus_dialog.py already has minimum and endpoint-line baselines inline; this should share that code rather than reimplement it."
 
 claude "Fix P2-6 and P2-7 in todo.txt: the table list and table preview widgets look inconsistent on macOS, and menu popup icons are not aligned with their text. Screenshot the current state first."
 
 claude "Implement P2-9 in todo.txt: split config.json into user settings and application config. Per-session window geometry currently dirties the working tree on every run; that half should not be tracked in git."
+
+claude "Finish the localization gap noted under P2-14: renderer and operation Description attributes are class data, so the _() sweep cannot see them. Name them in test_labels_held_in_tables_are_translated_too the way the settings dialog tables already are, and translate them."

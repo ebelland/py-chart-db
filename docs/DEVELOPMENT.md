@@ -41,13 +41,17 @@ app/
   widgets/            Panels embedded in dialogs/the main window
                       (properties editors, table list/preview, chart panel).
   series_operations/  One module per series operation (fit, smoothing,
-                      outlier removal, spectral analysis, clustering, ...).
+                      outlier removal, spectral analysis, clustering,
+                      calculus, peaks, ...), plus parameter_spec.py /
+                      parameter_form.py, the declarative parameter support
+                      shared by all of them (see §7.2).
   scanners/           AST-based plugin discovery for renderers and series
                       operations (see §4).
   styles/             style.py (the shared widget/action/icon factory),
                       macos_native.qss, fluent_win11.qss, palettes.py.
   utils/              config.json access, i18n, coercion, messages, dialog
-                      state persistence, DPI handling, LaTeX detection.
+                      state persistence, DPI handling, LaTeX detection,
+                      figure_metrics.py (§5.2), series_validation.py (§7.2).
   locales/            gettext-style .po catalogues (see §8).
 mplstyles/            The bundled Matplotlib style library (see §7.3).
 _make_demo_project.py Builds "Demo Project.dhub" through SqliteRepo - the
@@ -163,6 +167,49 @@ Internals, in `render_figure.py`:
 
 Tests: `app/tests/test_figure_layout_and_frame.py`.
 
+### 5.1 Layout engine and manual spacing
+
+Separate from the grid, and easy to confuse with it.
+`FigureDescriptor.options["layout_mode"]` picks Matplotlib's **layout
+engine**, which decides how the axes the grid produced are spaced:
+`constrained`, `compressed`, `tight`, or `none` (shown as **Manual**). Those
+four are the whole set `Figure.set_layout_engine()` accepts.
+
+**GridSpec is not a layout engine and does not belong in that list.** It is
+how axes are *created* — `_create_axes_from_gridspec` uses it for every
+figure — and it is what gives an axis its `row_span`/`col_span` (§5). The two
+answer different questions: GridSpec decides where an axis is, the engine
+decides how much room is left between them.
+
+Under `none`/Manual, `_apply_subplot_margins` reads
+`options["margins"]` — `left`, `right`, `bottom`, `top`, `wspace`, `hspace`
+— and applies them via `subplots_adjust`. These are editable as **Manual
+spacing** on the Figure panel, enabled only under Manual: the three automatic
+engines recompute spacing and overwrite whatever `subplots_adjust` set, so
+the controls are disabled with an explanatory tooltip rather than silently
+ignored.
+
+`wspace`/`hspace` are fractions of the *average axis size* and legitimately
+exceed 1; the four edges are fractions of the figure and do not.
+
+### 5.2 Physical size and DPI
+
+`figure_width_cm`, `figure_height_cm` and `figure_dpi` live in each figure's
+`options`, not in `config.json`. They were application-wide until they moved,
+which meant opening a second figure applied the first one's size to it. A
+slide wants 25cm wide and a journal column wants 8.5.
+
+`app/utils/figure_metrics.py` holds the keys and the reader.
+`figure_metrics_from_options()` returns `None` for a figure with no metrics
+of its own — deliberately distinct from zero, so a figure saved before the
+change keeps rendering as it did instead of being reset to a default. A
+half-set of metrics counts as absent too: applying a width without its height
+would distort the figure rather than resize it.
+
+`ChartPanel` pushes them into rcParams on construction and on every
+`reload()`, because rcParams is process-wide and every figure wants a
+different answer.
+
 ## 6. `frameon`
 
 `FigureDescriptor.options["frameon"]` (bool, default `True`) is the "Draw
@@ -222,6 +269,94 @@ Operations write their result back as a new table prefixed with `_`
 (`generated_table_name`) so the source list can group/hide generated tables
 separately from imported ones.
 
+#### Declaring parameters instead of building them
+
+Set `PARAMS` on the class and the base builds the form, wires every control
+to `refresh_results`, reads the values back by name, and shows or hides each
+row — no `build_parameter_selector`, no signal connections, no
+`_refresh_visibility`:
+
+```python
+PARAMS = (
+    FloatParam("threshold", "Threshold:", default_value=3.0,
+               minimum=0.1, maximum=30.0,
+               visible_for={"model": (OUTLIER_ZSCORE, OUTLIER_MAD)}),
+    IntParam("window", "Window size:", default_value=11,
+             minimum=3, maximum=9999, odd_only=True,
+             visible_for={"model": (OUTLIER_ROLLING,)}),
+)
+```
+
+Read them with `self.parameter_values()`, which returns **every** declared
+name whether or not its row is visible — an operation reading a parameter
+belonging to another model gets that parameter's default rather than a
+`KeyError`.
+
+- `app/series_operations/parameter_spec.py` — the declarations. Plain data,
+  no Qt import, so they stay testable without a window server.
+- `app/series_operations/parameter_form.py` — builds the widgets.
+
+`visible_for` maps *another* parameter's name to the values for which this
+row is shown. It may name something the form does not own — `model` is the
+base's own combo — because `ParameterForm` takes a `context` callable;
+`parameter_context()` supplies `model` by default.
+
+`odd_only` matters more than it looks: `savgol_filter` and `medfilt` both
+reject an even window with an exception raised from inside SciPy that names
+neither the control the user moved nor the series it was moved on.
+
+`PARAMS` is optional. An operation that leaves it empty keeps overriding
+`build_parameter_selector` by hand, which is still the right answer for a
+genuinely unusual control. The outlier dialog is the converted example.
+
+Honest note on the payoff: converting the outlier dialog changed it from 790
+lines to 794. It did not shrink. The gain is in the invariants — visibility
+rules and widgets are the same data so they cannot drift, a new parameter
+cannot be added without its signal connection, and range clamping happens in
+one place — not in the line count.
+
+#### Validating input before the operation runs
+
+Declare what the operation needs of its data and the base checks it:
+
+```python
+INPUT_MINIMUM_POINTS = 3
+INPUT_REQUIRES_SORTED_X = True
+INPUT_REQUIRES_UNIQUE_X = True
+INPUT_REQUIRES_UNIFORM_X = False
+INPUT_REQUIRES_VARYING_Y = False
+```
+
+Then call one of two methods on the materialized arrays:
+
+- `prepare_input_xy(x, y, label=...)` — validates **and repairs**, returning
+  cleaned arrays. Drops non-finite points always; sorts and averages
+  duplicate x according to the declarations. Every repair is reported.
+- `validate_input_xy(x, y, label=..., raise_on_error=False)` — reports only.
+  Use this whenever the result is mapped back to source rows: the outlier
+  detector matches by rowid and the cluster dialog by frame position, so
+  reordering would move each mark onto a different row.
+
+Requirements are declared rather than assumed because a validator that
+rejects data an operation handles fine is worse than none — it blocks real
+work and teaches people to dismiss it. An FFT needs uniform spacing;
+`np.gradient` does not. A spline needs unique x; clustering reads an
+observation matrix where repeated x is two ordinary observations.
+
+Severity depends on whether a repair is coming: duplicate x is fatal to a
+spline, but averaging is a defensible fix, so it is an error when nobody
+will fix it and a warning when somebody will (`repairable=True`, which
+`prepare_input_xy` passes).
+
+The three failure modes this exists for all produce *wrong answers* rather
+than errors — unsorted x smoothed as a sequence, a spline through duplicate
+x, and `pd.to_numeric(errors="coerce")` turning a text column into an
+all-NaN array with no complaint.
+
+The check itself is `app/utils/series_validation.py`: pure numpy, no Qt, no
+pandas. Tests in `app/tests/test_series_validation.py`, about half of which
+assert what it must **not** reject.
+
 ### 7.3 The `.mplstyle` library
 
 `mplstyles/` ships a large set of `.mplstyle` files, organized into
@@ -235,6 +370,61 @@ same dropdown has a **Browse…** entry that opens a native file picker for a
 style kept anywhere else entirely (`_browse_for_style_file`). Adding a style
 is just dropping a `.mplstyle` file anywhere under `mplstyles/`, including a
 new subfolder — no registration needed.
+
+### 7.4 ChartPanel interaction
+
+Everything the chart does under the pointer is wired in
+`app/widgets/chart_panel_widget.py`, through Matplotlib's own event system
+rather than Qt's — Matplotlib already knows which artist owns each pixel and
+can give a position in data coordinates, and redoing either against Qt
+coordinates would mean reimplementing marker sizes, transforms and axis
+scales for every renderer.
+
+| Event | Does |
+| --- | --- |
+| `scroll_event` | Zoom about the point under the cursor |
+| `pick_event` | Read out a point, a bar/wedge, or toggle a legend entry |
+| `button_press_event` | Ctrl+click creates an axis annotation |
+| `motion_notify_event` | Hover readout |
+
+**Hover** is throttled to `HOVER_INTERVAL_MS` (40ms) and **blitted**. Both
+matter: mouse motion arrives far faster than a hit test plus a repaint can be
+done, and a full `draw()` re-runs every renderer for every series. Restoring
+a cached bitmap and drawing one text box costs ~2.5ms whatever the data size,
+against 12–26ms for a full draw. What grows with the data is the hit test,
+which at 500k points is already the larger half of the budget.
+
+Two traps in the blitting, both of which silently defeat it:
+
+- The background must be captured with the annotation *hidden*, or it is
+  baked in and smears across the plot.
+- `_invalidate_hover_background` (on `draw_event`/`resize_event`) must drop
+  only the bitmap, never `_hover_axes`. Clearing both makes every hover
+  rebuild the annotation and force the full draw that blitting exists to
+  avoid — the blit path is then never reached at all.
+  `_discard_hover_annotation` is the separate, stronger reset, called from
+  `reload()` because `figure.clear()` destroys the artist itself.
+
+Hit distance is measured in **display pixels**, not data units: a chart of
+millivolts against seconds would otherwise treat a step along x as thousands
+of times nearer than one along y.
+
+**Picking** arms lines and collections with a tolerance in points, and
+patches with `picker=True` — a patch is a filled area, so "inside the shape"
+is the test, and a distance from its edge leaves the middle of a tall bar
+unclickable. Patches read out through `_describe_patch` rather than the point
+path: a bar reports its category and value, a wedge its share. Bar
+orientation comes from the `BarContainer`, not from the geometry, because a
+tall thin `barh` bar and a tall thin `bar` bar are the same rectangle.
+
+**Legend picking** toggles a series' visibility. Handles are matched to
+artists by label rather than by position, so a series drawn as several
+artists — a line plus its error bars — toggles as one. The entry dims instead
+of disappearing, so a hidden series still has something to click. Hidden
+series are skipped by the hover hit test.
+
+Tests: `app/tests/test_chart_panel_selection.py`,
+`app/tests/test_chart_panel_buffer.py`.
 
 ## 8. Styling (`app/styles/`)
 

@@ -2274,3 +2274,235 @@ msgstr "Ricarica tabelle"
 
 msgid "Reload database tables"
 msgstr "Ricarica le tabelle del database"
+
+
+msgid "Add annotation"
+msgstr "Aggiungi annotazione"
+
+
+msgid "Annotation"
+msgstr "Annotazione"
+
+
+msgid "Annotation added at x: {x}, y: {y}"
+msgstr "Annotazione aggiunta a x: {x}, y: {y}"
+
+
+msgid "Annotations"
+msgstr "Annotazioni"
+
+
+msgid "Annotations are stored in axis options. Kwargs must be JSON, for example: {\"xytext\": [10, 10], \"textcoords\": \"offset points\"}."
+msgstr "Le annotazioni sono salvate nelle opzioni dell'asse. I kwargs devono essere in JSON, per esempio: {\"xytext\": [10, 10], \"textcoords\": \"offset points\"}."
+
+
+msgid "Apply multi-peak"
+msgstr "Applica multi-picco"
+
+
+msgid "Browse…"
+msgstr "Sfoglia…"
+
+
+msgid "Calculus"
+msgstr "Calcolo"
+
+
+msgid "Choose the calculation."
+msgstr "Scegli il calcolo da eseguire."
+
+
+msgid "Copy parameters"
+msgstr "Copia i parametri"
+
+
+msgid "Correlation matrix"
+msgstr "Matrice di correlazione"
+
+
+msgid "Curve"
+msgstr "Curva"
+
+
+msgid "Delete selected"
+msgstr "Elimina selezionati"
+
+
+msgid "Detail"
+msgstr "Dettaglio"
+
+
+msgid "Find:"
+msgstr "Cerca:"
+
+
+msgid "Function expression"
+msgstr "Espressione della funzione"
+
+
+msgid "Function expression with evaluated parameters"
+msgstr "Espressione della funzione con i parametri valutati"
+
+
+msgid "Grid cells this axis spans from its position, so it can take up more room than the other axes in the figure."
+msgstr "Celle della griglia occupate da questo asse a partire dalla sua posizione, così da poter occupare più spazio degli altri assi della figura."
+
+
+msgid "Grid position"
+msgstr "Posizione nella griglia"
+
+
+msgid "Half-prominence bounds"
+msgstr "Limiti a metà prominenza"
+
+
+msgid "Initial value, bounds and fixed flag for each function parameter. Apply runs the fit with these settings."
+msgstr "Valore iniziale, limiti e blocco per ogni parametro della funzione. Applica esegue il fit con queste impostazioni."
+
+
+msgid "Kind"
+msgstr "Tipo"
+
+
+msgid "Kwargs JSON"
+msgstr "Kwargs JSON"
+
+
+msgid "Manual spacing"
+msgstr "Spaziatura manuale"
+
+
+msgid "Matplotlib Style (*.mplstyle);;All Files (*)"
+msgstr "Stile Matplotlib (*.mplstyle);;Tutti i file (*)"
+
+
+msgid "No descriptor axis found for annotation."
+msgstr "Nessun asse del descrittore trovato per l'annotazione."
+
+
+msgid "No peaks passed the filter. Lower the minimum, or switch from height to prominence if the baseline is not at zero."
+msgstr "Nessun picco ha superato il filtro. Abbassa il minimo, oppure passa da altezza a prominenza se la linea di base non è a zero."
+
+
+msgid "No results for this selection."
+msgstr "Nessun risultato per questa selezione."
+
+
+msgid "No results."
+msgstr "Nessun risultato."
+
+
+msgid "Peaks"
+msgstr "Picchi"
+
+
+msgid "Pick a scanned function model to populate the formula and parameters."
+msgstr "Scegli un modello di funzione rilevato per compilare la formula e i parametri."
+
+
+msgid "Points"
+msgstr "Punti"
+
+
+msgid "Prominence"
+msgstr "Prominenza"
+
+
+msgid "Reset parameters"
+msgstr "Reimposta i parametri"
+
+
+msgid "Save as CSV"
+msgstr "Salva come CSV"
+
+
+msgid "Save parameters as CSV"
+msgstr "Salva i parametri come CSV"
+
+
+msgid "Select Matplotlib Style"
+msgstr "Seleziona uno stile Matplotlib"
+
+
+msgid "Select one or more source series."
+msgstr "Seleziona una o più serie di origine."
+
+
+msgid "Set Figure layout to Manual to edit spacing by hand."
+msgstr "Imposta il layout della figura su Manuale per modificare la spaziatura a mano."
+
+
+msgid "Span"
+msgstr "Estensione"
+
+
+msgid "Text"
+msgstr "Testo"
+
+
+msgid "Tie eta"
+msgstr "Vincola eta"
+
+
+msgid "Tie width"
+msgstr "Vincola la larghezza"
+
+
+msgid "Total"
+msgstr "Totale"
+
+
+msgid "Type"
+msgstr "Tipo"
+
+
+msgid "Use latest fitted parameters"
+msgstr "Usa gli ultimi parametri ottimizzati"
+
+
+msgid "Which turning points to look for."
+msgstr "Quali punti di inversione cercare."
+
+
+msgid "X"
+msgstr "X"
+
+
+msgid "Y"
+msgstr "Y"
+
+
+msgid "bar"
+msgstr "barra"
+
+
+msgid "maximum"
+msgstr "massimo"
+
+
+msgid "minimum"
+msgstr "minimo"
+
+
+msgid "slice"
+msgstr "fetta"
+
+
+msgid "{label}: {value}"
+msgstr "{label}: {value}"
+
+
+msgid "{series}\nx: {x}\ny: {y}"
+msgstr "{series}\nx: {x}\ny: {y}"
+
+
+msgid "{series} hidden"
+msgstr "{series} nascosta"
+
+
+msgid "{series} shown"
+msgstr "{series} mostrata"
+
+
+msgid "{series} — {percent:.1f}% of the total"
+msgstr "{series} — {percent:.1f}% del totale"
