@@ -1,43 +1,263 @@
-BUGS:
-
-series operations: 
-     check if the data are ok
-     change spectral and plot incons
-     plot: after apply move to new ChartPanel
-
-plot:
-     default to scatterplot
-
-properties:
-     mplstyle: load instead of dropdown list or folders are not shown
-     neither marker nor line style is enabled --> use rcParams!
-     draw figure frame dowes not work
-     
-global:
-     local must be set to current platform locale
-     split config.json in user and config
-
-ChartPanel:
-     picker errors
-     when changing panel and Axis:Kwargs is selected, a modal window is shown!
-
-renderers:
-     check if colorby works for all renderers
-
-improve dialog loading speed
+py-chart-db TODO
+Ranked by priority. P0 = wrong results or blocked work, P3 = nice to have.
+Items marked [was:] came from the original list; the rest are from the
+codebase review. Ready-to-paste Claude commands are at the bottom.
 
 
-NEW STUFF
+================================================================
+P0 - BUGS: wrong output, or work that cannot proceed
+================================================================
 
-general:
-     table view: data coloring by value
-     external database link
-     ChartPlot "virtuale": contiene solo una lista di queries senza alcuna figura tracciata
-     custom function table generation
-     localization helper dialog
-     add other layouts to figure
+P0-1  series operations: verify input data before running
+      [was: "check if the data are ok"]
+      Operations run on whatever the series holds. NaNs, non-monotonic x,
+      duplicate x and single-point series each fail differently and some
+      fail silently with plausible-looking output.
 
-axis_properties:
-     Axis options and drawings kwargs: make more homogeneous
+P0-2  properties: "Draw figure frame" has no effect
+      [was: "draw figure frame does not work"]
 
-Chart Panel: remove default toolbar icons for configuring subplots and editing axis_properties
+P0-3  properties: marker and line style pickers are never enabled
+      [was: "neither marker nor line style is enabled --> use rcParams!"]
+
+P0-4  ChartPanel: picker errors
+      [was: "picker errors"]
+      See also P1-5: patches are deliberately unpickable, which is separate.
+
+P0-5  ChartPanel: selecting Axis:Kwargs while switching panels opens a modal
+      [was: "when changing panel and Axis:Kwargs is selected, a modal window
+      is shown!"]
+
+P0-6  query builder: snippets are inserted with no separator
+      _insert_snippet only prepends a newline when cursor.position() > 0, so
+      inserting at the start of a non-empty editor produces
+      `...b."<key>"SELECT * FROM "calibration"` - invalid SQL glued together.
+      The endswith("\n") test also inspects the whole document rather than
+      the text at the cursor, so mid-document inserts misjudge it too.
+
+P0-7  five actions name SVG files that no longer exist
+      nav_data->data, import->import, query_builder/sql_select->query,
+      settings->settings, rcparam_reset->reload. All have SFSymbol and
+      SegoeFluent set, so macOS and Windows are fine; any third platform
+      falls through to _svg_icon_or_empty and renders blank.
+
+P0-8  renderers: confirm colorby works for every renderer
+      [was: "check if colorby works for all renderers"]
+
+P0-9  properties: mplstyle picker does not show folders
+      [was: "mplstyle: load instead of dropdown list or folders are not
+      shown"]
+
+P0-10 global: locale must follow the platform locale
+      [was: "local must be set to current platform locale"]
+
+
+================================================================
+P1 - HIGH LEVERAGE: do these before piling on features
+================================================================
+
+P1-1  series operations: declarative parameter spec  <-- DO THIS FIRST
+      The eight operations run 775-1705 lines each, ~10,000 lines total,
+      against a 964-line base. Most of it is form building, signal wiring
+      and state persistence repeated eight times. Let an operation declare
+      its parameters as data and have the base build the UI:
+
+          PARAMS = (
+              FloatParam("window", label="Window", default=11,
+                         range=(3, 501), odd_only=True),
+              ChoiceParam("mode", label="Method", choices=(...)),
+          )
+
+      Discovery is already drop-in (series_operation_scanner AST-scans for
+      SeriesOperationDialogBase subclasses and reads Name/Description/Icon),
+      so this is the missing half. Every item in P1-3 and P2-2 gets cheaper
+      afterwards - which is why it goes first.
+
+P1-2  ChartPanel: hover readout
+      No motion_notify_event is connected anywhere; the chart is inert until
+      clicked. Biggest perceived-quality win. Two things that matter: throttle
+      it, and blit rather than full-draw or it will feel terrible on large
+      series.
+
+P1-3  series operation: Calculus (derivative + integral)
+      Confirmed absent - no np.gradient, no scipy.integrate, no find_peaks
+      anywhere in the codebase.
+        derivative: np.gradient (handles non-uniform x), Savitzky-Golay with
+          deriv=1,2 (savgol_filter is already imported in the smoothing
+          dialog), UnivariateSpline.derivative()
+        integral: cumulative_trapezoid for a running integral, simpson/
+          trapezoid for a definite value
+      Noise amplification is the whole difficulty of numerical differentiation,
+      so smoothing belongs inside this operation, not as a step the user is
+      expected to remember first. Baseline subtraction likewise belongs inside
+      the integral, or peak areas are meaningless.
+
+P1-4  series operation: peak finding
+      scipy.signal.find_peaks + peak_prominences + peak_widths. Very little
+      code, large payoff, and it pairs directly with P1-3: find a peak, then
+      integrate between its bounds. Given a calibration table and a spectral
+      dialog, this may be worth more than the derivative.
+
+P1-5  ChartPanel: bars and wedges are unpickable, so clicking them does nothing
+      chart_panel_widget.py:385 arms only axes.lines and axes.collections. The
+      docstring's reasoning is sound - a patch has no per-point index, so it
+      would report "1 point" and mean the whole shape - but the consequence is
+      that bar and pie charts are entirely inert. Fix by giving patches their
+      own readout reporting category and value, not by arming them into the
+      existing point path.
+
+P1-6  ChartPanel: legend picking to toggle series visibility
+      Standard Matplotlib recipe, roughly 20 lines, constantly wanted on
+      multi-series plots.
+
+
+================================================================
+P2 - VALUABLE
+================================================================
+
+P2-1  renderers that pair with infrastructure already built
+        Q-Q plot      - distribution_fit.py and an ECDF renderer already
+                        exist; Q-Q is the third of that set and is what
+                        people actually use to judge a distribution fit
+        residual plot - a full fitting dialog exists with no way to plot
+                        residuals, the standard way to see if a fit is good
+        heatmap/imshow- no 2D renderer at all, despite scikit-image being a
+                        declared dependency
+        contour
+
+P2-2  series operations: arithmetic (A-B, A/B, normalize, offset)
+      Needs a resample-onto-common-x helper first, since two series rarely
+      share an x grid. That helper does not exist and several other things
+      want it.
+
+P2-3  series operation: baseline correction (ALS or rubber-band)
+      Pure numpy/scipy. Prerequisite for meaningful peak areas.
+
+P2-4  ChartPanel: rubber-band region selection (RectangleSelector)
+      The natural bridge between the chart and the operations: select a peak
+      on screen, hand its limits to the integrator.
+
+P2-5  ChartPanel: downsample large series for display (LTTB) above ~50k points
+      Preserves visual shape at a fraction of the draw cost. bench_render.py
+      and the perf tests suggest this already matters.
+
+P2-6  table list widget + table preview widget: inconsistent look on macOS
+
+P2-7  menu popup: icons not aligned with their text
+
+P2-8  table view: colour data by value
+      [was: "table view: data coloring by value"]
+
+P2-9  global: split config.json into user settings and application config
+      [was: "split config.json in user and config"]
+      The file currently mixes the action catalogue with per-session window
+      geometry, so every run dirties the working tree.
+
+P2-10 query builder: column/table autocomplete in the editor
+      get_columns() already exists; a QCompleter over table and column names
+      is a small amount of code and makes the editor feel finished.
+
+P2-11 undo for descriptor edits
+      Operations write generated tables and deletes are final. Even a simple
+      command stack limited to descriptor edits is cheap insurance.
+
+P2-12 series operations: inline preview plot beside the numeric results
+      publish_results emits text/HTML only; a fit or a peak-find is far more
+      legible with a small plot next to it.
+
+P2-13 style.py: read presentation straight from config.json
+      [was: "simplify style.py"]
+
+P2-14 render plugins: localize their descriptions
+
+
+================================================================
+P3 - LATER
+================================================================
+
+P3-1  figure: mosaic layouts (subplot_mosaic-style named regions)
+      [was: "add other layouts to figure" - partly done]
+      Manual spacing and the four Matplotlib layout engines are now exposed.
+      Note for whoever picks this up: GridSpec is NOT a layout engine and does
+      not belong in that combo. It is how axes are created, which
+      _create_axes_from_gridspec already does for every figure, and it is what
+      gives an axis its row_span/col_span - both already have UI. The genuinely
+      missing thing is naming regions and letting axes claim them.
+
+P3-2  external database link
+      [was: "external database link"]
+
+P3-3  ChartPlot "virtuale": contiene solo una lista di queries senza alcuna
+      figura tracciata
+      [was, unchanged]
+
+P3-4  custom function table generation
+      [was: "custom function table generation"]
+
+P3-5  localization helper dialog
+      [was: "localization helper dialog"]
+
+P3-6  axis_properties: make Axis options and drawing kwargs homogeneous
+      [was: "Axis options and drawings kwargs: make more homogeneous"]
+
+P3-7  ChartPanel: remove the default toolbar icons for configuring subplots
+      and editing axis properties
+      [was, unchanged]
+
+P3-8  improve dialog loading speed
+      [was: "improve dialog loading speed"]
+
+P3-9  plot: default to scatterplot
+      [was: "plot: default to scatterplot"]
+
+P3-10 series operations: spectral/plot inconsistency; after Apply, move to the
+      new ChartPanel
+      [was: "change spectral and plot incons" / "plot: after apply move to new
+      ChartPanel"]
+
+P3-11 requirements.txt: declare scikit-learn as an optional dependency
+      The cluster dialog imports it behind a guarded try/except with a clear
+      "install this" message, so the behaviour is right - it is just
+      undeclared, so nobody knows the feature exists.
+
+P3-12 note: statsmodels, scikit-image and PyWavelets are each used by exactly
+      one file (series_smoothing_dialog.py). Three heavy dependencies for one
+      dialog - worth knowing if the install ever needs slimming.
+
+
+================================================================
+CLAUDE COMMANDS
+Paste into the terminal from the project root.
+================================================================
+
+# --- P0 ---
+
+claude "Fix P0-6 in todo.txt: _insert_snippet in app/dialogs/query_builder_dialog.py glues SQL together when inserting at position 0 of a non-empty editor. Separate the snippet from the text on both sides of the cursor, and test the text at the cursor rather than the whole document. Add a test."
+
+claude "Fix P0-7 in todo.txt: five actions in config.json name SVG files that were deleted. Either clear their icon fields for consistency with the rest of the SFSymbol/Fluent migration, or restore the SVGs as a fallback for platforms that are neither macOS nor Windows. Recommend which and explain the tradeoff before changing anything."
+
+claude "Fix P0-2 and P0-3 in todo.txt: in the figure and series properties panels, 'Draw figure frame' has no effect and the marker and line style pickers are never enabled. Find the root cause of each before changing anything, and tell me what it was."
+
+claude "Fix P0-4 and P0-5 in todo.txt: picker errors in ChartPanel, and a modal window appearing when panels are switched while Axis:Kwargs is selected. Reproduce each first and show me the traceback."
+
+claude "Fix P0-1 in todo.txt: series operations run on whatever the series holds. Add input validation for NaNs, non-monotonic x, duplicate x and too-few-points, reporting clearly instead of failing silently. Put it in the shared base so every operation gets it."
+
+# --- P1 ---
+
+claude "Implement P1-1 in todo.txt: a declarative parameter spec for series operations. Design it first and show me the shape before writing anything. Then convert ONE dialog to prove it works, on a branch, and report the line-count change before we touch the other seven."
+
+claude "Implement P1-3 and P1-4 in todo.txt: a Calculus series operation (derivative and integral) and a peak-finding operation. Read app/series_operations/series_smoothing_dialog.py first for the established pattern. Smoothing must be built into the derivative and baseline subtraction into the integral, for the reasons in the todo."
+
+claude "Implement P1-2 in todo.txt: hover readout in ChartPanel via motion_notify_event. Throttle it and use blitting rather than a full draw. Benchmark against a large series with app/tests/bench_render.py and show me the numbers."
+
+claude "Implement P1-5 and P1-6 in todo.txt: make bars and wedges report category and value on click via their own readout path, and add legend picking to toggle series visibility. Read the docstring at app/widgets/chart_panel_widget.py:385 first - it explains why patches are currently excluded."
+
+# --- P2 ---
+
+claude "Implement P2-1 in todo.txt: add Q-Q and residual renderers. Read app/charts/ecdf_axis.py and app/utils/distribution_fit.py first; both should reuse the existing fitting infrastructure rather than recomputing."
+
+claude "Implement P2-2 in todo.txt: a resample-onto-common-x helper, then a series arithmetic operation built on it. The helper is the real deliverable; several other planned features need it."
+
+claude "Fix P2-6 and P2-7 in todo.txt: the table list and table preview widgets look inconsistent on macOS, and menu popup icons are not aligned with their text. Screenshot the current state first."
+
+claude "Implement P2-9 in todo.txt: split config.json into user settings and application config. Per-session window geometry currently dirties the working tree on every run; that half should not be tracked in git."
