@@ -563,16 +563,16 @@ class SeriesInterpolateDialog(SeriesOperationDialogBase):
         df = self._repo.query_df(series.sql_query)
         x_col, y_col = self._xy_columns(df, series.roles)
 
-        clean = self._clean_xy(df, x_col, y_col)
-        if clean.shape[0] < 2:
-            applogger.error(f"{series.name}: at least two valid points are required.")
-
-        x_data = clean[x_col].to_numpy(dtype=float)
-        y_data = clean[y_col].to_numpy(dtype=float)
-        x_data, y_data = self._sort_unique_xy(x_data, y_data)
-
-        if x_data.size < 2:
-            applogger.error(f"{series.name}: at least two unique valid X values are required.")
+        # prepare_input_xy replaces the old _clean_xy/_sort_unique_xy pair. It
+        # does the same three things - drop non-finite, sort, average duplicate
+        # x - but says so. The old pair repaired silently, so a series with two
+        # readings at one x was interpolated through neither and nothing in the
+        # interface ever mentioned it.
+        x_data, y_data = self.prepare_input_xy(
+            pd.to_numeric(df[x_col], errors="coerce").to_numpy(dtype=float),
+            pd.to_numeric(df[y_col], errors="coerce").to_numpy(dtype=float),
+            label=series.name,
+        )
 
         x_eval = self._x_eval(x_data)
         model = self._model_name()
@@ -632,23 +632,6 @@ class SeriesInterpolateDialog(SeriesOperationDialogBase):
             applogger.error("Series query must expose at least two numeric columns.")
 
         return numeric[0], numeric[1]
-
-    @staticmethod
-    def _clean_xy(df: pd.DataFrame, x_col: str, y_col: str) -> pd.DataFrame:
-        clean = df[[x_col, y_col]].copy()
-        clean[x_col] = pd.to_numeric(clean[x_col], errors="coerce")
-        clean[y_col] = pd.to_numeric(clean[y_col], errors="coerce")
-        return clean.replace([np.inf, -np.inf], np.nan).dropna()
-
-
-    @staticmethod
-    def _sort_unique_xy(x_data: np.ndarray, y_data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        order = np.argsort(x_data)
-        grouped = pd.DataFrame({"x": x_data[order], "y": y_data[order]}).groupby(
-            "x",
-            as_index=False,
-        )["y"].mean()
-        return grouped["x"].to_numpy(float), grouped["y"].to_numpy(float)
 
     def _x_eval(self, x_data: np.ndarray) -> np.ndarray:
         spacing = self._spacing_combo.currentText()

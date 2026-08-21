@@ -217,3 +217,29 @@ def test_clean_survives_mismatched_lengths() -> None:
     """validate_xy calls this an error, but clean must not raise on it."""
     x_out, y_out, _ = clean_xy(np.arange(5.0), np.arange(3.0))
     assert x_out.size == y_out.size == 3
+
+
+# ----------------------------------------------------------------------
+# Severity depends on whether a repair is coming
+# ----------------------------------------------------------------------
+
+def test_duplicate_x_is_a_warning_when_the_caller_will_repair_it() -> None:
+    """prepare_input_xy averages duplicates, so it must not also refuse them."""
+    x = np.array([0.0, 1.0, 1.0, 2.0])
+    y = np.array([0.0, 5.0, 9.0, 1.0])
+    issues = validate_xy(x, y, require_unique_x=True, repairable=True)
+    assert DUPLICATE_X in codes(issues)
+    assert not errors(issues)
+    assert "averaged" in str(issues[0])
+
+
+def test_repairable_still_reports_the_duplicates() -> None:
+    """Silence was the old bug: interpolation averaged them and said nothing."""
+    x = np.array([0.0, 1.0, 1.0])
+    assert validate_xy(x, x.copy(), require_unique_x=True, repairable=True) != []
+
+
+def test_repairable_does_not_downgrade_an_unrepairable_problem() -> None:
+    """No amount of cleaning invents data, so too-few-points stays an error."""
+    issues = validate_xy([1.0], [1.0], minimum_points=5, repairable=True)
+    assert errors(issues)

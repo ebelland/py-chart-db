@@ -193,7 +193,9 @@ class SeriesSpectralDialog(SeriesOperationDialogBase):
     # meaningless, which is the worst of both worlds, hence the warning.
     INPUT_REQUIRES_SORTED_X = True
     INPUT_REQUIRES_UNIFORM_X = True
-    INPUT_MINIMUM_POINTS = 4
+    # Eight, matching _series_signal: a spectrum from fewer points has so few
+    # frequency bins that the result says nothing.
+    INPUT_MINIMUM_POINTS = 8
 
     Icon = """
     <path d="M4 18.5h16"/>
@@ -487,15 +489,11 @@ class SeriesSpectralDialog(SeriesOperationDialogBase):
         else:
             x_values = np.arange(y_values.size, dtype=float)
 
-        finite = np.isfinite(x_values) & np.isfinite(y_values)
-        if int(np.count_nonzero(finite)) < 8:
-            raise ValueError(f"series '{name}' has fewer than 8 usable points")
-
-        x_finite = x_values[finite]
-        y_finite = y_values[finite]
-
-        order = np.argsort(x_finite, kind="stable")
-        return name, x_finite[order], y_finite[order]
+        # Drops non-finite points and sorts, as this did by hand, and also
+        # reports the uneven spacing that makes a spectrum's frequency axis
+        # meaningless - the failure this dialog is most exposed to.
+        x_sorted, y_sorted = self.prepare_input_xy(x_values, y_values, label=name)
+        return name, x_sorted, y_sorted
 
     def _sampling_frequency(self, x_values: np.ndarray, name: str) -> float:
         """Return fs in samples per unit of x.

@@ -116,8 +116,14 @@ class SeriesFitDialog(SeriesOperationDialogBase):
     # least_squares needs residuals that actually vary: a flat y makes the
     # Jacobian singular, and the optimiser returns the starting guess with a
     # success flag rather than reporting that there was nothing to fit.
-    # Order and duplicate x are both fine - a fit does not interpolate.
+    #
+    # Sorting and duplicate merging are declared because this dialog has always
+    # done both - it sorted by x and averaged repeated x before fitting. A fit
+    # does not strictly need either, but the declaration has to describe what
+    # the code actually does to the data, or the report is a lie.
     INPUT_REQUIRES_VARYING_Y = True
+    INPUT_REQUIRES_SORTED_X = True
+    INPUT_REQUIRES_UNIQUE_X = True
     INPUT_MINIMUM_POINTS = 2
 
     Icon = """
@@ -683,19 +689,17 @@ class SeriesFitDialog(SeriesOperationDialogBase):
         if x_col == y_col:
             applogger.error("Selected series X and Y columns must be different.")
 
-        clean = pd.DataFrame(
-            {
-                "x": pd.to_numeric(frame[x_col], errors="coerce"),
-                "target": pd.to_numeric(frame[y_col], errors="coerce"),
-            }
-        ).replace([np.inf, -np.inf], np.nan).dropna()
-
-        if clean.shape[0] < 2:
-            applogger.error("At least two valid numeric X/Y rows are required for fitting.")
+        # Same three repairs as before - drop non-finite, sort by x, average
+        # repeated x - but reported rather than silent.
+        x_prepared, target_prepared = self.prepare_input_xy(
+            pd.to_numeric(frame[x_col], errors="coerce").to_numpy(dtype=float),
+            pd.to_numeric(frame[y_col], errors="coerce").to_numpy(dtype=float),
+            label=source_name,
+        )
 
         clean_frame = cast(
             pd.DataFrame,
-            clean.sort_values("x").groupby("x", as_index=False).agg(target=("target", "mean")),
+            pd.DataFrame({"x": x_prepared, "target": target_prepared}),
         )
 
         self._source_name = source_name

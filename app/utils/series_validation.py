@@ -111,6 +111,7 @@ def validate_xy(
     require_unique_x: bool = False,
     require_uniform_x: bool = False,
     require_varying_y: bool = False,
+    repairable: bool = False,
     label: str = "",
 ) -> list[SeriesIssue]:
     """Return every problem found in one x/y series.
@@ -120,6 +121,14 @@ def validate_xy(
     that a given operation handles perfectly well.  An FFT needs uniform
     spacing; ``np.gradient`` does not.  A spline needs unique x; a scatter
     smoother does not care.
+
+    ``repairable`` says the caller is about to run ``clean_xy`` with matching
+    settings.  It only changes severity, never what is detected: duplicate x is
+    fatal to a spline, but averaging the duplicates is a defensible repair, so
+    it is an error when nobody is going to fix it and a warning when somebody
+    is.  Reporting it either way is the point - the previous code averaged
+    duplicates silently, so a series with two readings at one x produced a
+    curve through neither, with nothing said.
 
     An empty result means the series is usable.  Order is stable and
     most-fundamental-first, so a caller showing only ``issues[0]`` shows the
@@ -184,9 +193,16 @@ def validate_xy(
             SeriesIssue(
                 UNSORTED_X,
                 "warning",
-                f"{prefix}x is not in increasing order. The result would "
-                f"follow row order rather than x; the points will be sorted "
-                f"first.",
+                f"{prefix}x is not in increasing order; the points will be "
+                f"sorted before the calculation."
+                if repairable
+                # Not every caller can reorder. The outlier detector maps its
+                # result back to source rows by rowid, so sorting would move
+                # the mark onto a different row - it has to say "fix your
+                # data" rather than "we fixed it".
+                else f"{prefix}x is not in increasing order, so this "
+                f"operation will follow row order rather than x. Sort the "
+                f"source data by x for a meaningful result.",
             )
         )
 
@@ -196,8 +212,11 @@ def validate_xy(
             issues.append(
                 SeriesIssue(
                     DUPLICATE_X,
-                    "error",
-                    f"{prefix}{duplicates} duplicate x value(s). This "
+                    "warning" if repairable else "error",
+                    f"{prefix}{duplicates} duplicate x value(s); their y "
+                    f"values will be averaged."
+                    if repairable
+                    else f"{prefix}{duplicates} duplicate x value(s). This "
                     f"operation needs one y per x - remove or average them "
                     f"first.",
                 )

@@ -1202,6 +1202,17 @@ class SeriesClusterDialog(SeriesOperationDialogBase):
         if z_col and z_col not in columns:
             z_col = ""
 
+        # Report only. Cluster labels are assigned back to the frame's rows, so
+        # the row order has to survive; and because clustering reads an
+        # observation matrix rather than f(x), the only checks that fire here
+        # are the universal ones - repeated x is two ordinary observations.
+        self.validate_input_xy(
+            pd.to_numeric(frame[x_col], errors="coerce").to_numpy(dtype=float),
+            pd.to_numeric(frame[y_col], errors="coerce").to_numpy(dtype=float),
+            label=name,
+            raise_on_error=False,
+        )
+
         return ClusterSeriesChoice(
             name=name,
             frame=frame.copy(),

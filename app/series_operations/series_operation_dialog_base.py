@@ -491,6 +491,7 @@ class SeriesOperationDialogBase(QDialog):
         *,
         label: str = "",
         raise_on_error: bool = True,
+        repairable: bool = False,
     ) -> list[SeriesIssue]:
         """Check one series against this operation's requirements.
 
@@ -510,6 +511,7 @@ class SeriesOperationDialogBase(QDialog):
             require_unique_x=self.INPUT_REQUIRES_UNIQUE_X,
             require_uniform_x=self.INPUT_REQUIRES_UNIFORM_X,
             require_varying_y=self.INPUT_REQUIRES_VARYING_Y,
+            repairable=repairable,
             label=label,
         )
 
@@ -546,7 +548,10 @@ class SeriesOperationDialogBase(QDialog):
         changed is reported, because quietly discarding a user's points is its
         own kind of wrong answer.
         """
-        self.validate_input_xy(x, y, label=label)
+        # repairable=True: clean_xy below fixes exactly what the declared
+        # requirements ask for, so a problem it is about to solve is a warning
+        # rather than a reason to stop.
+        self.validate_input_xy(x, y, label=label, repairable=True)
 
         x_clean, y_clean, report = clean_xy(
             x,

@@ -503,6 +503,15 @@ class SeriesOutlierDialog(SeriesOperationDialogBase):
         raw_y = to_numeric_axis(source_df["y"])
         raw_rowids = source_df["__rowid__"].to_numpy(dtype=int)
 
+        # Report only - never prepare_input_xy here. The mask this method
+        # computes is mapped back to source rows through raw_rowids, so sorting
+        # or merging x would move each mark onto a different row. Unsorted x is
+        # a real problem for the rolling detectors, but the fix belongs in the
+        # source data, and the warning says so.
+        self.validate_input_xy(
+            raw_x, raw_y, label=str(choice["name"]), raise_on_error=False
+        )
+
         finite_mask = np.isfinite(raw_x) & np.isfinite(raw_y)
         finite_count = int(np.count_nonzero(finite_mask))
         if finite_count < MIN_POINTS:
