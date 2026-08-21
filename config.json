@@ -646,8 +646,8 @@
       "maximized": false
     },
     "SeriesStatisticsDialog": {
-      "x": 821,
-      "y": 206,
+      "x": 412,
+      "y": 194,
       "width": 1060,
       "height": 720,
       "maximized": false
@@ -681,10 +681,24 @@
       "maximized": false
     },
     "query_builder_dialog": {
-      "x": 351,
-      "y": 375,
+      "x": 166,
+      "y": 297,
       "width": 977,
       "height": 598,
+      "maximized": false
+    },
+    "SeriesCalculusDialog": {
+      "x": 918,
+      "y": 214,
+      "width": 760,
+      "height": 640,
+      "maximized": false
+    },
+    "SeriesPeaksDialog": {
+      "x": 345,
+      "y": 207,
+      "width": 780,
+      "height": 640,
       "maximized": false
     }
   },
@@ -797,16 +811,16 @@
       "close_button": false
     },
     "SeriesStatisticsDialog": {
-      "model_combo": "Descriptive statistics",
+      "model_combo": "Tutte le statistiche",
       "create_chart_check": true,
-      "chart_type_combo": "Histogram",
-      "distribution_combo": "None",
-      "rank_combo": "AIC (penalises free parameters)",
+      "chart_type_combo": "",
+      "distribution_combo": "",
+      "rank_combo": "AIC (penalizza i parametri liberi)",
       "exhaustive_check": false,
       "popmean_spin": 0.0,
-      "alternative_combo": "Two-sided",
+      "alternative_combo": "Bilaterale",
       "trim_percent_spin": 10,
-      "anderson_method_combo": "Anderson p-value: interpolated",
+      "anderson_method_combo": "p-value di Anderson: interpolato",
       "monte_carlo_resamples_spin": 9999,
       "monte_carlo_batch_spin": 0,
       "preview_button": false,
@@ -874,6 +888,20 @@
       ],
       "table_combo": "calibration",
       "editor": "SELECT a.*, b.*\nFROM \"calibration\" AS a\nLEFT JOIN \"<other_table>\" AS b\n  ON a.\"<key>\" = b.\"<key>\"SELECT * FROM \"calibration\""
+    },
+    "SeriesCalculusDialog": {
+      "model_combo": "Derivative (spline)",
+      "preview_button": false,
+      "copy_html_button": false,
+      "apply_button": false,
+      "close_button": false
+    },
+    "SeriesPeaksDialog": {
+      "model_combo": "Maxima",
+      "preview_button": false,
+      "copy_html_button": false,
+      "apply_button": false,
+      "close_button": false
     }
   },
   "import_data_dialog": {

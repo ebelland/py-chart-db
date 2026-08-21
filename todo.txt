@@ -3,8 +3,9 @@ Ranked by priority. P0 = wrong results or blocked work, P3 = nice to have.
 Items marked [was:] came from the original list; the rest are from the
 codebase review. Ready-to-paste Claude commands are at the bottom.
 
-DONE so far: P0-1, P1-1, P1-2, P1-3, P1-4, P1-5, P1-6, and the localization
-and documentation items (P2-14, and §5.1/5.2/7.2/7.4 of docs/DEVELOPMENT.md).
+DONE so far: P0-1, P1-1, P1-2, P1-3, P1-4, P1-5, P1-6, N-1, N-2, and the
+localization and documentation items (P2-14, and §5.1/5.2/7.2/7.4 of
+docs/DEVELOPMENT.md).
 Completed entries are kept below, marked [DONE], with what was actually built
 and anything learned that changes a neighbouring item - deleting them loses
 the reason the next item is shaped the way it is.
@@ -13,16 +14,6 @@ the reason the next item is shaped the way it is.
 ================================================================
 P0 - BUGS: wrong output, or work that cannot proceed
 ================================================================
-
-P0-1  [DONE] series operations: verify input data before running
-      app/utils/series_validation.py + INPUT_* declarations on all eight
-      dialogs. Wired into all six materialization sites: Interpolation, Fit,
-      Spectral and Smoothing repair via prepare_input_xy; Outlier and Cluster
-      report only, because both map results back to source rows and
-      reordering would move each mark onto a different row.
-      Interpolation and Fit each had their own silent clean/sort/average
-      code, now deleted - a series with two readings at one x was fitted
-      through neither and nothing said so.
 
 P0-4  ChartPanel: picker errors
       [was: "picker errors"]
@@ -83,59 +74,46 @@ P1-1  [DONE] series operations: declarative parameter spec
       odd-window rounding happens in one place. Judge the remaining seven
       conversions on that, not on line count.
 
-P1-2  [DONE] ChartPanel: hover readout
-      Throttled to 40ms and blitted. Measured 8x5in @100dpi, mean of 25:
-        1k x1   full 12.03ms  blit 2.54ms + hit 0.03ms  = 4.7x
-        100k x1 full 14.50ms  blit 2.55ms + hit 0.91ms  = 4.2x
-        50k x10 full 26.33ms  blit 2.58ms + hit 4.63ms  = 3.7x
-      The blit is flat at ~2.55ms whatever the data size. What grows is the
-      hit test, and at 500k points it is already the larger half - which is
-      the argument for P2-5, not for a bigger throttle.
 
-P1-3  [DONE] series operation: Calculus (derivative + integral)
-      app/series_operations/series_calculus_dialog.py. Verified against
-      analytic results: d/dx sin = cos to 1.7e-07 (spline), integral of sin
-      over [0,pi] = 2.0000000007 (Simpson).
-      Both design claims measured, not assumed:
-       - Savitzky-Golay beats raw np.gradient by ~8x RMS on noisy data, which
-         is why smoothing is inside the derivative rather than a step before.
-       - A gaussian peak (true area 1.7725) on an offset of 5 integrates to
-         51.77 without baseline subtraction. 97% of the answer was baseline.
-        derivative: np.gradient (handles non-uniform x), Savitzky-Golay with
-          deriv=1,2 (savgol_filter is already imported in the smoothing
-          dialog), UnivariateSpline.derivative()
-        integral: cumulative_trapezoid for a running integral, simpson/
-          trapezoid for a definite value
-      Noise amplification is the whole difficulty of numerical differentiation,
-      so smoothing belongs inside this operation, not as a step the user is
-      expected to remember first. Baseline subtraction likewise belongs inside
-      the integral, or peak areas are meaningless.
 
-P1-4  [DONE] series operation: peak finding
-      app/series_operations/series_peaks_dialog.py. Reports each peak with
-      its prominence, width at half prominence, and the x bounds of that
-      width - which are what P1-3's integral wants.
-      Prominence is the default filter, not height, and the test data shows
-      why: on three gaussians over a sloping baseline, prominence finds
-      exactly the 3 true peaks while height returns 50 spurious ones, because
-      on a rising baseline everything late in the series is "high".
+================================================================
+NEW - requested after the review
+================================================================
 
-P1-5  [DONE] ChartPanel: bars and wedges are unpickable
-      chart_panel_widget.py:385 arms only axes.lines and axes.collections. The
-      docstring's reasoning is sound - a patch has no per-point index, so it
-      would report "1 point" and mean the whole shape - but the consequence is
-      that bar and pie charts are entirely inert. Fix by giving patches their
-      own readout reporting category and value, not by arming them into the
-      existing point path.
-      Done via _describe_patch. Bar orientation is read from the
-      BarContainer, not guessed from geometry: a tall thin barh bar and a
-      tall thin bar bar are the same rectangle, and the first attempt at
-      guessing got barh wrong.
+N-1   [DONE] series operation: control charts (JMP-style)
+      app/series_operations/series_control_chart_dialog.py. Individuals
+      (I-MR), moving range, X-bar & R, X-bar & S, with the Nelson run rules.
+      The one thing not to "simplify" later: sigma is estimated from
+      WITHIN-subgroup variation - average moving range over d2, or average
+      within-subgroup range/s - never from the standard deviation of all the
+      data. A process that drifted has a large overall SD *because* it
+      drifted, so limits built from it swallow the drift and the chart says
+      the process is fine. Measured on a +6 sigma shift: overall SD 3.12,
+      within-sigma 0.95, 38 signals. Using the overall SD would have given 0.
+      The SPC constants are tabulated, not computed - d2 and d3 have no
+      elementary form and every other tool uses the same table.
+      Violations carry every rule a point broke; the rule numbers are
+      historical, not a severity ranking, so reporting only the lowest hid
+      rule 7 behind rule 2.
+      NOT covered: attribute charts (p, np, c, u). They need counts and a
+      sample size per point rather than a measurement, so they want their own
+      role mapping - a separate piece of work, not a model to bolt on.
 
-P1-6  [DONE] ChartPanel: legend picking to toggle series visibility
-      Handles matched to artists by label, not by position, so a series drawn
-      as several artists (a line plus its error bars) toggles as one. Hidden
-      series are skipped by the P1-2 hover hit test.
+N-2   [DONE] series operation: plot functions without fitting
+      app/series_operations/series_function_dialog.py. Same FunctionScanner
+      the fit dialog uses, so all 56 functions across 10 categories are
+      available and a class dropped into user_functions.py appears with no
+      registration. Range as from/to/points/spacing (linear or log), function
+      parameters in an editable table, no optimiser.
+      It reads no source series and generates one, so it overrides
+      selected_series() to return []; _run_operation resolves the target from
+      the selected axis, which is unaffected.
+
+N-3   attribute control charts (p, np, c, u)
+      The half of SPC N-1 does not cover. These plot a proportion or a count
+      rather than a measurement, so the limits are binomial/Poisson rather
+      than normal, and the limits vary per point when the sample size does.
+      Needs a "sample size" role alongside x and y, which is the real work.
 
 
 ================================================================
@@ -199,16 +177,6 @@ P2-12 series operations: inline preview plot beside the numeric results
 P2-13 style.py: read presentation straight from config.json
       [was: "simplify style.py"]
 
-P2-14 [DONE] localization
-      All 58 untranslated strings now have Italian; the catalogue is 626
-      entries and app/tests/test_localization.py passes (12/12, previously
-      failing). Every format placeholder verified to survive translation - a
-      mangled one crashes at runtime rather than showing English.
-      Still open: renderer/operation Description attributes are class data,
-      so the _() sweep cannot see them. They need naming by hand in
-      test_labels_held_in_tables_are_translated_too, as the settings dialog
-      tables already are.
-
 
 ================================================================
 P3 - LATER
@@ -226,10 +194,6 @@ P3-1  figure: mosaic layouts (subplot_mosaic-style named regions)
 P3-2  external database link
       [was: "external database link"]
 
-P3-3  ChartPlot "virtuale": contiene solo una lista di queries senza alcuna
-      figura tracciata
-      [was, unchanged]
-
 P3-4  custom function table generation
       [was: "custom function table generation"]
 
@@ -238,13 +202,6 @@ P3-5  localization helper dialog
 
 P3-6  axis_properties: make Axis options and drawing kwargs homogeneous
       [was: "Axis options and drawings kwargs: make more homogeneous"]
-
-P3-7  ChartPanel: remove the default toolbar icons for configuring subplots
-      and editing axis properties
-      [was, unchanged]
-
-P3-8  improve dialog loading speed
-      [was: "improve dialog loading speed"]
 
 P3-9  plot: default to scatterplot
       [was: "plot: default to scatterplot"]
@@ -287,7 +244,7 @@ claude "Fix P0-8, P0-9 and P0-10 in todo.txt: colorby across all renderers, the 
 
 claude "Convert the remaining seven series operation dialogs to the PARAMS declaration described in section 7.2 of docs/DEVELOPMENT.md. The outlier dialog is the worked example. Do them ONE AT A TIME, committing each separately, and report the line-count change for each - the outlier conversion did not shrink the file and I want to know whether the larger dialogs do."
 
-claude "Add tests for the two new operations: app/series_operations/series_calculus_dialog.py and series_peaks_dialog.py. They were verified interactively against analytic results (d/dx sin = cos, integral of sin over [0,pi] = 2, three gaussians of known position and width) but that verification is not in the test suite. Turn it into one."
+claude "Implement N-3 in todo.txt: attribute control charts (p, np, c, u). Read app/series_operations/series_control_chart_dialog.py first - the Nelson rules, the violation reporting and the report layout are all reusable; what is new is the per-point limits and the sample-size role."
 
 # --- P2, in the order I would do them ---
 

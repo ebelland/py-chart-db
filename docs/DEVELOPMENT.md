@@ -357,6 +357,65 @@ The check itself is `app/utils/series_validation.py`: pure numpy, no Qt, no
 pandas. Tests in `app/tests/test_series_validation.py`, about half of which
 assert what it must **not** reject.
 
+#### The operations that ship
+
+| Operation | Reads | Produces |
+| --- | --- | --- |
+| Fit | one series | fitted curve + parameters |
+| Interpolation | one series | resampled curve |
+| Smoothing | one series | smoothed curve |
+| Outliers | one series | `Hide` flags on the source rows |
+| Spectral | one series | spectrum on a new axis |
+| Clustering | one series | cluster labels / split series |
+| Statistics | one series | a report, no series |
+| **Calculus** | one series | derivative or integral |
+| **Peaks** | one series | located peaks + measurements |
+| **Control Chart** | one series | chart values, limits, violations |
+| **Function** | *nothing* | an evaluated function |
+
+Three of these are worth knowing about before touching them.
+
+**Calculus** builds smoothing into the derivative and baseline subtraction
+into the integral, rather than leaving either as a step the user must
+remember. Differentiation amplifies noise — Savitzky-Golay beats a raw
+`np.gradient` by about 8x RMS on noisy data — and a peak on a raised baseline
+integrates to mostly baseline: a gaussian of true area 1.77 on an offset of 5
+comes out at 51.8 without subtraction.
+
+`savgol_filter` must be given `delta` set to the sample spacing, or it returns
+a derivative per *sample index* — correct only when the step happens to be 1.
+
+**Control Chart** estimates sigma from within-subgroup variation (average
+moving range over d2, or average within-subgroup range/standard deviation),
+**never** from the standard deviation of all the data. That is the whole idea:
+a process that has drifted has a large overall standard deviation *because* it
+drifted, so limits built from it are wide enough to contain the drift and the
+chart declares the process fine.
+
+The SPC constants (d2, d3, c4, A2, D3, D4, B3, B4) are tabulated rather than
+computed. c4 has a closed form, but d2 and d3 are integrals over the range
+distribution with no elementary form, and using anything but the published
+table would put these limits at odds with every other tool's.
+
+X-bar limits are derived from d2 and divided by sqrt(n) rather than applying
+the tabulated A2 shortcut, because A2 has the 3 of "three sigma" baked into it
+and the sigma multiplier is configurable here. The two agree to ~1e-3 of the
+limit, which is table rounding.
+
+Violations carry **every** Nelson rule a point broke, not the first: the rule
+numbers are historical, not a severity ranking.
+
+**Function** is the odd one out — it reads no source series and generates one,
+so it overrides `selected_series()` to return `[]`. `_run_operation` resolves
+its target from the selected *axis*, which is unaffected. Its function library
+comes from `FunctionScanner`, the same one the fit dialog uses, so a class
+dropped into `app/functions/user_functions.py` appears in both with no
+registration. Its range controls are declared in `PARAMS`; the function's own
+parameters are a table, because their number and names change with the
+selection and a declaration cannot express that.
+
+Tests for all four: `app/tests/test_new_operations.py`.
+
 ### 7.3 The `.mplstyle` library
 
 `mplstyles/` ships a large set of `.mplstyle` files, organized into

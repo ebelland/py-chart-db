@@ -2506,3 +2506,107 @@ msgstr "{series} mostrata"
 
 msgid "{series} — {percent:.1f}% of the total"
 msgstr "{series} — {percent:.1f}% del totale"
+
+
+msgid "Centre line"
+msgstr "Linea centrale"
+
+
+msgid "Chart"
+msgstr "Carta"
+
+
+msgid "Choose the control chart."
+msgstr "Scegli la carta di controllo."
+
+
+msgid "Control Chart"
+msgstr "Carta di controllo"
+
+
+msgid "Description"
+msgstr "Descrizione"
+
+
+msgid "Estimator"
+msgstr "Stimatore"
+
+
+msgid "Function"
+msgstr "Funzione"
+
+
+msgid "Lower control limit"
+msgstr "Limite di controllo inferiore"
+
+
+msgid "No points signal. The process is in statistical control - which says it is stable, not that it meets any specification."
+msgstr "Nessun punto segnala. Il processo è in controllo statistico: significa che è stabile, non che rispetti una specifica."
+
+
+msgid "Parameter"
+msgstr "Parametro"
+
+
+msgid "Point"
+msgstr "Punto"
+
+
+msgid "Points plotted"
+msgstr "Punti tracciati"
+
+
+msgid "Range"
+msgstr "Intervallo"
+
+
+msgid "Rule"
+msgstr "Regola"
+
+
+msgid "Select a function."
+msgstr "Seleziona una funzione."
+
+
+msgid "Sigma estimate"
+msgstr "Stima di sigma"
+
+
+msgid "Signal"
+msgstr "Segnale"
+
+
+msgid "Spacing"
+msgstr "Spaziatura"
+
+
+msgid "Subgroup size"
+msgstr "Dimensione del sottogruppo"
+
+
+msgid "This function takes no parameters."
+msgstr "Questa funzione non ha parametri."
+
+
+msgid "Undefined points"
+msgstr "Punti non definiti"
+
+
+msgid "Upper control limit"
+msgstr "Limite di controllo superiore"
+
+
+msgid "Value"
+msgstr "Valore"
+
+
+msgid "Values used to evaluate the function. Nothing is fitted here."
+msgstr "Valori usati per valutare la funzione. Qui non viene eseguito alcun fit."
+
+
+msgid "y range"
+msgstr "Intervallo di y"
+
+
+msgid "{count} of {total} points signal. The process is not in statistical control."
+msgstr "{count} punti su {total} segnalano. Il processo non è in controllo statistico."
