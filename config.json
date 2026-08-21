@@ -609,7 +609,7 @@
   },
   "chart_panel": {
     "resize_mode": "FIXED",
-    "initial_zoom_percent": 100,
+    "initial_zoom_percent": 127,
     "background_color": "#ffffff",
     "figure_width_cm": 160.26,
     "figure_height_cm": 120.19,
@@ -619,7 +619,7 @@
   "window_geometry": {
     "main_window": {
       "x": 170,
-      "y": 138,
+      "y": 139,
       "width": 1196,
       "height": 882,
       "maximized": false
@@ -681,10 +681,10 @@
       "maximized": false
     },
     "query_builder_dialog": {
-      "x": 425,
-      "y": 213,
-      "width": 1020,
-      "height": 700,
+      "x": 351,
+      "y": 279,
+      "width": 977,
+      "height": 598,
       "maximized": false
     }
   },
@@ -870,10 +870,10 @@
     "query_builder_dialog": {
       "splitter": [
         600,
-        389
+        346
       ],
       "table_combo": "calibration",
-      "editor": "SELECT * FROM \"calibration\""
+      "editor": "SELECT a.*, b.*\nFROM \"calibration\" AS a\nLEFT JOIN \"<other_table>\" AS b\n  ON a.\"<key>\" = b.\"<key>\"SELECT * FROM \"calibration\""
     }
   },
   "import_data_dialog": {
