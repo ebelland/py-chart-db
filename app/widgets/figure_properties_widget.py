@@ -39,16 +39,16 @@ from app.styles.style import (
     stdSizeAndlayout,
     configure_combo_width,
 )
-from app.utils.config import MPLSTYLES_DIR, load_config, save_config
-
-CM_PER_INCH = 2.54
-DEFAULT_FIGURE_DPI = 100
-DEFAULT_FIGURE_SIZE_IN = (6.4, 4.8)
-
-CONFIG_SECTION = "chart_panel"
-CONFIG_FIGURE_WIDTH_CM = "figure_width_cm"
-CONFIG_FIGURE_HEIGHT_CM = "figure_height_cm"
-CONFIG_FIGURE_DPI = "figure_dpi"
+from app.utils.config import MPLSTYLES_DIR
+from app.utils.figure_metrics import (
+    CM_PER_INCH,
+    DEFAULT_FIGURE_DPI,
+    DEFAULT_FIGURE_SIZE_IN,
+    OPT_FIGURE_DPI,
+    OPT_FIGURE_HEIGHT_CM,
+    OPT_FIGURE_WIDTH_CM,
+    figure_metrics_from_options,
+)
 
 from app.logs.logger import applogger
 from app.utils.hidpi import apply_configured_dpi
@@ -67,10 +67,10 @@ def _read_text_any_encoding(path: Path) -> str:
 class FigurePropertiesWidget(QWidget):
     """Reusable Figure properties editor extracted from the old dialog Figure tab.
 
-    Width, height, and DPI are rcParams-owned values. rcParams are only process
-    memory, so this widget also persists them in config.json under
-    ``chart_panel`` and restores them into rcParams whenever a figure is
-    connected.
+    Width, height, and DPI belong to the figure, not to the application: they
+    are stored in the connected figure's descriptor options and pushed into
+    rcParams only for the duration of a render, so that switching figures picks
+    up that figure's own metrics instead of whatever was edited last.
     """
 
     style_changed = Signal(str)
@@ -94,7 +94,6 @@ class FigurePropertiesWidget(QWidget):
         self._figure_id: int | None = None
         self._figure = None
         self._redraw_callback = None
-        self._config: dict[str, Any] = load_config()
         self._last_valid_style_index = 0
 
         self._style_combo: QComboBox
@@ -281,7 +280,6 @@ class FigurePropertiesWidget(QWidget):
         self._figure_id = int(figure_id)
         self._figure = figure
         self._redraw_callback = redraw_callback
-        self._config = load_config()
         self._apply_persisted_metrics_to_rcparams()
         self._apply_rcparams_to_connected_figure()
         self._reload_from_descriptor()
@@ -419,10 +417,7 @@ class FigurePropertiesWidget(QWidget):
             max(0, self._ncols_combo.findData(ncols))
         )
 
-        width_cm, height_cm = self._rcparams_figsize_cm()
-        self._fig_dpi.setValue(self._rcparams_dpi())
-        self._fig_width_cm.setValue(width_cm)
-        self._fig_height_cm.setValue(height_cm)
+        self._load_metrics_into_spins(fig_opts)
         self._fig_frameon.setChecked(bool(fig_opts.get("frameon", True)))
 
         current_layout = str(
@@ -610,8 +605,27 @@ class FigurePropertiesWidget(QWidget):
         try:
             dpi = int(round(float(rcParams.get("figure.dpi", DEFAULT_FIGURE_DPI))))
         except Exception:
-            return DEFAULT_FIGURE_DPI
+            return int(DEFAULT_FIGURE_DPI)
         return max(1, dpi)
+
+    def _load_metrics_into_spins(self, fig_opts: dict[str, Any]) -> None:
+        """Show this figure's own metrics, falling back to the rcParams ones.
+
+        A figure saved before metrics were per-figure carries no keys, so the
+        fallback is the live rcParams value - which is what that figure has
+        been rendering with all along.
+        """
+        metrics = figure_metrics_from_options(fig_opts)
+        if metrics is None:
+            width_cm, height_cm = self._rcparams_figsize_cm()
+            dpi = self._rcparams_dpi()
+        else:
+            width_cm, height_cm, dpi_value = metrics
+            dpi = int(round(dpi_value))
+
+        self._fig_dpi.setValue(max(1, dpi))
+        self._fig_width_cm.setValue(width_cm)
+        self._fig_height_cm.setValue(height_cm)
 
     def _rcparams_figsize_cm(self) -> tuple[float, float]:
         try:
@@ -636,7 +650,8 @@ class FigurePropertiesWidget(QWidget):
 
         rcParams["figure.figsize"] = [width_in, height_in]
         rcParams["figure.dpi"] = dpi
-        self._persist_metrics(width_cm=width_cm, height_cm=height_cm, dpi=dpi)
+        # No persistence here: the values ride out in the options payload that
+        # _save_figure_options emits, and are stored against this figure alone.
         self._apply_rcparams_to_connected_figure()
 
     def _apply_rcparams_to_connected_figure(self) -> None:
@@ -661,52 +676,34 @@ class FigurePropertiesWidget(QWidget):
             return
 
     def _apply_persisted_metrics_to_rcparams(self) -> None:
-        chart_config = self._config.setdefault(CONFIG_SECTION, {})
-        try:
-            width_cm = chart_config.get(CONFIG_FIGURE_WIDTH_CM)
-            height_cm = chart_config.get(CONFIG_FIGURE_HEIGHT_CM)
-            dpi = chart_config.get(CONFIG_FIGURE_DPI)
+        """Push the connected figure's own metrics into rcParams.
 
-            if width_cm is not None and height_cm is not None:
-                width_in = float(width_cm) / CM_PER_INCH
-                height_in = float(height_cm) / CM_PER_INCH
-                if width_in > 0.0 and height_in > 0.0:
-                    rcParams["figure.figsize"] = [width_in, height_in]
-
-            if dpi is not None:
-                dpi_value = float(dpi)
-                if dpi_value > 0.0:
-                    rcParams["figure.dpi"] = dpi_value
-        except Exception:
+        Called before a render rather than once at startup: rcParams is global
+        and every figure wants a different answer, so the value has to be set
+        from the descriptor each time a figure becomes the current one.
+        """
+        metrics = figure_metrics_from_options(self._figure_options())
+        if metrics is None:
             return
 
-    def _persist_metrics(
-        self,
-        *,
-        width_cm: float,
-        height_cm: float,
-        dpi: float,
-    ) -> None:
-        chart_config = self._config.setdefault(CONFIG_SECTION, {})
-        if not isinstance(chart_config, dict):
-            chart_config = {}
-            self._config[CONFIG_SECTION] = chart_config
-
-        chart_config[CONFIG_FIGURE_WIDTH_CM] = float(width_cm)
-        chart_config[CONFIG_FIGURE_HEIGHT_CM] = float(height_cm)
-        chart_config[CONFIG_FIGURE_DPI] = float(dpi)
-
-        save_config(self._config)
+        width_cm, height_cm, dpi = metrics
+        width_in = float(width_cm) / CM_PER_INCH
+        height_in = float(height_cm) / CM_PER_INCH
+        if width_in > 0.0 and height_in > 0.0:
+            rcParams["figure.figsize"] = [width_in, height_in]
+        if dpi > 0.0:
+            rcParams["figure.dpi"] = float(dpi)
 
     def _save_figure_options(self) -> None:
         self._apply_size_to_rcparams()
 
-        # Keep physical size and DPI out of descriptor options. They are stored
-        # in config.json and restored into rcParams instead.
         payload = {
             "name": self._name_edit.text().strip(),
             "frameon": bool(self._fig_frameon.isChecked()),
             "layout_mode": str(self._fig_layout_mode.currentData() or "constrained"),
+            OPT_FIGURE_WIDTH_CM: float(self._fig_width_cm.value()),
+            OPT_FIGURE_HEIGHT_CM: float(self._fig_height_cm.value()),
+            OPT_FIGURE_DPI: float(self._fig_dpi.value()),
         }
         self.figure_options_requested.emit(payload)
 

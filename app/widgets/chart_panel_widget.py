@@ -29,6 +29,7 @@ from app.logs.logger import applogger
 from app.utils.messages import ask, show_message
 from app.styles.style import SPLITTER_HANDLE_WIDTH, MenuItem, create_menu, create_toolbar_button
 from app.utils.config import get_value, load_config, save_config
+from app.utils.figure_metrics import CM_PER_INCH, figure_metrics_from_options
 from app.utils.hidpi import (
     apply_configured_dpi,
     canvas_pixel_ratio,
@@ -48,10 +49,6 @@ CONFIG_MIN_ZOOM: Final[str] = "min_zoom_percent"
 CONFIG_MAX_ZOOM: Final[str] = "max_zoom_percent"
 CONFIG_INITIAL_ZOOM: Final[str] = "initial_zoom_percent"
 CONFIG_BACKGROUND_COLOR: Final[str] = "background_color"
-CONFIG_FIGURE_WIDTH_CM: Final[str] = "figure_width_cm"
-CONFIG_FIGURE_HEIGHT_CM: Final[str] = "figure_height_cm"
-CONFIG_FIGURE_DPI: Final[str] = "figure_dpi"
-CM_PER_INCH: Final[float] = 2.54
 CONFIG_COPY_DPI: Final[str] = "copy_dpi"
 FIGURE_VIEW_OPTIONS_KEY: Final[str] = "view"
 RESIZE_MODES: Final[tuple[str, ...]] = ("FIT", "FIT_PROPORTIONAL", "FIXED")
@@ -163,7 +160,7 @@ class ChartPanel(QFrame):
         # If this figure has its own view state, it wins.
         self._apply_persisted_view_state()
 
-        self._apply_persisted_figure_metrics_to_rcparams(chart_config)
+        self._apply_persisted_figure_metrics_to_rcparams()
 
         self._figure = Figure()
         self._reset_figure_metrics_from_rcparams_for_reload()
@@ -1457,31 +1454,36 @@ class ChartPanel(QFrame):
         """Reload config through the app.utils.config API."""
         self._config = load_config()
 
-    def _apply_persisted_figure_metrics_to_rcparams(
-        self,
-        chart_config: dict[str, Any] | None = None,
-    ) -> None:
-        """Apply persisted figure width, height, and DPI to rcParams."""
-        if chart_config is None:
-            chart_config = self._chart_config()
+    def _apply_persisted_figure_metrics_to_rcparams(self) -> None:
+        """Apply this figure's own width, height and DPI to rcParams.
 
+        Read from the figure descriptor rather than from config.json: the
+        metrics belong to the figure, so every panel has to set them before it
+        renders instead of inheriting whatever the previously-opened figure
+        left in this process-wide rcParams.
+
+        A figure with no metrics of its own leaves rcParams untouched, which
+        keeps figures saved before this change rendering exactly as they did.
+        """
         try:
-            width_cm = chart_config.get(CONFIG_FIGURE_WIDTH_CM)
-            height_cm = chart_config.get(CONFIG_FIGURE_HEIGHT_CM)
-            dpi = chart_config.get(CONFIG_FIGURE_DPI)
+            descriptor = self._repo.load_figure_descriptor(self._figure_id)
+            options = getattr(descriptor, "options", None) if descriptor else None
+            metrics = figure_metrics_from_options(
+                options if isinstance(options, dict) else None
+            )
+            if metrics is None:
+                return
 
-            if width_cm is not None and height_cm is not None:
-                width_in = float(width_cm) / CM_PER_INCH
-                height_in = float(height_cm) / CM_PER_INCH
-                if width_in > 0.0 and height_in > 0.0:
-                    rcParams["figure.figsize"] = [width_in, height_in]
-
-            if dpi is not None:
-                dpi_value = float(dpi)
-                if dpi_value > 0.0:
-                    rcParams["figure.dpi"] = dpi_value
+            width_cm, height_cm, dpi = metrics
+            rcParams["figure.figsize"] = [
+                width_cm / CM_PER_INCH,
+                height_cm / CM_PER_INCH,
+            ]
+            rcParams["figure.dpi"] = dpi
         except Exception:
-            applogger.exception("Failed to apply persisted chart figure metrics")
+            applogger.exception(
+                "Failed to apply figure metrics (figure_id=%s)", self._figure_id
+            )
 
     def _reset_figure_metrics_from_rcparams_for_reload(self) -> None:
         """Reset logical figure size and base DPI from current rcParams."""

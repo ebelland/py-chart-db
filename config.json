@@ -608,8 +608,8 @@
     }
   },
   "chart_panel": {
-    "resize_mode": "FIT_PROPORTIONAL",
-    "initial_zoom_percent": 60,
+    "resize_mode": "FIXED",
+    "initial_zoom_percent": 100,
     "background_color": "#ffffff",
     "figure_width_cm": 160.26,
     "figure_height_cm": 120.19,
