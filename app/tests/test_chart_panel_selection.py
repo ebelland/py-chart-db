@@ -150,11 +150,19 @@ def test_a_formatter_that_raises_falls_back_to_the_number() -> None:
 # ----------------------------------------------------------------------
 # Arming
 # ----------------------------------------------------------------------
-def test_rendering_arms_lines_and_collections_but_not_patches() -> None:
-    """Bars and wedges have no per-point index to report.
+def test_rendering_arms_every_data_artist_including_patches() -> None:
+    """Bars and wedges are armed too, but read out down a different path.
 
-    A pick on one would come back as a single point and mean the whole shape,
-    which reads as a value the chart does not contain.
+    They were previously left unpickable because a patch has no per-point index
+    and would report "1 point" while meaning the whole shape. The consequence
+    was that clicking a bar chart did nothing at all. They are armed now, and
+    _describe_patch reports what is actually meaningful about a bar - its
+    category and its value - instead of forcing it through the point readout.
+
+    The picker value differs by kind on purpose: a line is hit within a
+    tolerance in points, while a patch is a filled area where "inside the
+    shape" is the test. A tolerance on a patch would leave the middle of a
+    tall bar unclickable.
     """
     panel = ChartPanel.__new__(ChartPanel)
     figure = Figure()
@@ -163,12 +171,109 @@ def test_rendering_arms_lines_and_collections_but_not_patches() -> None:
     points = axes.scatter([0.0, 1.0], [1.0, 0.0])
     bars = axes.bar([0.0, 1.0], [1.0, 2.0])
     panel._figure = figure
+    panel._legend_targets = {}
 
     panel._make_data_artists_pickable()
 
     assert line.get_picker() == pytest.approx(PICK_TOLERANCE_POINTS)
     assert points.get_picker() == pytest.approx(PICK_TOLERANCE_POINTS)
-    assert all(bar.get_picker() is None for bar in bars)
+    assert all(bar.get_picker() is True for bar in bars)
+
+
+def test_a_bar_reads_out_its_category_and_value() -> None:
+    """The readout a bar could not previously give."""
+    emitted: list[str] = []
+    panel = ChartPanel.__new__(ChartPanel)
+    figure = Figure()
+    axes = figure.add_subplot(1, 1, 1)
+    bars = axes.bar(["alpha", "beta"], [3.0, 7.5])
+    panel._figure = figure
+    panel._legend_targets = {}
+    panel.selection_changed = _Recorder(emitted)
+
+    panel._describe_patch(bars.patches[1])
+
+    assert "beta" in emitted[0]
+    assert "7.5" in emitted[0]
+
+
+def test_a_horizontal_bar_reads_its_length_not_its_height() -> None:
+    """barh puts the value on x. The orientation comes from the BarContainer,
+    because the two cases are geometrically indistinguishable."""
+    emitted: list[str] = []
+    panel = ChartPanel.__new__(ChartPanel)
+    figure = Figure()
+    axes = figure.add_subplot(1, 1, 1)
+    bars = axes.barh(["north", "south"], [12.0, 4.0])
+    panel._figure = figure
+    panel._legend_targets = {}
+    panel.selection_changed = _Recorder(emitted)
+
+    panel._describe_patch(bars.patches[0])
+
+    assert "north" in emitted[0]
+    assert "12" in emitted[0]
+
+
+def test_a_pie_wedge_reads_out_its_share() -> None:
+    """A wedge carries its value in its angles, not in a height."""
+    emitted: list[str] = []
+    panel = ChartPanel.__new__(ChartPanel)
+    figure = Figure()
+    axes = figure.add_subplot(1, 1, 1)
+    wedges, _texts = axes.pie([25.0, 75.0])
+    wedges[0].set_label("quarter")
+    panel._figure = figure
+    panel._legend_targets = {}
+    panel.selection_changed = _Recorder(emitted)
+
+    panel._describe_patch(wedges[0])
+
+    assert "quarter" in emitted[0]
+    assert "25" in emitted[0]
+
+
+def test_clicking_a_legend_entry_toggles_only_its_own_series() -> None:
+    emitted: list[str] = []
+    panel = ChartPanel.__new__(ChartPanel)
+    figure = Figure()
+    axes = figure.add_subplot(1, 1, 1)
+    (first,) = axes.plot([0.0, 1.0], [0.0, 1.0], label="A")
+    (second,) = axes.plot([0.0, 1.0], [1.0, 0.0], label="B")
+    axes.legend()
+    panel._figure = figure
+    panel._canvas = _NullCanvas()
+    panel.selection_changed = _Recorder(emitted)
+
+    panel._make_legend_pickable()
+
+    handle = next(
+        h for h, targets in panel._legend_targets.items()
+        if targets[0].get_label() == "A"
+    )
+    panel._toggle_series_visibility(handle)
+    assert first.get_visible() is False
+    assert second.get_visible() is True, "the other series must not move"
+
+    panel._toggle_series_visibility(handle)
+    assert first.get_visible() is True, "hiding must be reversible"
+
+
+class _Recorder:
+    """Stand-in for the Qt signal, which needs no QApplication here."""
+
+    def __init__(self, sink: list[str]) -> None:
+        self._sink = sink
+
+    def emit(self, message: str) -> None:
+        self._sink.append(message)
+
+
+class _NullCanvas:
+    """Enough canvas for the toggle path, which only asks for a redraw."""
+
+    def draw_idle(self) -> None:
+        return None
 
 
 def test_the_window_shows_the_readout_in_the_status_bar() -> None:

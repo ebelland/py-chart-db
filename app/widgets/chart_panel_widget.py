@@ -18,10 +18,12 @@ from PySide6.QtCore import QEvent, QObject, QPoint, QSize, Qt, QTimer, Signal
 import PySide6.QtGui
 from PySide6.QtWidgets import QApplication, QAbstractScrollArea, QFileDialog, QFrame, QHBoxLayout, QLabel, QMenu, QScrollArea, QSizePolicy, QSlider, QSplitter, QToolButton, QVBoxLayout, QWidget
 
+import numpy as np
 from matplotlib import rcParams
 from matplotlib.backends.backend_qt import NavigationToolbar2QT
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
+from matplotlib.patches import Patch, Rectangle, Wedge
 
 from app.charts.render_figure import render_figure_from_descriptor
 from app.data.sqlite_repo import SqliteRepo
@@ -171,7 +173,12 @@ class ChartPanel(QFrame):
         # _capture_fixed_metrics_from_rendered_figure.
         self._fixed_figure_dpi = float(rcParams.get("figure.dpi", 100.0) or 100.0)
 
+        # Legend handle -> the artists it stands for. Rebuilt by every render,
+        # bound here so a pick arriving before the first one cannot fail.
+        self._legend_targets: dict[Any, list[Any]] = {}
+
         self._canvas = FigureCanvasQTAgg(self._figure)
+        self._init_hover_readout()
         self._toolbar = NavigationToolbar2QT(
             self._canvas,
             parent=self,
@@ -376,13 +383,71 @@ class ChartPanel(QFrame):
         renderers that draw through Matplotlib helpers we do not construct
         ourselves.
 
-        Only lines and collections are armed. Patches - bars, wedges, the
-        scatter's confidence ellipse - have no per-point index to report, so a
-        pick on one would say "1 point" and mean the whole shape.
+        Lines and collections report a point. Patches - bars and wedges - are
+        armed too but read out differently: a patch has no per-point index, so
+        the old code left them unpickable entirely and clicking a bar chart did
+        nothing at all. The fix is not to force them through the point path,
+        which would say "1 point" and mean the whole shape, but to report what
+        is actually meaningful about a bar: its category and its value. See
+        _describe_patch.
+
+        The legend is armed last, and for a different purpose: clicking a
+        legend entry toggles its series rather than reading anything out.
         """
         for axes in self._figure.axes:
             for artist in (*axes.lines, *axes.collections):
                 artist.set_picker(PICK_TOLERANCE_POINTS)
+
+            # True, not a tolerance in points: a patch is a filled area, so
+            # "inside the shape" is the hit test, and a distance from its edge
+            # would make the middle of a tall bar unclickable.
+            for patch in axes.patches:
+                patch.set_picker(True)
+
+        self._make_legend_pickable()
+
+    def _make_legend_pickable(self) -> None:
+        """Let a click on a legend entry hide and show its series.
+
+        Wired here rather than at render time for the same reason as the data
+        artists: the legend is rebuilt by every render, so the connection has
+        to be re-established against the new handles each time.
+        """
+        self._legend_targets = {}
+
+        for axes in self._figure.axes:
+            legend = axes.get_legend()
+            if legend is None:
+                continue
+
+            handles = list(getattr(legend, "legend_handles", None) or [])
+            labels = [text.get_text() for text in legend.get_texts()]
+
+            # Map each legend handle back to the artists it stands for. Matched
+            # by label rather than by position: a renderer that draws a series
+            # as several artists - a line plus its error bars - produces one
+            # legend entry for the group, and toggling only the first would
+            # leave the error bars floating on their own.
+            by_label: dict[str, list[Any]] = {}
+            for artist in (*axes.lines, *axes.collections, *axes.patches):
+                label = str(artist.get_label() or "")
+                if label and not label.startswith("_"):
+                    by_label.setdefault(label, []).append(artist)
+
+            for handle, label in zip(handles, labels):
+                targets = by_label.get(str(label), [])
+                if not targets:
+                    continue
+                handle.set_picker(PICK_TOLERANCE_POINTS)
+                self._legend_targets[handle] = targets
+
+            for text in legend.get_texts():
+                # The label text is the larger target and the one people
+                # actually aim at; the swatch alone is a few pixels.
+                targets = by_label.get(str(text.get_text()), [])
+                if targets:
+                    text.set_picker(True)
+                    self._legend_targets[text] = targets
 
     def _on_button_press(self, event: Any) -> None:
         """Create an annotation with Ctrl + left click on a data axis.
@@ -514,6 +579,19 @@ class ChartPanel(QFrame):
         one index reads out the value, several read out the summary.
         """
         artist = event.artist
+
+        # Legend first: a legend handle is also a line or a patch, so testing
+        # it after the data cases would read out the swatch's own coordinates
+        # instead of toggling the series.
+        if artist in getattr(self, "_legend_targets", {}):
+            self._toggle_series_visibility(artist)
+            return
+
+        # A patch carries no index, so it never reaches the point path below.
+        if isinstance(artist, Patch):
+            self._describe_patch(artist)
+            return
+
         indices = [int(index) for index in getattr(event, "ind", []) or []]
         if not indices:
             return
@@ -556,6 +634,336 @@ class ChartPanel(QFrame):
             )
         )
 
+    def _toggle_series_visibility(self, handle: Any) -> None:
+        """Show or hide the series a legend entry stands for.
+
+        The legend entry itself is dimmed rather than removed, so a hidden
+        series still has something to click to bring it back - a legend that
+        deleted its own entry would be a one-way door.
+        """
+        targets = self._legend_targets.get(handle) or []
+        if not targets:
+            return
+
+        visible = not targets[0].get_visible()
+        for artist in targets:
+            artist.set_visible(visible)
+
+        handle.set_alpha(1.0 if visible else 0.25)
+
+        label = str(targets[0].get_label() or "").strip() or _("series")
+        self.selection_changed.emit(
+            _("{series} shown").format(series=label)
+            if visible
+            else _("{series} hidden").format(series=label)
+        )
+        self._canvas.draw_idle()
+
+    def _describe_patch(self, patch: Any) -> None:
+        """Read out a bar or a wedge by what it means, not by index.
+
+        A patch has no per-point index, which is why these were left
+        unpickable and clicking a bar chart did nothing. What is meaningful
+        about a bar is its category and its height, and both can be recovered
+        from the geometry: the tick label under its centre names it, and the
+        rectangle's height is the value.
+
+        A wedge carries its share in its angles rather than in a height, so it
+        reports a percentage instead.
+        """
+        axes = patch.axes
+        if axes is None:
+            return
+
+        series = str(patch.get_label() or "").strip()
+        if not series or series.startswith("_"):
+            series = ""
+
+        if isinstance(patch, Wedge):
+            share = abs(patch.theta2 - patch.theta1) / 360.0
+            name = series or _("slice")
+            self.selection_changed.emit(
+                _("{series} — {percent:.1f}% of the total").format(
+                    series=name, percent=share * 100.0
+                )
+            )
+            return
+
+        if isinstance(patch, Rectangle):
+            width = float(patch.get_width())
+            height = float(patch.get_height())
+            if self._bar_is_horizontal(axes, patch):
+                value, value_axis = width, axes.xaxis
+                centre, category_axis = patch.get_y() + height / 2.0, axes.yaxis
+            else:
+                value, value_axis = height, axes.yaxis
+                centre, category_axis = patch.get_x() + width / 2.0, axes.xaxis
+
+            category = self._category_at(category_axis, centre)
+            label = " — ".join(part for part in (series, category) if part)
+            self.selection_changed.emit(
+                _("{label}: {value}").format(
+                    label=label or _("bar"),
+                    value=axis_text(value_axis, value),
+                )
+            )
+            return
+
+        if series:
+            self.selection_changed.emit(series)
+
+    @staticmethod
+    def _bar_is_horizontal(axes: Any, patch: Any) -> bool:
+        """Say whether a bar grows along x rather than along y.
+
+        Read from the BarContainer that owns the patch, which records the
+        orientation ax.bar/ax.barh gave it. Guessing from the rectangle's own
+        geometry does not work: a tall thin horizontal bar and a tall thin
+        vertical bar have the same shape, and only the container knows which
+        dimension is the value.
+
+        The geometric fallback is for a patch drawn directly rather than
+        through the bar helpers, where there is no container to ask.
+        """
+        for container in getattr(axes, "containers", []) or []:
+            if patch in list(getattr(container, "patches", []) or []):
+                return str(getattr(container, "orientation", "vertical")) == "horizontal"
+
+        # No container: a bar sits on its baseline, so the coordinate that is
+        # pinned to zero tells us which way it grows.
+        return float(patch.get_x()) == 0.0 and float(patch.get_y()) != 0.0
+
+    @staticmethod
+    def _category_at(axis: Any, position: float) -> str:
+        """Return the tick label at a position, or the position itself.
+
+        A categorical bar chart puts the category names in the tick labels and
+        the bars at integer positions, so the label under the bar's centre is
+        its name. A numeric bar chart has no such names, and there the position
+        formatted by the axis is the honest answer.
+        """
+        try:
+            locations = list(axis.get_ticklocs())
+            labels = [text.get_text() for text in axis.get_ticklabels()]
+            for location, label in zip(locations, labels):
+                if abs(float(location) - position) < 0.5 and label:
+                    return str(label)
+        except Exception:
+            pass
+        return axis_text(axis, position)
+
+    # ------------------------------------------------------------------
+    # Hover readout
+    # ------------------------------------------------------------------
+
+    #: How long the pointer must be still before the readout is recomputed.
+    #: Mouse motion arrives far faster than a hit test plus a blit can be done,
+    #: so handling every event makes the chart lag behind the cursor. 40ms is
+    #: below the ~100ms at which a response stops feeling immediate, and it
+    #: collapses a fast sweep across the plot into a handful of tests instead
+    #: of hundreds.
+    HOVER_INTERVAL_MS: Final[int] = 40
+
+    #: Pixels. Wider than the click tolerance: hovering is a coarse gesture and
+    #: nobody positions the pointer precisely before reading a value.
+    HOVER_TOLERANCE_PIXELS: Final[float] = 12.0
+
+    def _init_hover_readout(self) -> None:
+        """Prepare the throttle timer and the blitting state."""
+        self._hover_event: Any | None = None
+        self._hover_annotation: Any | None = None
+        self._hover_background: Any | None = None
+        self._hover_axes: Any | None = None
+
+        self._hover_timer = QTimer(self)
+        self._hover_timer.setSingleShot(True)
+        self._hover_timer.setInterval(self.HOVER_INTERVAL_MS)
+        self._hover_timer.timeout.connect(self._update_hover_readout)
+
+    def _on_motion(self, event: Any) -> None:
+        """Record the pointer and let the timer decide when to act.
+
+        Deliberately does no work: this runs on every mouse move, and a hit
+        test here would be the thing that makes the chart feel slow.
+        """
+        self._hover_event = event
+        if not self._hover_timer.isActive():
+            self._hover_timer.start()
+
+    def _invalidate_hover_background(self) -> None:
+        """Drop the cached pixels after anything that repaints the canvas.
+
+        The background is a snapshot of the chart without the annotation on it.
+        Zooming, panning and resizing all invalidate it, and blitting a stale
+        one paints the old chart back over the new one.
+
+        Only the bitmap is dropped. The annotation artist itself survives a
+        repaint, and clearing _hover_axes here would make every hover rebuild
+        it and force the full draw that blitting exists to avoid - the blit
+        path would then never be reached at all.
+        """
+        self._hover_background = None
+
+    def _discard_hover_annotation(self) -> None:
+        """Forget the annotation artist itself, after the figure is cleared.
+
+        figure.clear() destroys every artist including this one, so the
+        reference left behind belongs to no axes and cannot be drawn.
+        """
+        self._hover_annotation = None
+        self._hover_axes = None
+        self._hover_background = None
+
+    def _update_hover_readout(self) -> None:
+        """Find the point under the pointer and draw its value beside it."""
+        event = self._hover_event
+        if event is None or getattr(event, "inaxes", None) is None:
+            self._hide_hover_annotation()
+            return
+
+        hit = self._nearest_point_to(event)
+        if hit is None:
+            self._hide_hover_annotation()
+            return
+
+        artist, x_value, y_value = hit
+        axes = event.inaxes
+
+        series = str(artist.get_label() or "").strip()
+        if not series or series.startswith("_"):
+            series = _("series")
+
+        text = _("{series}\nx: {x}\ny: {y}").format(
+            series=series,
+            x=axis_text(axes.xaxis, x_value),
+            y=axis_text(axes.yaxis, y_value),
+        )
+
+        annotation = self._hover_annotation_for(axes)
+        annotation.xy = (x_value, y_value)
+        annotation.set_text(text)
+        annotation.set_visible(True)
+        self._blit_hover(axes, annotation)
+
+    def _nearest_point_to(self, event: Any) -> tuple[Any, float, float] | None:
+        """Return (artist, x, y) for the closest data point, or None.
+
+        Distance is measured in display pixels, not in data units: the two axes
+        rarely share a scale, and a chart of millivolts against seconds would
+        otherwise treat a step along x as thousands of times nearer than a step
+        along y.
+        """
+        axes = event.inaxes
+        best: tuple[float, Any, float, float] | None = None
+
+        for artist in (*axes.lines, *axes.collections):
+            if not artist.get_visible():
+                continue
+
+            try:
+                if hasattr(artist, "get_offsets"):
+                    points = np.asarray(artist.get_offsets(), dtype=float)
+                    if points.size == 0:
+                        continue
+                    xs, ys = points[:, 0], points[:, 1]
+                else:
+                    xs, ys = (np.asarray(a, dtype=float) for a in artist.get_data())
+                if xs.size == 0:
+                    continue
+
+                pixels = axes.transData.transform(np.column_stack([xs, ys]))
+            except Exception:
+                continue
+
+            offsets = pixels - np.array([event.x, event.y], dtype=float)
+            distances = np.hypot(offsets[:, 0], offsets[:, 1])
+            index = int(np.nanargmin(distances))
+            distance = float(distances[index])
+
+            if distance <= self.HOVER_TOLERANCE_PIXELS and (
+                best is None or distance < best[0]
+            ):
+                best = (distance, artist, float(xs[index]), float(ys[index]))
+
+        return None if best is None else (best[1], best[2], best[3])
+
+    def _hover_annotation_for(self, axes: Any) -> Any:
+        """Return the annotation artist, moving it to *axes* when needed.
+
+        One artist reused rather than one per axes: it is only ever visible in
+        the axes under the pointer, and a per-axes cache would have to be
+        invalidated on every re-render alongside everything else.
+        """
+        if self._hover_annotation is not None and self._hover_axes is axes:
+            return self._hover_annotation
+
+        if self._hover_annotation is not None:
+            try:
+                self._hover_annotation.remove()
+            except Exception:
+                pass
+            # The annotation was part of the old axes' contents, so the cached
+            # background no longer matches what is on screen.
+            self._hover_background = None
+
+        self._hover_annotation = axes.annotate(
+            "",
+            xy=(0.0, 0.0),
+            xytext=(12, 12),
+            textcoords="offset points",
+            ha="left",
+            va="bottom",
+            fontsize=8,
+            zorder=10_000,
+            bbox={"boxstyle": "round,pad=0.4", "fc": "#ffffe0", "ec": "#808080", "alpha": 0.95},
+            arrowprops={"arrowstyle": "-", "color": "#808080", "linewidth": 0.8},
+            annotation_clip=False,
+        )
+        self._hover_annotation.set_visible(False)
+        self._hover_axes = axes
+        return self._hover_annotation
+
+    def _blit_hover(self, axes: Any, annotation: Any) -> None:
+        """Repaint only the annotation, over a cached copy of the chart.
+
+        This is the whole reason hovering is affordable. A full draw() re-runs
+        every renderer for every series; blitting restores a bitmap and draws
+        one text box, so the cost does not grow with the size of the data.
+        """
+        canvas = self._canvas
+        try:
+            if self._hover_background is None:
+                # Capture without the annotation, or it would be baked into
+                # the background and smear across the plot as the pointer moves.
+                annotation.set_visible(False)
+                canvas.draw()
+                self._hover_background = canvas.copy_from_bbox(self._figure.bbox)
+                annotation.set_visible(True)
+
+            canvas.restore_region(self._hover_background)
+            axes.draw_artist(annotation)
+            canvas.blit(self._figure.bbox)
+        except Exception:
+            # Any backend that cannot blit still gets a correct, slower chart.
+            self._hover_background = None
+            canvas.draw_idle()
+
+    def _hide_hover_annotation(self) -> None:
+        """Take the readout away once the pointer leaves every point."""
+        annotation = self._hover_annotation
+        if annotation is None or not annotation.get_visible():
+            return
+
+        annotation.set_visible(False)
+        try:
+            if self._hover_background is not None:
+                self._canvas.restore_region(self._hover_background)
+                self._canvas.blit(self._figure.bbox)
+                return
+        except Exception:
+            self._hover_background = None
+        self._canvas.draw_idle()
+
     def _configure_fixed_scroll_area(self) -> None:
         """Configure the scroll area used only by FIXED mode."""
         self._fixed_scroll_area.setSizeAdjustPolicy(
@@ -594,6 +1002,13 @@ class ChartPanel(QFrame):
         # a pick event, so it works even when there is no marker exactly
         # under the cursor.
         self._canvas.mpl_connect("button_press_event", self._on_button_press)
+        # Hover readout. Throttled and blitted; see _on_motion.
+        self._canvas.mpl_connect("motion_notify_event", self._on_motion)
+        # Any of these repaints the canvas, so the cached background that
+        # blitting restores is no longer what is underneath.
+        self._canvas.mpl_connect("draw_event", lambda _e: self._invalidate_hover_background())
+        self._canvas.mpl_connect("resize_event", lambda _e: self._invalidate_hover_background())
+        self._canvas.mpl_connect("axes_leave_event", lambda _e: self._hide_hover_annotation())
         self._canvas.setMinimumSize(0, 0)
         self._canvas.setMaximumSize(QSize(16777215, 16777215))
         self._canvas.setAutoFillBackground(False)
@@ -1751,6 +2166,7 @@ class ChartPanel(QFrame):
     def reload(self) -> None:
         """Reload the latest descriptor from the repository and re-render it."""
         self._figure.clear()
+        self._discard_hover_annotation()
         self._refresh_config_from_source()
         self._apply_persisted_figure_metrics_to_rcparams()
         self._reset_figure_metrics_from_rcparams_for_reload()
