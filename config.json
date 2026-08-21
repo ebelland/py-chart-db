@@ -608,7 +608,7 @@
     }
   },
   "chart_panel": {
-    "resize_mode": "FIXED",
+    "resize_mode": "FIT",
     "initial_zoom_percent": 127,
     "background_color": "#ffffff",
     "figure_width_cm": 160.26,
@@ -682,7 +682,7 @@
     },
     "query_builder_dialog": {
       "x": 351,
-      "y": 279,
+      "y": 375,
       "width": 977,
       "height": 598,
       "maximized": false

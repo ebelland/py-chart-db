@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from matplotlib import rcParams
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -88,6 +88,53 @@ class FigurePropertiesWidget(QWidget):
     # three the same size and readable on every platform.
     FIGURE_SPIN_MIN_WIDTH = 110
 
+    #: (label, descriptor value, tooltip) for Matplotlib's layout engines.
+    #:
+    #: These four are the whole set Matplotlib accepts.  GridSpec is not one of
+    #: them - it is how axes are *created*, which this application already does
+    #: for every figure (see ``_create_axes_from_gridspec``), and it is what
+    #: gives an axis its row_span/col_span.  The engine only decides how the
+    #: resulting axes are spaced.
+    LAYOUT_ENGINES: tuple[tuple[str, str, str], ...] = (
+        (
+            "Constrained",
+            "constrained",
+            "Fit axes, labels and titles without overlap. Best default for a "
+            "grid of plots.",
+        ),
+        (
+            "Compressed",
+            "compressed",
+            "Like Constrained, but pulls fixed-aspect axes together and "
+            "removes the gaps between them.",
+        ),
+        (
+            "Tight",
+            "tight",
+            "Older automatic spacing. Handles simple grids; can misplace "
+            "colorbars and figure-level legends.",
+        ),
+        (
+            "Manual",
+            "none",
+            "No automatic spacing - the Manual spacing values below are used "
+            "instead.",
+        ),
+    )
+
+    #: (option key, label, default, tooltip) for the manual spacing block.
+    #: Defaults match ``_apply_subplot_margins`` in the renderer, so opening
+    #: this panel on a figure that has no margins block shows what it is
+    #: actually being drawn with.
+    MARGIN_FIELDS: tuple[tuple[str, str, float, str], ...] = (
+        ("left", "Left", 0.04, "Left edge of the axes area, as a fraction of figure width."),
+        ("right", "Right", 0.99, "Right edge of the axes area, as a fraction of figure width."),
+        ("bottom", "Bottom", 0.06, "Bottom edge of the axes area, as a fraction of figure height."),
+        ("top", "Top", 0.97, "Top edge of the axes area, as a fraction of figure height."),
+        ("wspace", "Column gap", 0.08, "Width of the gap between columns, as a fraction of the average axis width."),
+        ("hspace", "Row gap", 0.08, "Height of the gap between rows, as a fraction of the average axis height."),
+    )
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._repo = None
@@ -105,6 +152,11 @@ class FigurePropertiesWidget(QWidget):
         self._fig_height_cm: QDoubleSpinBox
         self._fig_frameon: QCheckBox
         self._fig_layout_mode: QComboBox
+        # Bound before _build_ui rather than declared: the layout combo's
+        # currentIndexChanged handler reads them, and a stray signal during
+        # construction would otherwise hit an attribute that does not exist.
+        self._margin_spins: dict[str, QDoubleSpinBox] = {}
+        self._margins_section: QWidget | None = None
 
         self._apply_persisted_metrics_to_rcparams()
         self._build_ui()
@@ -252,13 +304,16 @@ class FigurePropertiesWidget(QWidget):
 
         self._fig_layout_mode = QComboBox(opts_section)
         self._configure_combo_width(self._fig_layout_mode, minimum_contents_length=14)
-        for label, value in [
-            ("constrained", "constrained"),
-            ("compressed", "compressed"),
-            ("tight", "tight"),
-            ("none", "none"),
-        ]:
-            self._fig_layout_mode.addItem(label, value)
+        for label, value, tooltip in self.LAYOUT_ENGINES:
+            self._fig_layout_mode.addItem(_(label), value)
+            self._fig_layout_mode.setItemData(
+                self._fig_layout_mode.count() - 1,
+                _(tooltip),
+                Qt.ItemDataRole.ToolTipRole,
+            )
+        self._fig_layout_mode.currentIndexChanged.connect(
+            self._update_margin_controls_enabled
+        )
 
         form.addRow(_("DPI"), self._fig_dpi)
         form.addRow(_("Width"), self._fig_width_cm)
@@ -267,7 +322,63 @@ class FigurePropertiesWidget(QWidget):
         form.addRow(_("Figure layout"), self._fig_layout_mode)
         opts_section_lay.addLayout(form)
         lay.addWidget(opts_section)
+
+        lay.addWidget(self._build_margins_section())
         lay.addStretch(1)
+
+    def _build_margins_section(self) -> QWidget:
+        """Spacing controls for the manual layout mode.
+
+        The renderer has always honoured a ``margins`` block in the figure
+        options - ``_apply_subplot_margins`` reads all six values - but nothing
+        in the UI ever wrote one, so the only way to use manual layout was to
+        edit the project file by hand.  These are those six values.
+
+        They apply only under "Manual": the three automatic engines compute
+        spacing themselves and overwrite whatever subplots_adjust set, so the
+        controls are disabled rather than silently ignored.
+        """
+        section = create_card_widget(self, "figureMarginsCard")
+        section_lay = QVBoxLayout(section)
+        apply_card_layout(section_lay)
+        section_lay.addWidget(create_section_title(_("Manual spacing"), section))
+
+        form = QFormLayout()
+        stdSizeAndlayout(form)
+
+        self._margin_spins = {}
+        for key, label, default, tooltip in self.MARGIN_FIELDS:
+            spin = QDoubleSpinBox(section)
+            # Fractions of the figure, so 0..1 for edges.  wspace/hspace are
+            # fractions of the average axis size and can legitimately exceed 1
+            # when axes need to be spread far apart.
+            spin.setRange(0.0, 2.0 if key in ("wspace", "hspace") else 1.0)
+            spin.setDecimals(3)
+            spin.setSingleStep(0.01)
+            spin.setValue(default)
+            spin.setToolTip(_(tooltip))
+            spin.setMinimumWidth(self.FIGURE_SPIN_MIN_WIDTH)
+            spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            self._margin_spins[key] = spin
+            form.addRow(_(label), spin)
+
+        section_lay.addLayout(form)
+        self._margins_section = section
+        return section
+
+    def _update_margin_controls_enabled(self) -> None:
+        """Enable the spacing controls only when the layout engine is manual."""
+        manual = str(self._fig_layout_mode.currentData() or "") == "none"
+        enabled = manual and self._figure_id is not None
+        for spin in self._margin_spins.values():
+            spin.setEnabled(enabled)
+
+        if self._margins_section is not None:
+            self._margins_section.setToolTip(
+                ""
+                if manual
+                else _("Set Figure layout to Manual to edit spacing by hand.")
+            )
 
     def set_connected_figure(
         self,
@@ -306,6 +417,7 @@ class FigurePropertiesWidget(QWidget):
         self._fig_height_cm.setValue(height_cm)
         self._fig_frameon.setChecked(True)
         self._fig_layout_mode.setCurrentIndex(0)
+        self._load_margins_into_spins({})
         self._name_edit.clear()
         self._set_enabled_state(False)
 
@@ -325,6 +437,10 @@ class FigurePropertiesWidget(QWidget):
             self._btn_apply,
         ):
             widget.setEnabled(enabled)
+
+        # Always last: the spacing controls need the layout mode as well as the
+        # connected state, so they cannot just follow ``enabled``.
+        self._update_margin_controls_enabled()
 
     def _figure_options(self) -> dict[str, Any]:
         """Return figure options safely from the connected descriptor."""
@@ -384,6 +500,7 @@ class FigurePropertiesWidget(QWidget):
             self._fig_height_cm.setValue(height_cm)
             self._fig_frameon.setChecked(True)
             self._fig_layout_mode.setCurrentIndex(0)
+            self._load_margins_into_spins({})
             self._set_enabled_state(False)
             return
 
@@ -418,6 +535,7 @@ class FigurePropertiesWidget(QWidget):
         )
 
         self._load_metrics_into_spins(fig_opts)
+        self._load_margins_into_spins(fig_opts)
         self._fig_frameon.setChecked(bool(fig_opts.get("frameon", True)))
 
         current_layout = str(
@@ -608,6 +726,25 @@ class FigurePropertiesWidget(QWidget):
             return int(DEFAULT_FIGURE_DPI)
         return max(1, dpi)
 
+    def _load_margins_into_spins(self, fig_opts: dict[str, Any]) -> None:
+        """Show this figure's manual spacing, or the renderer's defaults.
+
+        Each field falls back independently: a figure whose options set only
+        ``hspace`` should show its own hspace next to the defaults for the
+        rest, which is what the renderer draws it with.
+        """
+        margins = fig_opts.get("margins")
+        margins = margins if isinstance(margins, dict) else {}
+
+        for key, _label, default, _tooltip in self.MARGIN_FIELDS:
+            try:
+                value = float(margins.get(key, default))
+            except (TypeError, ValueError):
+                value = default
+
+            spin = self._margin_spins[key]
+            spin.setValue(min(max(value, spin.minimum()), spin.maximum()))
+
     def _load_metrics_into_spins(self, fig_opts: dict[str, Any]) -> None:
         """Show this figure's own metrics, falling back to the rcParams ones.
 
@@ -704,6 +841,10 @@ class FigurePropertiesWidget(QWidget):
             OPT_FIGURE_WIDTH_CM: float(self._fig_width_cm.value()),
             OPT_FIGURE_HEIGHT_CM: float(self._fig_height_cm.value()),
             OPT_FIGURE_DPI: float(self._fig_dpi.value()),
+            "margins": {
+                key: float(spin.value())
+                for key, spin in self._margin_spins.items()
+            },
         }
         self.figure_options_requested.emit(payload)
 
