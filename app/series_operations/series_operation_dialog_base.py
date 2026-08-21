@@ -43,6 +43,8 @@ from app.utils.series_validation import (
     errors,
     validate_xy,
 )
+from app.series_operations.parameter_form import ParameterForm
+from app.series_operations.parameter_spec import Param, defaults
 from app.utils.messages import show_message
 from app.utils.dialog_state import (
     restore_dialog_state,
@@ -246,10 +248,64 @@ class SeriesOperationDialogBase(QDialog):
         return panel
 
     
+    #: Declared parameters.  An operation that sets this gets its parameter
+    #: form built, wired and read back for free; see ``parameter_spec``.
+    #: Leaving it empty keeps the old behaviour, where the subclass overrides
+    #: ``build_parameter_selector`` and builds the form by hand - which is
+    #: still the right answer for a genuinely unusual control.
+    PARAMS: tuple[Param, ...] = ()
+
     def build_parameter_selector(self) -> QWidget:
-        """Return the parameter editor widget for the left panel."""
-        # ABSTRACT MUST IMPLEMENT
-        return QWidget(self)
+        """Return the parameter editor widget for the left panel.
+
+        Builds itself from ``PARAMS`` when the operation declares any.  An
+        operation that declares none must override this - hence the empty
+        widget rather than NotImplementedError, which is what the dialogs
+        written before ``PARAMS`` existed rely on.
+        """
+        if not self.PARAMS:
+            return QWidget(self)
+
+        self._parameter_form_spec = ParameterForm(
+            self.PARAMS,
+            self,
+            on_change=self.refresh_results,
+            context=self.parameter_context,
+        )
+        # Kept under the name the base already uses for the hand-built form, so
+        # set_row_visible and the state helpers keep working unchanged.
+        self._parameter_form = self._parameter_form_spec.layout
+        return self._parameter_form_spec.widget
+
+    def parameter_context(self) -> Mapping[str, Any]:
+        """Return values a ``visible_for`` rule may reference but not own.
+
+        The model combo by default, under the name ``model``: nearly every
+        operation's parameter visibility depends on which model is selected,
+        and the combo belongs to this base rather than to ``PARAMS``.
+        """
+        combo = getattr(self, "model_combo", None)
+        if combo is None:
+            return {}
+        return {"model": combo.currentText()}
+
+    def parameter_values(self) -> dict[str, Any]:
+        """Return the declared parameters' current values, keyed by name.
+
+        Falls back to the declared defaults when there is no form yet, so an
+        operation can call this from ``compute_results`` during construction
+        without a special case.
+        """
+        form = getattr(self, "_parameter_form_spec", None)
+        if form is None:
+            return defaults(self.PARAMS)
+        return form.values()
+
+    def set_parameter_values(self, values: Mapping[str, Any]) -> None:
+        """Restore declared parameters from saved state."""
+        form = getattr(self, "_parameter_form_spec", None)
+        if form is not None:
+            form.set_values(values)
 
     def build_results_pane(self) -> QWidget:
         """Return the shared HTML results widget."""

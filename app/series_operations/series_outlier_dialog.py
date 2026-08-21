@@ -16,9 +16,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from PySide6.QtWidgets import (
-    QDoubleSpinBox,
     QFormLayout,
-    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -26,6 +24,7 @@ from scipy.ndimage import median_filter
 
 from app.data.data_source import parse_roles, quote_identifier, row_value
 from app.data.sqlite_repo import SqliteRepo
+from app.series_operations.parameter_spec import FloatParam, IntParam
 from app.series_operations.series_operation_dialog_base import (
     ResultSeriesSpec,
     SeriesOperationDialogBase,
@@ -118,6 +117,41 @@ class SeriesOutlierDialog(SeriesOperationDialogBase):
     INPUT_REQUIRES_SORTED_X = True
     INPUT_MINIMUM_POINTS = 3
 
+    # Replaces the three hand-built spin boxes, their three signal
+    # connections, and _refresh_visibility's three set_row_visible calls. The
+    # visibility rules that used to live in code are now the same data the
+    # widgets are built from, so the two cannot drift apart.
+    PARAMS = (
+        FloatParam(
+            "threshold",
+            "Threshold:",
+            tooltip="Threshold multiplier applied to the method's spread estimate.",
+            default_value=3.0,
+            minimum=0.1,
+            maximum=30.0,
+            visible_for={"model": (OUTLIER_ZSCORE, OUTLIER_MAD, OUTLIER_ROLLING)},
+        ),
+        FloatParam(
+            "iqr_factor",
+            "IQR multiplier:",
+            tooltip="Multiplier applied to IQR outlier bounds.",
+            default_value=1.5,
+            minimum=0.5,
+            maximum=10.0,
+            visible_for={"model": (OUTLIER_IQR,)},
+        ),
+        IntParam(
+            "window",
+            "Window size:",
+            tooltip="Rolling window size, in points, used to compute the local median.",
+            default_value=11,
+            minimum=3,
+            maximum=9999,
+            odd_only=True,
+            visible_for={"model": (OUTLIER_ROLLING,)},
+        ),
+    )
+
     Icon = """
     <circle cx="7" cy="8" r="1.3"/>
     <circle cx="10.5" cy="11" r="1.3"/>
@@ -155,9 +189,6 @@ class SeriesOutlierDialog(SeriesOperationDialogBase):
 
     def init_operation_widgets(self) -> None:
         self._doc_link = create_doc_link(self)
-        self._threshold_spin = QDoubleSpinBox(self)
-        self._iqr_factor_spin = QDoubleSpinBox(self)
-        self._window_spin = QSpinBox(self)
         self._parameter_form = None
 
     def build_model_selector(self) -> QWidget:
@@ -180,37 +211,11 @@ class SeriesOutlierDialog(SeriesOperationDialogBase):
         layout.addWidget(form_container)
         return panel
 
-    def build_parameter_selector(self) -> QWidget:
-        widget = QWidget(self)
-        self._parameter_form = QFormLayout(widget)
-        self._parameter_form.setContentsMargins(0, 0, 0, 0)
-        self._parameter_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
-
-        self._threshold_spin.setRange(0.1, 30.0)
-        self._threshold_spin.setDecimals(3)
-        self._threshold_spin.setValue(3.0)
-        self._threshold_spin.setToolTip(_("Threshold multiplier applied to the method's spread estimate."))
-        self._parameter_form.addRow(_("Threshold:"), self._threshold_spin)
-
-        self._iqr_factor_spin.setRange(0.5, 10.0)
-        self._iqr_factor_spin.setDecimals(3)
-        self._iqr_factor_spin.setValue(1.5)
-        self._iqr_factor_spin.setToolTip(_("Multiplier applied to IQR outlier bounds."))
-        self._parameter_form.addRow(_("IQR multiplier:"), self._iqr_factor_spin)
-
-        self._window_spin.setRange(3, 9999)
-        self._window_spin.setValue(11)
-        self._window_spin.setToolTip(_("Rolling window size, in points, used to compute the local median."))
-        self._parameter_form.addRow(_("Window size:"), self._window_spin)
-
-        return widget
-
     def connect_operation_signals(self) -> None:
+        # Only the model combo: ParameterForm connects every declared
+        # parameter to refresh_results when it builds them.
         self.model_combo.currentIndexChanged.connect(self._refresh_visibility)
         self.model_combo.currentIndexChanged.connect(self.refresh_results)
-        self._threshold_spin.valueChanged.connect(self.refresh_results)
-        self._iqr_factor_spin.valueChanged.connect(self.refresh_results)
-        self._window_spin.valueChanged.connect(self.refresh_results)
 
     def _populate_axes(self) -> None:
         self.series_selector.reload(select_all_series=True)
@@ -226,13 +231,16 @@ class SeriesOutlierDialog(SeriesOperationDialogBase):
         self._refresh_visibility()
 
     def _refresh_visibility(self) -> None:
+        """Re-evaluate the declared visibility rules, and update the doc link.
+
+        The rows are handled by the parameter form from the ``visible_for``
+        declarations; only the documentation link, which is not a parameter,
+        is still set here.
+        """
         model = self.model_combo.currentText()
-        has_threshold = model in {OUTLIER_ZSCORE, OUTLIER_MAD, OUTLIER_ROLLING}
-        has_iqr = model == OUTLIER_IQR
-        has_window = model == OUTLIER_ROLLING
-        self.set_row_visible(self._threshold_spin, has_threshold)
-        self.set_row_visible(self._iqr_factor_spin, has_iqr)
-        self.set_row_visible(self._window_spin, has_window)
+        form = getattr(self, "_parameter_form_spec", None)
+        if form is not None:
+            form.refresh_visibility()
         title, url = OUTLIER_DOCS[model]
         set_doc_link(self._doc_link, title, url)
 
@@ -576,11 +584,7 @@ class SeriesOutlierDialog(SeriesOperationDialogBase):
         )
 
     def _params(self) -> dict[str, Any]:
-        return {
-            "threshold": float(self._threshold_spin.value()),
-            "iqr_factor": float(self._iqr_factor_spin.value()),
-            "window": int(self._window_spin.value()),
-        }
+        return self.parameter_values()
 
     def _outlier_mask(self, y_data: np.ndarray, model: str, params: Mapping[str, Any]) -> np.ndarray:
         threshold = float(params.get("threshold", 3.0))
