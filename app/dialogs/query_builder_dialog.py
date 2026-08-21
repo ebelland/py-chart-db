@@ -98,7 +98,11 @@ _SNIPPET_BUILDERS: dict[str, Any] = {
 
 
 class QueryBuilderDialog(QDialog):
-    """Create and edit saved queries, and preview their results."""
+    """Create and edit saved queries, and run them to check the result."""
+
+    #: Roughly eight rows.  Enough to pick from without the list dominating the
+    #: side panel; it scrolls past that.
+    SAVED_LIST_MAX_HEIGHT = 170
 
     def __init__(
         self,
@@ -156,7 +160,11 @@ class QueryBuilderDialog(QDialog):
         self._query_list = QListWidget(panel)
         mark_editor_panel(self._query_list)
         self._query_list.itemSelectionChanged.connect(self._on_saved_selected)
-        layout.addWidget(self._query_list, 2)
+        # Stretch 0 with a capped height: the list is a picker, not the subject
+        # of the dialog, and at stretch 2 it swallowed the space the tables and
+        # snippets below it needed.
+        self._query_list.setMaximumHeight(self.SAVED_LIST_MAX_HEIGHT)
+        layout.addWidget(self._query_list, 0)
 
         layout.addWidget(create_section_title(_("Tables"), panel))
         self._table_combo = QComboBox(panel)
@@ -242,16 +250,13 @@ class QueryBuilderDialog(QDialog):
         return panel
 
     def _build_action_row(self) -> QHBoxLayout:
-        """Validate / Run on the left, Save / Close on the right."""
+        """Run on the left, Save / Close on the right."""
         row = QHBoxLayout()
         stdSizeAndlayout(row)
 
-        create_action_button(
-            parent=self,
-            action_id="preview",
-            action=self.validate,
-            layout=row,
-        )
+        # No separate Preview button: it only called validate(), which run()
+        # already does before executing, so the two buttons differed only in
+        # whether you also got the rows.
         create_action_button(
             parent=self,
             action_id="run",
