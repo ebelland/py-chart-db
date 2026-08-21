@@ -109,6 +109,22 @@ N-2   [DONE] series operation: plot functions without fitting
       selected_series() to return []; _run_operation resolves the target from
       the selected axis, which is unaffected.
 
+N-2b  [DONE] Calculus: draw on a new axis by default
+      A derivative divides by dx and an integral accumulates, so neither
+      shares a scale with its source - overlaid, one of the two is a flat
+      line on the zero gridline. "Draw on a new axis" is on by default, with
+      a checkbox to overlay when the ranges happen to be comparable. The axis
+      is created once and reused, labelled dy/dx, d2y/dx2 or the integral
+      sign from the result rather than from the model name, and removed again
+      if the dialog closes without Apply.
+      Found while doing this: PARAMS labels and tooltips are class data, so
+      the _() sweep never saw them and 47 strings across the new operations
+      would have shipped in English with nothing failing. There is now a test
+      that discovers every operation's PARAMS rather than hand-listing them,
+      so the next operation is covered the day it is written. This closes the
+      gap left open under P2-14 for parameters; renderer/operation
+      Description attributes are still open.
+
 N-3   attribute control charts (p, np, c, u)
       The half of SPC N-1 does not cover. These plot a proportion or a count
       rather than a measurement, so the limits are binomial/Poisson rather

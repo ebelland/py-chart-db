@@ -514,3 +514,120 @@ def test_a_discovered_function_evaluates_over_a_range() -> None:
     y = np.asarray(model(x, np.asarray([0.0, 1.0])), dtype=float)
 
     assert y == pytest.approx(x), "intercept 0, slope 1 is the identity"
+
+
+# ======================================================================
+# Calculus: where the result is drawn
+# ======================================================================
+
+class _AxisSpy:
+    """Stands in for the repository and for the base's axis helpers.
+
+    A derivative's axis routing is decided entirely from the parameter value
+    and the result metadata, so it can be exercised without a figure.
+    """
+
+    def __init__(self, new_axis: bool) -> None:
+        self.new_axis = new_axis
+        self.created: list[dict] = []
+        self.deleted: list[int] = []
+        self.labelled: dict | None = None
+
+    def create_result_axis(self, **kwargs) -> int:
+        self.created.append(kwargs)
+        return 99
+
+    def update_axis_descriptor(self, **kwargs) -> None:
+        self.labelled = kwargs
+
+    def delete_axis(self, axis_id: int) -> None:
+        self.deleted.append(axis_id)
+
+
+def _calculus_with_axis(new_axis: bool) -> tuple[SeriesCalculusDialog, _AxisSpy]:
+    spy = _AxisSpy(new_axis)
+    dialog = _bare(SeriesCalculusDialog)
+    dialog._result_axis_id = None
+    dialog._applied = False
+    dialog._repo = spy
+    dialog.create_result_axis = spy.create_result_axis
+    dialog.parameter_values = lambda: {"new_axis": new_axis}
+    dialog._model = lambda: DERIV_SAVGOL
+    return dialog, spy
+
+
+def _derivative_result(order: int = 1, model: str = DERIV_SAVGOL):
+    from app.series_operations.series_calculus_dialog import CalculusResult
+
+    return CalculusResult(
+        source_name="s",
+        result_name="s - d",
+        model=model,
+        x=np.array([0.0, 1.0]),
+        y=np.array([0.0, 1.0]),
+        metadata={"order": order},
+    )
+
+
+def test_calculus_draws_on_a_new_axis_by_default() -> None:
+    """A derivative divides by dx, so it rarely shares a scale with its
+    source; overlaid, one of the two is a flat line on the zero gridline."""
+    dialog, spy = _calculus_with_axis(True)
+    target = dialog.resolve_target_axis_id(7, [_derivative_result()])
+
+    assert target == 99
+    assert target != 7
+    assert len(spy.created) == 1
+
+
+def test_calculus_overlays_when_the_checkbox_is_cleared() -> None:
+    dialog, spy = _calculus_with_axis(False)
+    target = dialog.resolve_target_axis_id(7, [_derivative_result()])
+
+    assert target == 7, "must fall back to the selected axis"
+    assert spy.created == []
+
+
+def test_the_result_axis_is_created_once_and_reused() -> None:
+    """Otherwise adjusting a parameter repeatedly leaves a trail of axes."""
+    dialog, spy = _calculus_with_axis(True)
+    for _ in range(4):
+        dialog.resolve_target_axis_id(7, [_derivative_result()])
+
+    assert len(spy.created) == 1
+
+
+@pytest.mark.parametrize(
+    "order, model, expected",
+    [
+        (1, DERIV_SAVGOL, "dy/dx"),
+        (2, DERIV_SAVGOL, "d²y/dx²"),
+        (1, INTEGRAL_CUMULATIVE, "∫y dx"),
+    ],
+)
+def test_the_new_axis_is_labelled_by_what_was_computed(order, model, expected) -> None:
+    """Not by the model name: a first and a second derivative are both
+    "Savitzky-Golay" but are not the same quantity."""
+    dialog, spy = _calculus_with_axis(True)
+    dialog.resolve_target_axis_id(7, [_derivative_result(order, model)])
+
+    assert spy.labelled is not None
+    assert spy.labelled["y_label"] == expected
+
+
+def test_closing_without_applying_removes_the_axis_it_created() -> None:
+    """Creating an axis commits, so the preview savepoint does not cover it."""
+    dialog, spy = _calculus_with_axis(True)
+    dialog.resolve_target_axis_id(7, [_derivative_result()])
+    dialog.discard_operation_artifacts()
+
+    assert spy.deleted == [99]
+
+
+def test_an_applied_axis_survives_closing() -> None:
+    dialog, spy = _calculus_with_axis(True)
+    dialog.resolve_target_axis_id(7, [_derivative_result()])
+    dialog._applied = True
+    dialog.discard_operation_artifacts()
+
+    assert spy.deleted == [], "after Apply the axis is the user's, not ours"

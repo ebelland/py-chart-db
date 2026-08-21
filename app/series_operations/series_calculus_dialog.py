@@ -191,6 +191,18 @@ class SeriesCalculusDialog(SeriesOperationDialogBase):
             visible_for={"model": INTEGRALS},
         ),
         BoolParam(
+            "new_axis",
+            "Draw on a new axis:",
+            tooltip=(
+                "A derivative or an integral rarely shares a scale with the "
+                "series it came from - d/dx of a slow drift is near zero "
+                "beside data in the thousands. On by default for that reason; "
+                "turn it off to overlay when the ranges happen to be "
+                "comparable."
+            ),
+            default_value=True,
+        ),
+        BoolParam(
             "simpson",
             "Use Simpson's rule:",
             tooltip=(
@@ -220,6 +232,11 @@ class SeriesCalculusDialog(SeriesOperationDialogBase):
 
         self._last_results: list[CalculusResult] = []
         self._parameter_form: QFormLayout | None = None
+        # Created lazily on the first Preview/Apply that asks for it, and
+        # reused after, so adjusting the window repeatedly does not leave a
+        # trail of empty axes behind.
+        self._result_axis_id: int | None = None
+        self._applied = False
 
         super().__init__(
             repo=repo,
@@ -541,6 +558,93 @@ class SeriesCalculusDialog(SeriesOperationDialogBase):
             return y_values - line, "endpoint line subtracted"
 
         return y_values, "none"
+
+    # ------------------------------------------------------------------
+    # Where the results are drawn
+    # ------------------------------------------------------------------
+
+    def apply(self) -> bool:
+        """Apply, and keep any axis this dialog created."""
+        applied = super().apply()
+        # Only now is the new axis the user's rather than this dialog's.
+        self._applied = self._applied or applied
+        return applied
+
+    def resolve_target_axis_id(
+        self,
+        selected_axis_id: int,
+        results: Sequence[Any],
+    ) -> int:
+        """Return the axis to draw on: a new one unless asked otherwise.
+
+        A derivative and its source almost never share a scale. Differentiating
+        divides by dx, so a slow drift over thousands of seconds has a
+        derivative near zero; drawn on the source's axis the result is a flat
+        line on the zero gridline while the source fills the plot. An integral
+        goes the other way and grows without bound. Either way both curves
+        become unreadable, which is why this defaults to a new axis rather than
+        following the usual "write back where the input came from" rule.
+
+        A new axis on the same figure, not a new tab: the result is a second
+        view of this chart's data and belongs beside it.
+        """
+        if not bool(self.parameter_values().get("new_axis", True)):
+            return selected_axis_id
+
+        if self._result_axis_id is None:
+            self._result_axis_id = self.create_result_axis(
+                chart_type="Scatter Plot",
+                title=self._model(),
+                options={"grid": True, "linestyle": "-", "marker": ""},
+            )
+
+        self._label_result_axis(results)
+        return self._result_axis_id
+
+    def _label_result_axis(self, results: Sequence[Any]) -> None:
+        """Name the axis after what was actually computed.
+
+        From the results rather than from the model name, because the same
+        model produces different quantities: a first derivative and a second
+        are both "Savitzky-Golay".
+        """
+        if self._result_axis_id is None or not results:
+            return
+
+        first = results[0]
+        order = int(first.metadata.get("order", 1) or 1)
+        if first.model in DERIVATIVES:
+            y_label = "d\u00b2y/dx\u00b2" if order == 2 else "dy/dx"
+        else:
+            y_label = "\u222by dx"
+
+        try:
+            self._repo.update_axis_descriptor(
+                axis_id=self._result_axis_id,
+                title=str(first.model or ""),
+                x_label="x",
+                y_label=y_label,
+            )
+        except Exception:
+            applogger.exception("Failed to label the calculus result axis")
+
+    def discard_operation_artifacts(self) -> None:
+        """Delete the axis this dialog created, when Apply never happened.
+
+        Creating an axis commits, so it is not covered by the preview
+        savepoint: closing without applying has to remove it by hand or an
+        empty axis is left behind.
+        """
+        if self._applied or self._result_axis_id is None:
+            return
+
+        axis_id = self._result_axis_id
+        self._result_axis_id = None
+        try:
+            self._repo.delete_axis(axis_id)
+            applogger.info("Discarded the unapplied calculus axis %s.", axis_id)
+        except Exception:
+            applogger.exception("Failed to discard calculus axis %s", axis_id)
 
     # ------------------------------------------------------------------
     # Results

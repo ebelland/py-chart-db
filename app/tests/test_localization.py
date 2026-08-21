@@ -121,6 +121,44 @@ def test_labels_held_in_tables_are_translated_too() -> None:
     assert missing == []
 
 
+def test_declared_operation_parameters_are_translated() -> None:
+    """PARAMS is the same trap, and a growing one.
+
+    A declared parameter's label and tooltip are class data, wrapped in _() by
+    ParameterForm when it builds the widget rather than at the point they are
+    written. So they are invisible to the sweep in
+    ``test_every_translated_string_is_in_the_italian_catalogue`` and would ship
+    in English with nothing failing.
+
+    Discovered rather than hand-listed, unlike the tables above: every
+    operation that declares PARAMS is covered the day it is written, without
+    anyone remembering to add it here.
+    """
+    from app.scanners.series_operation_scanner import (
+        _discover_series_operations,
+        import_class_from_file,
+    )
+
+    catalog = i18n._parse_po(PO_PATH)
+    missing: set[str] = set()
+
+    for operation in _discover_series_operations():
+        cls = import_class_from_file(operation)
+        if cls is None:
+            continue
+        for param in getattr(cls, "PARAMS", ()) or ():
+            for text in (param.label, param.tooltip):
+                if text and text not in catalog:
+                    missing.add(text)
+            for label, _value in getattr(param, "labelled_choices", lambda: ())():
+                if label and label not in catalog:
+                    missing.add(label)
+
+    assert sorted(missing) == [], (
+        f"{len(missing)} declared parameter strings have no Italian"
+    )
+
+
 def test_the_catalogue_has_no_empty_translations() -> None:
     """An empty msgstr silently falls back, so it reads as untranslated."""
     catalog = i18n._parse_po(PO_PATH)

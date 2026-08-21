@@ -2610,3 +2610,191 @@ msgstr "Intervallo di y"
 
 msgid "{count} of {total} points signal. The process is not in statistical control."
 msgstr "{count} punti su {total} segnalano. Il processo non è in controllo statistico."
+
+
+msgid "0 interpolates every point exactly; larger values allow the spline to depart from noisy data."
+msgstr "0 interpola esattamente ogni punto; valori maggiori permettono alla spline di discostarsi da dati rumorosi."
+
+
+msgid "1 for the slope, 2 for the curvature."
+msgstr "1 per la pendenza, 2 per la curvatura."
+
+
+msgid "3 is the Shewhart convention: on a stable normal process it gives about one false alarm per 370 points, which balances missed signals against chasing noise."
+msgstr "3 è la convenzione di Shewhart: su un processo normale e stabile dà circa un falso allarme ogni 370 punti, il che bilancia i segnali mancati e le false segnalazioni."
+
+
+msgid "A derivative or an integral rarely shares a scale with the series it came from - d/dx of a slow drift is near zero beside data in the thousands. On by default for that reason; turn it off to overlay when the ranges happen to be comparable."
+msgstr "Una derivata o un integrale raramente condivide la scala della serie di origine: la d/dx di una deriva lenta è quasi zero accanto a dati dell'ordine delle migliaia. Per questo è attivo per impostazione predefinita; disattivalo per sovrapporre le curve quando gli intervalli sono confrontabili."
+
+
+msgid "Apply Nelson rules:"
+msgstr "Applica le regole di Nelson:"
+
+
+msgid "As a fraction of the signal's full range. 0.1 keeps peaks standing at least a tenth of the range above their surroundings."
+msgstr "Come frazione dell'intervallo completo del segnale. 0,1 mantiene i picchi che si elevano almeno di un decimo dell'intervallo rispetto a ciò che li circonda."
+
+
+msgid "Baseline:"
+msgstr "Linea di base:"
+
+
+msgid "Consecutive points averaged into each plotted subgroup. Rational subgrouping: choose it so variation within a subgroup is only common-cause noise."
+msgstr "Punti consecutivi mediati in ogni sottogruppo tracciato. Sottogruppi razionali: scegli la dimensione in modo che la variazione interna al sottogruppo sia solo rumore di causa comune."
+
+
+msgid "Derivative order:"
+msgstr "Ordine della derivata:"
+
+
+msgid "Draw on a new axis:"
+msgstr "Disegna su un nuovo asse:"
+
+
+msgid "Draw the located peaks as markers rather than writing a table of measurements."
+msgstr "Disegna i picchi individuati come marcatori invece di scrivere una tabella di misure."
+
+
+msgid "End of the range to evaluate over."
+msgstr "Fine dell'intervallo su cui valutare la funzione."
+
+
+msgid "Exclude flagged points from the limits:"
+msgstr "Escludi dai limiti i punti segnalati:"
+
+
+msgid "Filter by:"
+msgstr "Filtra per:"
+
+
+msgid "Flags runs, trends and other patterns that stay inside the limits - the signals a limits-only chart misses."
+msgstr "Segnala sequenze, tendenze e altri andamenti che restano entro i limiti: i segnali che una carta basata solo sui limiti non vede."
+
+
+msgid "From x:"
+msgstr "Da x:"
+
+
+msgid "Height (absolute)"
+msgstr "Altezza (assoluta)"
+
+
+msgid "How densely to sample. A curve with sharp features needs more; a straight line needs two."
+msgstr "Densità di campionamento. Una curva con dettagli marcati ne richiede di più; una retta ne richiede due."
+
+
+msgid "Keeps the most prominent peaks when many are found."
+msgstr "Mantiene i picchi più prominenti quando ne vengono trovati molti."
+
+
+msgid "Limits at sigma:"
+msgstr "Limiti a sigma:"
+
+
+msgid "Linear"
+msgstr "Lineare"
+
+
+msgid "Logarithmic"
+msgstr "Logaritmica"
+
+
+msgid "Logarithmic puts equal numbers of points in each decade, which is what a curve plotted on a log axis needs. It requires a range strictly above zero."
+msgstr "La spaziatura logaritmica mette lo stesso numero di punti in ogni decade, come richiede una curva tracciata su un asse logaritmico. Richiede un intervallo strettamente maggiore di zero."
+
+
+msgid "Mark peaks only:"
+msgstr "Segna solo i picchi:"
+
+
+msgid "Minimum separation:"
+msgstr "Separazione minima:"
+
+
+msgid "Minimum width:"
+msgstr "Larghezza minima:"
+
+
+msgid "Minimum:"
+msgstr "Minimo:"
+
+
+msgid "More accurate on smooth data than the trapezoidal rule. Assumes the curve is well approximated by parabolas."
+msgstr "Più accurata del metodo dei trapezi su dati regolari. Presuppone che la curva sia ben approssimata da parabole."
+
+
+msgid "None"
+msgstr "Nessuna"
+
+
+msgid "Order of the polynomial fitted over each window."
+msgstr "Grado del polinomio adattato su ogni finestra."
+
+
+msgid "Points at half prominence. Raise it to reject single-sample spikes, which are usually instrument artefacts rather than features."
+msgstr "Punti a metà prominenza. Aumentalo per scartare i picchi di un solo campione, che di solito sono artefatti dello strumento e non caratteristiche del segnale."
+
+
+msgid "Points per polynomial fit. Larger smooths more and rounds sharp features; must exceed the polynomial order."
+msgstr "Punti per ogni adattamento polinomiale. Valori maggiori levigano di più e arrotondano i dettagli marcati; deve essere maggiore del grado del polinomio."
+
+
+msgid "Points. Of any two peaks closer than this, the more prominent is kept - which is how a single noisy peak stops being reported as several."
+msgstr "Punti. Fra due picchi più vicini di così viene mantenuto il più prominente: è così che un singolo picco rumoroso non viene riportato come più picchi."
+
+
+msgid "Polynomial order:"
+msgstr "Grado del polinomio:"
+
+
+msgid "Prominence (relative)"
+msgstr "Prominenza (relativa)"
+
+
+msgid "Prominence measures a peak against its own surroundings and survives a sloping baseline. Height compares it to zero, which only means something when the baseline is at zero."
+msgstr "La prominenza misura un picco rispetto a ciò che lo circonda e regge anche con una linea di base inclinata. L'altezza lo confronta con lo zero, il che ha senso solo se la linea di base è a zero."
+
+
+msgid "Recomputes the limits without the points they flagged. Use only when the flagged points have an assigned cause you have removed; otherwise it hides the problem."
+msgstr "Ricalcola i limiti senza i punti che hanno segnalato. Usalo solo quando i punti segnalati hanno una causa identificata che hai rimosso; altrimenti nasconde il problema."
+
+
+msgid "Removed before integrating. Without this, a raised baseline contributes its offset times the width to the area."
+msgstr "Rimossa prima di integrare. Senza questo, una linea di base sollevata contribuisce all'area con il suo scostamento moltiplicato per la larghezza."
+
+
+msgid "Report at most:"
+msgstr "Riporta al massimo:"
+
+
+msgid "Smoothing window:"
+msgstr "Finestra di lisciamento:"
+
+
+msgid "Spline smoothing:"
+msgstr "Lisciamento della spline:"
+
+
+msgid "Start of the range to evaluate over."
+msgstr "Inizio dell'intervallo su cui valutare la funzione."
+
+
+msgid "Straight line between endpoints"
+msgstr "Retta fra gli estremi"
+
+
+msgid "Subgroup size:"
+msgstr "Dimensione del sottogruppo:"
+
+
+msgid "Subtract minimum"
+msgstr "Sottrai il minimo"
+
+
+msgid "To x:"
+msgstr "A x:"
+
+
+msgid "Use Simpson's rule:"
+msgstr "Usa il metodo di Simpson:"
