@@ -37,6 +37,12 @@ from app.styles.style import (
 )
 from app.logs.logger import applogger
 from app.utils.coercion import to_numeric_axis
+from app.utils.series_validation import (
+    SeriesIssue,
+    clean_xy,
+    errors,
+    validate_xy,
+)
 from app.utils.messages import show_message
 from app.utils.dialog_state import (
     restore_dialog_state,
@@ -461,6 +467,103 @@ class SeriesOperationDialogBase(QDialog):
     def compute_results(self) -> Sequence[Any]:
         """Return operation-specific result objects for the selected series."""
         raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Input validation
+    # ------------------------------------------------------------------
+
+    #: What this operation needs of its input.  Subclasses override the ones
+    #: that matter to them; the defaults are the weakest useful set, so an
+    #: operation that says nothing still gets the empty/length/NaN checks
+    #: without having its input rejected for a shape it handles fine.
+    #:
+    #: See ``app/utils/series_validation.py`` for what each one catches.
+    INPUT_MINIMUM_POINTS: int = 2
+    INPUT_REQUIRES_SORTED_X: bool = False
+    INPUT_REQUIRES_UNIQUE_X: bool = False
+    INPUT_REQUIRES_UNIFORM_X: bool = False
+    INPUT_REQUIRES_VARYING_Y: bool = False
+
+    def validate_input_xy(
+        self,
+        x: Any,
+        y: Any,
+        *,
+        label: str = "",
+        raise_on_error: bool = True,
+    ) -> list[SeriesIssue]:
+        """Check one series against this operation's requirements.
+
+        Warnings are logged and the caller continues; errors are logged and,
+        by default, raised - so an operation that does not check the return
+        value still cannot run on data that would give a wrong answer.
+
+        Pass ``raise_on_error=False`` to collect problems across several series
+        and report them together, which is what the multi-series dialogs want:
+        one bad series should not hide the six good ones.
+        """
+        issues = validate_xy(
+            x,
+            y,
+            minimum_points=self.INPUT_MINIMUM_POINTS,
+            require_sorted_x=self.INPUT_REQUIRES_SORTED_X,
+            require_unique_x=self.INPUT_REQUIRES_UNIQUE_X,
+            require_uniform_x=self.INPUT_REQUIRES_UNIFORM_X,
+            require_varying_y=self.INPUT_REQUIRES_VARYING_Y,
+            label=label,
+        )
+
+        for issue in issues:
+            if issue.severity == "warning":
+                applogger.warning(
+                    issue.message, show_dialog=False, raise_error=False
+                )
+
+        blocking = errors(issues)
+        if blocking and raise_on_error:
+            # One message, not one per issue: a dialog that pops three boxes
+            # for one bad series trains the user to dismiss them unread.
+            applogger.error(
+                " ".join(issue.message for issue in blocking),
+                show_dialog=True,
+                raise_error=True,
+            )
+
+        return issues
+
+    def prepare_input_xy(
+        self,
+        x: Any,
+        y: Any,
+        *,
+        label: str = "",
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Validate, then return the series cleaned to this operation's needs.
+
+        The repair follows the declared requirements: an operation that needs
+        sorted x gets sorted x, one that needs unique x gets duplicates
+        averaged, and every operation gets non-finite points dropped.  Anything
+        changed is reported, because quietly discarding a user's points is its
+        own kind of wrong answer.
+        """
+        self.validate_input_xy(x, y, label=label)
+
+        x_clean, y_clean, report = clean_xy(
+            x,
+            y,
+            sort_x=self.INPUT_REQUIRES_SORTED_X,
+            merge_duplicate_x=self.INPUT_REQUIRES_UNIQUE_X,
+        )
+
+        if report.changed:
+            prefix = f"{label}: " if label else ""
+            applogger.warning(
+                f"{prefix}{report.describe()}.",
+                show_dialog=False,
+                raise_error=False,
+            )
+
+        return x_clean, y_clean
 
     def result_to_frame(self, result: Any) -> Any:
         """Return the pandas DataFrame to save for one result."""

@@ -201,6 +201,13 @@ class SeriesInterpolateDialog(SeriesOperationDialogBase):
     Name: str  = "Interpolation"
     Description = "Fill missing values"
 
+    # Every model here interpolates y as a function of x, so x has to be
+    # ordered and single-valued: a spline through two different y at one x has
+    # no solution, and SciPy reports that as a singular matrix rather than as
+    # a problem with the data.
+    INPUT_REQUIRES_SORTED_X = True
+    INPUT_REQUIRES_UNIQUE_X = True
+
     Icon = """
     <path d="M4 18.5h16"/>
     <path d="M4.5 18V5"/>

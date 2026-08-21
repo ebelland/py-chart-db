@@ -113,6 +113,13 @@ class SeriesFitDialog(SeriesOperationDialogBase):
     Name: str  = "Fit"
     Description = "Fit data models"
 
+    # least_squares needs residuals that actually vary: a flat y makes the
+    # Jacobian singular, and the optimiser returns the starting guess with a
+    # success flag rather than reporting that there was nothing to fit.
+    # Order and duplicate x are both fine - a fit does not interpolate.
+    INPUT_REQUIRES_VARYING_Y = True
+    INPUT_MINIMUM_POINTS = 2
+
     Icon = """
     <path d="M4 18.5h16"/>
     <path d="M4.5 18V5"/>

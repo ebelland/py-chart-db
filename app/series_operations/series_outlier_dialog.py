@@ -112,6 +112,12 @@ class SeriesOutlierDialog(SeriesOperationDialogBase):
     Name: str = "Outliers"
     Description = "Detect anomalies"
 
+    # The rolling-median detectors walk the series in order; an unsorted x
+    # makes every window span an arbitrary set of points, so the residuals
+    # it flags are not the outliers.
+    INPUT_REQUIRES_SORTED_X = True
+    INPUT_MINIMUM_POINTS = 3
+
     Icon = """
     <circle cx="7" cy="8" r="1.3"/>
     <circle cx="10.5" cy="11" r="1.3"/>

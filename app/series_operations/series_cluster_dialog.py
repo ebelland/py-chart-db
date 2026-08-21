@@ -824,6 +824,12 @@ class SeriesClusterDialog(SeriesOperationDialogBase):
     Name: str  = "Clustering"
     Description = "Group similar data"
 
+    # Clustering reads an observation matrix, not a function of x, so order and
+    # repeated x carry no meaning here and must not be rejected: two samples
+    # with the same x are an ordinary pair of observations. Only the universal
+    # empty/length/non-finite checks apply.
+    INPUT_MINIMUM_POINTS = 2
+
     Icon = """
     <circle cx="7" cy="8" r="2"/>
     <circle cx="16.5" cy="7" r="2"/>

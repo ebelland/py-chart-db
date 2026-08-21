@@ -861,6 +861,13 @@ class SeriesSmoothingDialog(SeriesOperationDialogBase):
     Name: str = "Smoothing"
     Description = "Reduce noise"
 
+    # Savitzky-Golay, the rolling filters and every window method treat the
+    # series as an ordered sequence rather than as f(x), so points arriving
+    # in query order are smoothed across a fold in the data - which returns
+    # numbers that look like a result. Duplicate x is harmless here.
+    INPUT_REQUIRES_SORTED_X = True
+    INPUT_MINIMUM_POINTS = 3
+
     Icon = """
     <path d="M4 13c1.7-4 3.4 4 5.1 0s3.4-4 5.1 0 3.4 4 5.8-1"/>
     <path d="M4 17c3.3-2.3 6.7-2.3 10 0 2 1.3 4 1.3 6 0"/>
@@ -1236,12 +1243,38 @@ class SeriesSmoothingDialog(SeriesOperationDialogBase):
         if values_col:
             values = pd.to_numeric(frame[values_col], errors="coerce").to_numpy(dtype=float)
 
+        x_values = np.asarray(x_values, dtype=float).reshape(-1)
+        y_values = np.asarray(y_values, dtype=float).reshape(-1)
+        z_values = (
+            np.asarray(z_values, dtype=float).reshape(-1)
+            if z_values is not None
+            else None
+        )
+        values = (
+            np.asarray(values, dtype=float).reshape(-1)
+            if values is not None
+            else None
+        )
+
+        # to_numeric(errors="coerce") turns any unparseable cell into NaN, so a
+        # text column picked up as x arrives here as an all-NaN array rather
+        # than as an error. That is exactly what the check is for.
+        if z_values is None and values is None:
+            x_values, y_values = self.prepare_input_xy(
+                x_values, y_values, label=str(name)
+            )
+        else:
+            # 3D: x, y, z and values are parallel, so reordering the first two
+            # would silently pair each x with another point's z. Report the
+            # problems, repair nothing.
+            self.validate_input_xy(x_values, y_values, label=str(name))
+
         return SeriesChoice(
             name=str(name),
-            x=np.asarray(x_values, dtype=float).reshape(-1),
-            y=np.asarray(y_values, dtype=float).reshape(-1),
-            z=np.asarray(z_values, dtype=float).reshape(-1) if z_values is not None else None,
-            values=np.asarray(values, dtype=float).reshape(-1) if values is not None else None,
+            x=x_values,
+            y=y_values,
+            z=z_values,
+            values=values,
             source=row,
         )
 

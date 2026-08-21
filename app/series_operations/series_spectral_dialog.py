@@ -188,6 +188,13 @@ class SeriesSpectralDialog(SeriesOperationDialogBase):
     Name: str = "Spectral Analysis"
     Description = "Analyse frequencies"
 
+    # An FFT maps sample index to frequency, so it assumes a constant step.
+    # Uneven x does not fail - it returns a spectrum whose frequency axis is
+    # meaningless, which is the worst of both worlds, hence the warning.
+    INPUT_REQUIRES_SORTED_X = True
+    INPUT_REQUIRES_UNIFORM_X = True
+    INPUT_MINIMUM_POINTS = 4
+
     Icon = """
     <path d="M4 18.5h16"/>
     <path d="M4.5 18V5"/>

@@ -14,12 +14,6 @@ P0-1  series operations: verify input data before running
       duplicate x and single-point series each fail differently and some
       fail silently with plausible-looking output.
 
-P0-2  properties: "Draw figure frame" has no effect
-      [was: "draw figure frame does not work"]
-
-P0-3  properties: marker and line style pickers are never enabled
-      [was: "neither marker nor line style is enabled --> use rcParams!"]
-
 P0-4  ChartPanel: picker errors
       [was: "picker errors"]
       See also P1-5: patches are deliberately unpickable, which is separate.

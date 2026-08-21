@@ -92,6 +92,11 @@ class SeriesStatisticsDialog(SeriesOperationDialogBase):
     Name: str = "Statistics"
     Description = "Compute metrics"
 
+    # Order-independent summaries, so only the universal checks apply. Two
+    # points is the floor: a standard deviation of one value is not a number
+    # anyone wants reported.
+    INPUT_MINIMUM_POINTS = 2
+
     Icon = """
     <path d="M5 19h14"/>
     <path d="M7 16v-5"/>
