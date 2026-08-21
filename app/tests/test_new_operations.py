@@ -674,3 +674,132 @@ def test_an_applied_axis_survives_closing() -> None:
     dialog.discard_operation_artifacts()
 
     assert spy.deleted_axes == [], "after Apply the axis is the user's, not ours"
+
+
+# ======================================================================
+# Control charts: the lines, not just the points
+# ======================================================================
+
+def _chart_result(nelson: bool = False):
+    rng = np.random.default_rng(4)
+    x = np.arange(60, dtype=float)
+    values = rng.normal(100.0, 1.0, 60)
+    values[30] = 130.0
+    return _bare(SeriesControlChartDialog)._build_chart(
+        "s", x, values, CHART_INDIVIDUALS, {**CONTROL_PARAMS, "nelson": nelson}
+    )
+
+
+DRAW_ALL = {
+    "draw_center": True,
+    "draw_limits": True,
+    "draw_zones": True,
+    "draw_violations": True,
+}
+
+
+def _specs(result, **overrides):
+    dialog = _bare(SeriesControlChartDialog)
+    dialog.parameter_values = lambda: {**DRAW_ALL, **overrides}
+    return dialog.result_series_specs(1, "_T", result)
+
+
+def _labels(specs) -> list[str]:
+    return [spec.name.split(" - ")[-1] for spec in specs]
+
+
+def test_the_result_table_carries_every_line_the_chart_can_draw() -> None:
+    """Written whether or not the box is ticked, so switching a line on later
+    is a descriptor change rather than a recomputation."""
+    frame = _chart_result().to_frame()
+    for column in (
+        "center", "ucl", "lcl",
+        "zone_1_upper", "zone_1_lower", "zone_2_upper", "zone_2_lower",
+        "violation", "violation_y",
+    ):
+        assert column in frame.columns
+
+
+def test_a_control_chart_draws_its_limits_by_default() -> None:
+    """Without them it is a run chart: the same numbers, a different question."""
+    labels = _labels(_specs(_chart_result(), draw_zones=False))
+    assert "UCL" in labels
+    assert "LCL" in labels
+    assert "CL" in labels
+
+
+def test_each_line_can_be_switched_off_independently() -> None:
+    result = _chart_result()
+
+    assert "CL" not in _labels(_specs(result, draw_center=False))
+    assert "UCL" not in _labels(_specs(result, draw_limits=False))
+    assert "+1s" not in _labels(_specs(result, draw_zones=False))
+    assert "signals" not in _labels(_specs(result, draw_violations=False))
+
+
+def test_switching_everything_off_leaves_only_the_points() -> None:
+    specs = _specs(
+        _chart_result(),
+        draw_center=False, draw_limits=False,
+        draw_zones=False, draw_violations=False,
+    )
+    assert len(specs) == 1
+
+
+def test_the_zone_lines_are_evenly_spaced_between_centre_and_limit() -> None:
+    """One and two sigma, which is what makes the A/B/C zones the run rules
+    are phrased in visible."""
+    result = _chart_result()
+    frame = result.to_frame()
+
+    assert frame["zone_1_upper"].iloc[0] == pytest.approx(result.center + result.sigma)
+    assert frame["zone_2_upper"].iloc[0] == pytest.approx(result.center + 2 * result.sigma)
+    assert frame["ucl"].iloc[0] == pytest.approx(result.center + 3 * result.sigma)
+
+
+def test_the_flagged_points_column_holds_only_the_flagged_points() -> None:
+    result = _chart_result()
+    frame = result.to_frame()
+    marked = frame["violation_y"].notna()
+
+    assert int(marked.sum()) == len(result.violations)
+    assert frame.loc[marked, "violation_y"].tolist() == [
+        pytest.approx(violation.y) for violation in result.violations
+    ]
+
+
+def test_the_signals_series_is_absent_when_nothing_signals() -> None:
+    """An empty series would draw an empty legend entry."""
+    rng = np.random.default_rng(3)
+    quiet = _bare(SeriesControlChartDialog)._build_chart(
+        "s", np.arange(60, dtype=float), rng.normal(0.0, 1.0, 60),
+        CHART_INDIVIDUALS, CONTROL_PARAMS,
+    )
+    if not quiet.violations:
+        assert "signals" not in _labels(_specs(quiet))
+
+
+def test_the_data_is_drawn_over_the_lines_and_the_signals_on_top() -> None:
+    """Order is the draw order, so the reference lines must come first."""
+    labels = _labels(_specs(_chart_result()))
+
+    assert labels[-1] == "signals", "flagged points sit above everything"
+    assert labels[-2] == CHART_INDIVIDUALS, "then the data"
+    for reference in ("UCL", "LCL", "CL", "+1s", "+2s"):
+        assert labels.index(reference) < labels.index(CHART_INDIVIDUALS)
+
+
+def test_every_series_shares_the_cleanup_filter() -> None:
+    """Otherwise re-applying leaves orphaned limit lines behind."""
+    dialog = _bare(SeriesControlChartDialog)
+    expected = dict(SeriesControlChartDialog.generated_style_filter.fget(dialog))
+    for spec in _specs(_chart_result()):
+        for key, value in expected.items():
+            assert spec.style.get(key) == value
+
+
+def test_every_line_is_an_ordinary_two_column_series() -> None:
+    """Aliased to y in SQL so the renderer needs no special case."""
+    for spec in _specs(_chart_result()):
+        assert spec.roles == {"x": "x", "y": "y"}
+        assert " AS y" in spec.sql_query or "SELECT x, y " in spec.sql_query

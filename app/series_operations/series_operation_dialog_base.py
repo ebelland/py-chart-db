@@ -649,6 +649,26 @@ class SeriesOperationDialogBase(QDialog):
         """Build the chart-series descriptor for one saved result table."""
         raise NotImplementedError
 
+    def result_series_specs(
+        self,
+        axis_id: int,
+        table_name: str,
+        result: Any,
+    ) -> Sequence[ResultSeriesSpec]:
+        """Return every series one result should draw.
+
+        One by default, which is what almost every operation wants and what
+        ``result_series_spec`` already answers. A control chart is the
+        exception: its result table carries the plotted values, the centre
+        line and the control limits, and drawing only the first of those
+        leaves the chart without the lines that make it a control chart.
+
+        Overriding this rather than calling create_series_descriptor directly
+        keeps preview and apply on the same path - a spec listed here is
+        previewed, cleaned up and applied exactly like any other.
+        """
+        return [self.result_series_spec(axis_id, table_name, result)]
+
     def result_table_name(self, axis_id: int, result: Any) -> str:
         """Return a safe default table name for one result.
 
@@ -702,18 +722,24 @@ class SeriesOperationDialogBase(QDialog):
         return removed
 
     def create_result_series(self, axis_id: int, table_name: str, result: Any) -> int | None:
-        """Create one chart-series descriptor for a saved result table."""
-        spec = self.result_series_spec(axis_id, table_name, result)
-        series_id = self._repo.create_series_descriptor(
-            axis_id=axis_id,
-            series_index=self._repo.next_series_index(axis_id),
-            name=spec.name,
-            sql_query=spec.sql_query,
-            roles=dict(spec.roles),
-            style=dict(spec.style),
-        )
-        applogger.info(f"Created series: {spec.name}")
-        return int(series_id) if series_id is not None else None
+        """Create every chart-series descriptor for a saved result table.
+
+        Returns the first series id, for callers that only ever make one.
+        """
+        first_id: int | None = None
+        for spec in self.result_series_specs(axis_id, table_name, result):
+            series_id = self._repo.create_series_descriptor(
+                axis_id=axis_id,
+                series_index=self._repo.next_series_index(axis_id),
+                name=spec.name,
+                sql_query=spec.sql_query,
+                roles=dict(spec.roles),
+                style=dict(spec.style),
+            )
+            applogger.info(f"Created series: {spec.name}")
+            if first_id is None and series_id is not None:
+                first_id = int(series_id)
+        return first_id
 
     def resolve_target_axis_id(self, selected_axis_id: int, results: Sequence[Any]) -> int:
         """Return the axis the results should be written to.
@@ -893,18 +919,21 @@ class SeriesOperationDialogBase(QDialog):
         self.remove_preview_tables()
 
     def create_preview_series(self, axis_id: int, table_name: str, result: Any) -> int | None:
-        spec = self.result_series_spec(axis_id, table_name, result)
-        style = dict(spec.style)
-        style.update(self.preview_style_filter)
-        series_id = self._repo.create_series_descriptor(
-            axis_id=axis_id,
-            series_index=self._repo.next_series_index(axis_id),
-            name=f"Preview: {spec.name}",
-            sql_query=spec.sql_query,
-            roles=dict(spec.roles),
-            style=style,
-        )
-        return int(series_id) if series_id is not None else None
+        first_id: int | None = None
+        for spec in self.result_series_specs(axis_id, table_name, result):
+            style = dict(spec.style)
+            style.update(self.preview_style_filter)
+            series_id = self._repo.create_series_descriptor(
+                axis_id=axis_id,
+                series_index=self._repo.next_series_index(axis_id),
+                name=f"Preview: {spec.name}",
+                sql_query=spec.sql_query,
+                roles=dict(spec.roles),
+                style=style,
+            )
+            if first_id is None and series_id is not None:
+                first_id = int(series_id)
+        return first_id
 
     def preview_results_to_axis(self, axis_id: int, results: Sequence[Any]) -> None:
         self.remove_preview_artifacts(axis_id)

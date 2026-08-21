@@ -142,6 +142,21 @@ N-2c  [DONE] operation dialogs: figure locked, series hidden where unused,
       never the tabs, so a figure created by an operation stayed invisible
       until restart.
 
+N-1b  [DONE] control charts: draw the centre line, limits and zones
+      Four checkboxes in the parameters - centre line, control limits, the one
+      and two sigma lines, and highlighting the flagged points. Limits and
+      centre default on: without them the chart is a run chart, which shows
+      the same numbers and answers a different question.
+      Needed a base change: result_series_specs() (plural) alongside the
+      existing singular hook, defaulting to one so nothing else moved. Both
+      preview and apply iterate it, so a line is previewed, cleaned up and
+      applied on exactly the same path as the data.
+      All the lines are columns of the one result table and every series is a
+      plain "SELECT x, <column> AS y", so the renderer needs no special case
+      and switching a line on later is a descriptor change, not a
+      recomputation. The flagged points get a violation_y column that is NULL
+      elsewhere, so they draw alone without a second table.
+
 N-3   attribute control charts (p, np, c, u)
       The half of SPC N-1 does not cover. These plot a proportion or a count
       rather than a measurement, so the limits are binomial/Poisson rather

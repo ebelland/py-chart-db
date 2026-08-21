@@ -154,15 +154,39 @@ class ControlChartResult:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_frame(self) -> pd.DataFrame:
+        """Every line the chart may draw, as columns of one table.
+
+        Written whether or not the corresponding checkbox is ticked: the
+        columns cost almost nothing, and holding them means turning a line on
+        later is a descriptor change rather than a recomputation.
+
+        The zone columns are the one- and two-sigma lines, which is what
+        divides a Shewhart chart into the A/B/C zones the run rules are
+        phrased in - "two of three beyond two sigma" is a statement about a
+        line the reader should be able to see.
+        """
         flagged = {violation.index for violation in self.violations}
+        size = self.x.size
         return pd.DataFrame(
             {
                 "x": self.x,
                 "y": self.y,
-                "center": np.full(self.x.size, self.center),
-                "ucl": np.full(self.x.size, self.upper),
-                "lcl": np.full(self.x.size, self.lower),
-                "violation": [int(i in flagged) for i in range(self.x.size)],
+                "center": np.full(size, self.center),
+                "ucl": np.full(size, self.upper),
+                "lcl": np.full(size, self.lower),
+                "zone_2_upper": np.full(size, self.center + 2.0 * self.sigma),
+                "zone_2_lower": np.full(size, self.center - 2.0 * self.sigma),
+                "zone_1_upper": np.full(size, self.center + self.sigma),
+                "zone_1_lower": np.full(size, self.center - self.sigma),
+                "violation": [int(i in flagged) for i in range(size)],
+                # The flagged points as their own column, NULL elsewhere, so a
+                # series can plot them alone. A WHERE clause would work for
+                # apply, but the preview writes the same table and a second
+                # query over it is a second scan for no gain.
+                "violation_y": [
+                    float(value) if index in flagged else None
+                    for index, value in enumerate(self.y)
+                ],
             }
         )
 
@@ -218,6 +242,36 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
                 "Flags runs, trends and other patterns that stay inside the "
                 "limits - the signals a limits-only chart misses."
             ),
+            default_value=True,
+        ),
+        BoolParam(
+            "draw_center",
+            "Draw the centre line:",
+            tooltip="The process mean the limits are built around.",
+            default_value=True,
+        ),
+        BoolParam(
+            "draw_limits",
+            "Draw the control limits:",
+            tooltip=(
+                "The upper and lower limits. Without them the chart is a run "
+                "chart - the points, but nothing to judge them against."
+            ),
+            default_value=True,
+        ),
+        BoolParam(
+            "draw_zones",
+            "Draw the one and two sigma lines:",
+            tooltip=(
+                "The A/B/C zones the run rules are phrased in: \"two of three "
+                "beyond two sigma\" is a statement about a line worth seeing."
+            ),
+            default_value=False,
+        ),
+        BoolParam(
+            "draw_violations",
+            "Highlight the flagged points:",
+            tooltip="Draws the signalling points again as separate markers.",
             default_value=True,
         ),
         BoolParam(
@@ -747,28 +801,119 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
     def result_to_frame(self, result: ControlChartResult) -> pd.DataFrame:
         return result.to_frame()
 
+    #: Shared by every series this operation draws, so that
+    #: remove_previous_generated_series takes the whole chart away rather than
+    #: leaving orphaned limit lines behind when it is re-applied.
+    def _series_style(self, result: ControlChartResult, **overrides: Any) -> dict[str, Any]:
+        style: dict[str, Any] = {
+            "generated_control_chart": True,
+            "control_chart_dialog": "series_control_chart",
+            "source_name": result.source_name,
+            "chart": result.chart,
+        }
+        style.update(overrides)
+        return style
+
     def result_series_spec(
         self,
         axis_id: int,
         table_name: str,
         result: ControlChartResult,
     ) -> ResultSeriesSpec:
+        """The plotted values themselves - the series the chart is about."""
         del axis_id
         return ResultSeriesSpec(
             name=result.result_name,
-            sql_query=f'SELECT x, y, center, ucl, lcl, violation FROM "{table_name}" ORDER BY x',
+            sql_query=f'SELECT x, y FROM "{table_name}" ORDER BY x',
             roles={"x": "x", "y": "y"},
-            style={
-                "generated_control_chart": True,
-                "control_chart_dialog": "series_control_chart",
-                "source_name": result.source_name,
-                "chart": result.chart,
-                "linestyle": "-",
-                "linewidth": 1.2,
-                "marker": "o",
-                "markersize": 4.0,
-            },
+            style=self._series_style(
+                result,
+                linestyle="-",
+                linewidth=1.2,
+                marker="o",
+                markersize=4.0,
+            ),
         )
+
+    def result_series_specs(
+        self,
+        axis_id: int,
+        table_name: str,
+        result: ControlChartResult,
+    ) -> Sequence[ResultSeriesSpec]:
+        """The points, plus whichever reference lines are switched on.
+
+        A control chart is the points *and* the lines: without limits it is a
+        run chart, which shows the same numbers and answers a different
+        question. Hence the lines default to on and this is not a one-series
+        operation.
+
+        Order matters to the drawing: the reference lines go first so the data
+        is drawn over them, and the flagged points go last so they sit on top
+        of everything.
+        """
+        params = self.parameter_values()
+        specs: list[ResultSeriesSpec] = []
+
+        def line(column: str, name: str, **style: Any) -> ResultSeriesSpec:
+            return ResultSeriesSpec(
+                name=f"{result.result_name} - {name}",
+                # Aliased to y so the renderer's x/y roles need no special
+                # case: every one of these is an ordinary two-column series.
+                sql_query=f'SELECT x, {column} AS y FROM "{table_name}" ORDER BY x',
+                roles={"x": "x", "y": "y"},
+                style=self._series_style(result, marker="", **style),
+            )
+
+        if bool(params.get("draw_zones", False)):
+            for column, label in (
+                ("zone_2_upper", "+2s"),
+                ("zone_2_lower", "-2s"),
+                ("zone_1_upper", "+1s"),
+                ("zone_1_lower", "-1s"),
+            ):
+                specs.append(
+                    line(column, label, linestyle=":", linewidth=0.7, color="#9e9e9e")
+                )
+
+        if bool(params.get("draw_limits", True)):
+            specs.append(
+                line("ucl", "UCL", linestyle="--", linewidth=1.1, color="#c62828")
+            )
+            specs.append(
+                line("lcl", "LCL", linestyle="--", linewidth=1.1, color="#c62828")
+            )
+
+        if bool(params.get("draw_center", True)):
+            specs.append(
+                line("center", "CL", linestyle="-", linewidth=1.0, color="#2e7d32")
+            )
+
+        specs.append(self.result_series_spec(axis_id, table_name, result))
+
+        if bool(params.get("draw_violations", True)) and result.violations:
+            specs.append(
+                ResultSeriesSpec(
+                    name=f"{result.result_name} - signals",
+                    # violation_y is NULL for every point that did not signal,
+                    # so this draws only the flagged ones without a second
+                    # table or a WHERE clause the preview would have to repeat.
+                    sql_query=(
+                        f'SELECT x, violation_y AS y FROM "{table_name}" '
+                        f"WHERE violation_y IS NOT NULL ORDER BY x"
+                    ),
+                    roles={"x": "x", "y": "y"},
+                    style=self._series_style(
+                        result,
+                        linestyle="",
+                        marker="o",
+                        markersize=9.0,
+                        color="#c62828",
+                    ),
+                )
+            )
+
+        return specs
 
     @property
     def generated_style_filter(self) -> Mapping[str, Any]:

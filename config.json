@@ -619,14 +619,14 @@
   "window_geometry": {
     "main_window": {
       "x": 47,
-      "y": 94,
+      "y": 126,
       "width": 1397,
       "height": 882,
       "maximized": false
     },
     "SeriesInterpolateDialog": {
       "x": 449,
-      "y": 287,
+      "y": 383,
       "width": 731,
       "height": 640,
       "maximized": false
@@ -639,8 +639,8 @@
       "maximized": false
     },
     "SeriesSmoothingDialog": {
-      "x": 449,
-      "y": 322,
+      "x": 928,
+      "y": 281,
       "width": 731,
       "height": 640,
       "maximized": false
@@ -654,7 +654,7 @@
     },
     "SeriesFitDialog": {
       "x": 624,
-      "y": 231,
+      "y": 327,
       "width": 882,
       "height": 632,
       "maximized": false
@@ -675,7 +675,7 @@
     },
     "SeriesOutlierDialog": {
       "x": 202,
-      "y": 175,
+      "y": 271,
       "width": 731,
       "height": 640,
       "maximized": false
@@ -696,16 +696,23 @@
     },
     "SeriesPeaksDialog": {
       "x": 345,
-      "y": 207,
+      "y": 399,
       "width": 780,
       "height": 640,
       "maximized": false
     },
     "SeriesFunctionDialog": {
-      "x": 282,
-      "y": 205,
+      "x": 208,
+      "y": 258,
       "width": 820,
       "height": 680,
+      "maximized": false
+    },
+    "SeriesControlChartDialog": {
+      "x": 215,
+      "y": 138,
+      "width": 800,
+      "height": 660,
       "maximized": false
     }
   },
@@ -811,7 +818,7 @@
       "rbf_neighbors_spin": 0,
       "preview_check": true,
       "dimension_combo": "1D series",
-      "method_combo": "Moving Average",
+      "method_combo": "Smoothing Spline (SciPy)",
       "preview_button": false,
       "copy_html_button": false,
       "apply_button": false,
@@ -880,9 +887,6 @@
     },
     "SeriesOutlierDialog": {
       "model_combo": "Interquartile range",
-      "threshold_spin": 3.0,
-      "iqr_factor_spin": 0.5,
-      "window_spin": 11,
       "preview_button": false,
       "copy_html_button": false,
       "apply_button": false,
@@ -904,7 +908,7 @@
       "close_button": false
     },
     "SeriesPeaksDialog": {
-      "model_combo": "Maxima",
+      "model_combo": "Maxima and minima",
       "preview_button": false,
       "copy_html_button": false,
       "apply_button": false,
@@ -912,6 +916,13 @@
     },
     "SeriesFunctionDialog": {
       "model_combo": "",
+      "preview_button": false,
+      "copy_html_button": false,
+      "apply_button": false,
+      "close_button": false
+    },
+    "SeriesControlChartDialog": {
+      "model_combo": "X-bar and R",
       "preview_button": false,
       "copy_html_button": false,
       "apply_button": false,

@@ -2822,3 +2822,35 @@ msgstr "Stesso asse dell'origine"
 
 msgid "The operation runs on the figure it was opened from."
 msgstr "L'operazione viene eseguita sulla figura da cui è stata aperta."
+
+
+msgid "Draw the centre line:"
+msgstr "Traccia la linea centrale:"
+
+
+msgid "Draw the control limits:"
+msgstr "Traccia i limiti di controllo:"
+
+
+msgid "Draw the one and two sigma lines:"
+msgstr "Traccia le linee a uno e due sigma:"
+
+
+msgid "Draws the signalling points again as separate markers."
+msgstr "Ridisegna i punti che segnalano come marcatori separati."
+
+
+msgid "Highlight the flagged points:"
+msgstr "Evidenzia i punti segnalati:"
+
+
+msgid "The A/B/C zones the run rules are phrased in: \"two of three beyond two sigma\" is a statement about a line worth seeing."
+msgstr "Le zone A/B/C in cui sono formulate le regole di sequenza: \"due su tre oltre due sigma\" parla di una linea che vale la pena vedere."
+
+
+msgid "The process mean the limits are built around."
+msgstr "La media del processo attorno alla quale sono costruiti i limiti."
+
+
+msgid "The upper and lower limits. Without them the chart is a run chart - the points, but nothing to judge them against."
+msgstr "I limiti superiore e inferiore. Senza di essi la carta è un semplice grafico dei valori: i punti, ma nulla con cui confrontarli."
