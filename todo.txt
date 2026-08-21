@@ -19,7 +19,6 @@ global:
 
 ChartPanel:
      picker errors
-     fit to zoom button design inconsistent on MacOS
      when changing panel and Axis:Kwargs is selected, a modal window is shown!
 
 renderers:
