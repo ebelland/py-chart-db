@@ -90,7 +90,8 @@ def row_value(row: object, *names: str, default: Any = None) -> Any:
                 if name in row and row[name] is not None:
                     return row[name]
                 continue
-            if name in (row.keys() if hasattr(row, "keys") else ()):
+            keys = getattr(row, "keys", None)
+            if callable(keys) and name in keys():  # type: ignore[operator]
                 value = row[name]  # type: ignore[index]
                 if value is not None:
                     return value
