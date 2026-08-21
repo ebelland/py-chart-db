@@ -37,7 +37,7 @@
       "SegoeFluent": ""
     },
     "copy": {
-      "icon": "copy",
+      "icon": "",
       "text": "Copy",
       "description": "Copy to the clipboard",
       "shortcut": "Ctrl+C",
@@ -45,21 +45,21 @@
       "SegoeFluent": "E8C8"
     },
     "delete": {
-      "icon": "delete",
+      "icon": "",
       "text": "Delete",
       "description": "Delete the selection",
       "SFSymbol": "trash",
       "SegoeFluent": "E74D"
     },
     "down": {
-      "icon": "down",
+      "icon": "",
       "text": "Down",
       "description": "Down",
       "SFSymbol": "chevron.down",
       "SegoeFluent": "e70d"
     },
     "edit": {
-      "icon": "edit",
+      "icon": "",
       "text": "Edit",
       "description": "Edit",
       "shortcut": "Ctrl+X",
@@ -67,18 +67,18 @@
       "SegoeFluent": "E70F"
     },
     "export_csv": {
-      "icon": "csv",
+      "icon": "",
       "text": "Export CSV",
       "description": "Export as a CSV file",
-      "SFSymbol": "tablecells",
-      "SegoeFluent": "E8EC"
+      "SFSymbol": "text.document",
+      "SegoeFluent": "e8a5"
     },
     "export_xlsx": {
       "icon": "excel",
       "text": "Export Excel",
       "description": "Export as an Excel workbook",
-      "SFSymbol": "tablecells.badge.ellipsis",
-      "SegoeFluent": "E8EC"
+      "SFSymbol": "",
+      "SegoeFluent": ""
     },
     "import": {
       "icon": "import",
@@ -147,8 +147,8 @@
       "icon": "",
       "text": "Series Operations",
       "description": "Show series operations",
-      "SFSymbol": "",
-      "SegoeFluent": ""
+      "SFSymbol": "function",
+      "SegoeFluent": "e9d2"
     },
     "new": {
       "icon": "new",
@@ -611,15 +611,15 @@
     "resize_mode": "FIT_PROPORTIONAL",
     "initial_zoom_percent": 60,
     "background_color": "#ffffff",
-    "figure_width_cm": 16.26,
-    "figure_height_cm": 12.19,
-    "figure_dpi": 75.0
+    "figure_width_cm": 160.26,
+    "figure_height_cm": 120.19,
+    "figure_dpi": 122.0
   },
   "last_database": "/Users/ebelland/Desktop/py-chart-db/Demo Project.dhub",
   "window_geometry": {
     "main_window": {
-      "x": 424,
-      "y": 139,
+      "x": 170,
+      "y": 138,
       "width": 1196,
       "height": 882,
       "maximized": false
@@ -640,7 +640,7 @@
     },
     "SeriesSmoothingDialog": {
       "x": 449,
-      "y": 226,
+      "y": 322,
       "width": 731,
       "height": 640,
       "maximized": false
@@ -672,12 +672,26 @@
       "width": 900,
       "height": 680,
       "maximized": false
+    },
+    "SeriesOutlierDialog": {
+      "x": 202,
+      "y": 175,
+      "width": 731,
+      "height": 640,
+      "maximized": false
+    },
+    "query_builder_dialog": {
+      "x": 425,
+      "y": 213,
+      "width": 1020,
+      "height": 700,
+      "maximized": false
     }
   },
   "main_window_splitters": {
     "main": [
-      370,
-      820
+      436,
+      754
     ],
     "data_page": [
       282,
@@ -842,6 +856,24 @@
       "copy_html_button": false,
       "apply_button": false,
       "close_button": false
+    },
+    "SeriesOutlierDialog": {
+      "model_combo": "Interquartile range",
+      "threshold_spin": 3.0,
+      "iqr_factor_spin": 0.5,
+      "window_spin": 11,
+      "preview_button": false,
+      "copy_html_button": false,
+      "apply_button": false,
+      "close_button": false
+    },
+    "query_builder_dialog": {
+      "splitter": [
+        600,
+        389
+      ],
+      "table_combo": "calibration",
+      "editor": "SELECT * FROM \"calibration\""
     }
   },
   "import_data_dialog": {
