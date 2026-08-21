@@ -79,8 +79,11 @@ class SeriesFunctionDialog(SeriesOperationDialogBase):
     Description = "Plot a function"
 
     # This operation reads no source series - it generates one - so the input
-    # requirements the base applies to selected series never come into play.
+    # requirements the base applies to selected series never come into play,
+    # and the series picker has nothing to pick. The figure and axis rows stay:
+    # a generated curve still has to be drawn somewhere.
     INPUT_MINIMUM_POINTS = 0
+    SHOWS_SERIES_SELECTOR = False
 
     PARAMS = (
         FloatParam(
@@ -500,7 +503,10 @@ class SeriesFunctionDialog(SeriesOperationDialogBase):
             blocks = [report_html.summary_table(summary_rows)]
 
             if result.expression:
-                blocks.append(report_html.note(result.expression))
+                # raw_note, not note: expression is authored as HTML by the
+                # function class - "<b>Constant</b><br>y = C" - so escaping it
+                # shows the reader the tags instead of the formula.
+                blocks.append(report_html.raw_note(result.expression))
 
             if result.params:
                 blocks.append(

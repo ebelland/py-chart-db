@@ -2798,3 +2798,27 @@ msgstr "A x:"
 
 msgid "Use Simpson's rule:"
 msgstr "Usa il metodo di Simpson:"
+
+
+msgid "A derivative or an integral rarely shares a scale with the series it came from - d/dx of a slow drift is near zero beside data in the thousands - so a new axis is the default. Same axis overlays them when the ranges are comparable; a new figure keeps the result out of this chart entirely."
+msgstr "Una derivata o un integrale raramente condivide la scala della serie di origine - la d/dx di una deriva lenta è quasi zero accanto a dati dell'ordine delle migliaia - quindi l'impostazione predefinita è un nuovo asse. Stesso asse sovrappone le curve quando gli intervalli sono confrontabili; nuova figura tiene il risultato del tutto fuori da questo grafico."
+
+
+msgid "Draw on:"
+msgstr "Disegna su:"
+
+
+msgid "New axis in this figure"
+msgstr "Nuovo asse in questa figura"
+
+
+msgid "New figure"
+msgstr "Nuova figura"
+
+
+msgid "Same axis as the source"
+msgstr "Stesso asse dell'origine"
+
+
+msgid "The operation runs on the figure it was opened from."
+msgstr "L'operazione viene eseguita sulla figura da cui è stata aperta."

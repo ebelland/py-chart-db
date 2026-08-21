@@ -1164,6 +1164,10 @@ class MainWindow(QMainWindow):
         dialog.exec()
         panel.reload()
         self._table_panel.reload()
+        # An operation may have created a figure of its own, which is a new
+        # chart tab rather than a change to this one - reloading only the panel
+        # left it invisible until the next restart.
+        self._reload_tabs()
         self._update_properties_for_current_chart()
    
 

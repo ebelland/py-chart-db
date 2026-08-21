@@ -125,6 +125,23 @@ N-2b  [DONE] Calculus: draw on a new axis by default
       gap left open under P2-14 for parameters; renderer/operation
       Description attributes are still open.
 
+N-2c  [DONE] operation dialogs: figure locked, series hidden where unused,
+      and a new-figure destination
+      - The Figure combo is disabled in every operation. It was a live bug,
+        not just clutter: a dialog is constructed with one figure_id and
+        create_result_axis writes to it, so changing the combo listed one
+        figure's axes while the results went to another's. Disabled rather
+        than hidden - which figure is being operated on is worth seeing.
+      - Function hides the series list (SHOWS_SERIES_SELECTOR = False); it
+        generates a series rather than reading one. Figure and axis rows stay,
+        because a generated curve still has to be drawn somewhere.
+      - Calculus's new-axis checkbox became a three-way choice: new axis in
+        this figure (default), same axis, or new figure. create_result_figure
+        is on the base for any operation to use.
+      Found while doing this: _open_series_operation reloaded the panel but
+      never the tabs, so a figure created by an operation stayed invisible
+      until restart.
+
 N-3   attribute control charts (p, np, c, u)
       The half of SPC N-1 does not cover. These plot a proportion or a count
       rather than a measurement, so the limits are binomial/Poisson rather

@@ -700,6 +700,13 @@
       "width": 780,
       "height": 640,
       "maximized": false
+    },
+    "SeriesFunctionDialog": {
+      "x": 282,
+      "y": 205,
+      "width": 820,
+      "height": 680,
+      "maximized": false
     }
   },
   "main_window_splitters": {
@@ -898,6 +905,13 @@
     },
     "SeriesPeaksDialog": {
       "model_combo": "Maxima",
+      "preview_button": false,
+      "copy_html_button": false,
+      "apply_button": false,
+      "close_button": false
+    },
+    "SeriesFunctionDialog": {
+      "model_combo": "",
       "preview_button": false,
       "copy_html_button": false,
       "apply_button": false,

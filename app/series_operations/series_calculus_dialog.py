@@ -95,6 +95,10 @@ CALCULUS_DOCS = {
     ),
 }
 
+DEST_SAME_AXIS = "same_axis"
+DEST_NEW_AXIS = "new_axis"
+DEST_NEW_FIGURE = "new_figure"
+
 BASELINE_NONE = "none"
 BASELINE_MINIMUM = "minimum"
 BASELINE_ENDPOINTS = "endpoints"
@@ -190,17 +194,22 @@ class SeriesCalculusDialog(SeriesOperationDialogBase):
             ),
             visible_for={"model": INTEGRALS},
         ),
-        BoolParam(
-            "new_axis",
-            "Draw on a new axis:",
+        ChoiceParam(
+            "destination",
+            "Draw on:",
             tooltip=(
                 "A derivative or an integral rarely shares a scale with the "
                 "series it came from - d/dx of a slow drift is near zero "
-                "beside data in the thousands. On by default for that reason; "
-                "turn it off to overlay when the ranges happen to be "
-                "comparable."
+                "beside data in the thousands - so a new axis is the default. "
+                "Same axis overlays them when the ranges are comparable; a new "
+                "figure keeps the result out of this chart entirely."
             ),
-            default_value=True,
+            choices=(
+                ("New axis in this figure", DEST_NEW_AXIS),
+                ("Same axis as the source", DEST_SAME_AXIS),
+                ("New figure", DEST_NEW_FIGURE),
+            ),
+            default_value=DEST_NEW_AXIS,
         ),
         BoolParam(
             "simpson",
@@ -236,6 +245,7 @@ class SeriesCalculusDialog(SeriesOperationDialogBase):
         # reused after, so adjusting the window repeatedly does not leave a
         # trail of empty axes behind.
         self._result_axis_id: int | None = None
+        self._result_figure_id: int | None = None
         self._applied = False
 
         super().__init__(
@@ -588,18 +598,38 @@ class SeriesCalculusDialog(SeriesOperationDialogBase):
         A new axis on the same figure, not a new tab: the result is a second
         view of this chart's data and belongs beside it.
         """
-        if not bool(self.parameter_values().get("new_axis", True)):
+        destination = str(self.parameter_values().get("destination", DEST_NEW_AXIS))
+
+        if destination == DEST_SAME_AXIS:
             return selected_axis_id
 
         if self._result_axis_id is None:
-            self._result_axis_id = self.create_result_axis(
-                chart_type="Scatter Plot",
-                title=self._model(),
-                options={"grid": True, "linestyle": "-", "marker": ""},
-            )
+            if destination == DEST_NEW_FIGURE:
+                self._result_figure_id, self._result_axis_id = self.create_result_figure(
+                    name=self._result_figure_name(results),
+                    chart_type="Scatter Plot",
+                    title=self._model(),
+                    options={"grid": True, "linestyle": "-", "marker": ""},
+                )
+            else:
+                self._result_axis_id = self.create_result_axis(
+                    chart_type="Scatter Plot",
+                    title=self._model(),
+                    options={"grid": True, "linestyle": "-", "marker": ""},
+                )
 
         self._label_result_axis(results)
         return self._result_axis_id
+
+    def _result_figure_name(self, results: Sequence[Any]) -> str:
+        """Name the new figure after the series and the calculation.
+
+        "Calculus 1" would tell the user nothing in a tab bar; the source name
+        and the operation are what identifies it a week later.
+        """
+        source = str(getattr(results[0], "source_name", "")) if results else ""
+        model = self._model()
+        return f"{source} - {model}".strip(" -") or "Calculus"
 
     def _label_result_axis(self, results: Sequence[Any]) -> None:
         """Name the axis after what was actually computed.
@@ -639,10 +669,20 @@ class SeriesCalculusDialog(SeriesOperationDialogBase):
             return
 
         axis_id = self._result_axis_id
+        figure_id = self._result_figure_id
         self._result_axis_id = None
+        self._result_figure_id = None
+
         try:
-            self._repo.delete_axis(axis_id)
-            applogger.info("Discarded the unapplied calculus axis %s.", axis_id)
+            # A whole figure when that is what was made: deleting only its axis
+            # would leave an empty chart tab behind, which is worse than the
+            # axis it was meant to clean up.
+            if figure_id is not None:
+                self._repo.delete_figure(figure_id)
+                applogger.info("Discarded the unapplied calculus figure %s.", figure_id)
+            else:
+                self._repo.delete_axis(axis_id)
+                applogger.info("Discarded the unapplied calculus axis %s.", axis_id)
         except Exception:
             applogger.exception("Failed to discard calculus axis %s", axis_id)
 

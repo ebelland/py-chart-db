@@ -154,6 +154,11 @@ class SeriesOperationDialogBase(QDialog):
         self._preview_table_names: set[str] = set()
         self._preview_active = False
         self.series_selector = AxisSeriesSelector(self._repo, self._figure_id, self)
+        # Every operation is opened on one figure and keeps it: create_result_
+        # axis adds to self._figure_id, so a combo that could change figures
+        # would show one figure's axes while writing to another's.
+        self.series_selector.set_figure_locked(self.LOCK_FIGURE_SELECTION)
+        self.series_selector.set_series_visible(self.SHOWS_SERIES_SELECTOR)
         # The Axis / Series page lives inside the QToolBox left panel. It must
         # be vertically expanding; otherwise its internal series_list can expand
         # only inside the selector's fixed size and the empty space remains in
@@ -248,6 +253,16 @@ class SeriesOperationDialogBase(QDialog):
         return panel
 
     
+    #: Whether the figure combo is disabled. True for every operation so far;
+    #: an operation that genuinely means to move between figures would have to
+    #: keep self._figure_id in step with it, which none currently does.
+    LOCK_FIGURE_SELECTION: bool = True
+
+    #: Whether the series list is shown. An operation that generates a series
+    #: rather than transforming one has nothing to select, and a picker it
+    #: never reads is worse than no picker.
+    SHOWS_SERIES_SELECTOR: bool = True
+
     #: Declared parameters.  An operation that sets this gets its parameter
     #: form built, wired and read back for free; see ``parameter_spec``.
     #: Leaving it empty keeps the old behaviour, where the subclass overrides
@@ -761,6 +776,50 @@ class SeriesOperationDialogBase(QDialog):
             figure_id,
         )
         return axis_id
+
+    def create_result_figure(
+        self,
+        *,
+        name: str,
+        chart_type: str,
+        title: str = "",
+        x_label: str = "",
+        y_label: str = "",
+        options: Mapping[str, Any] | None = None,
+    ) -> tuple[int, int]:
+        """Create a figure with one axis and return ``(figure_id, axis_id)``.
+
+        For results that do not belong in the source chart at all.  A new axis
+        (``create_result_axis``) keeps the result beside its input, which is
+        right when the two are meant to be compared; a new figure is right when
+        they are not - a derivative kept for its own sake, or a result destined
+        for a different report.
+
+        The dialog does NOT follow the new figure: ``self._figure_id`` stays
+        put, because the selector is locked to it and the axis combo would
+        otherwise start listing axes of a figure the user cannot see. The main
+        window picks the new figure up when it reloads its tabs.
+        """
+        figure_id = int(self._repo.create_figure_descriptor(name=str(name), nrows=1, ncols=1))
+        axis_id = int(
+            self._repo.create_axis_descriptor(
+                figure_id=figure_id,
+                axis_index=0,
+                chart_type=chart_type,
+                title=title,
+                x_label=x_label,
+                y_label=y_label,
+                options=dict(options or {"grid": True}),
+            )
+        )
+        applogger.info(
+            "%s: created figure %s with axis %s (%s).",
+            self.operation_label,
+            figure_id,
+            axis_id,
+            chart_type,
+        )
+        return figure_id, axis_id
 
     def discard_operation_artifacts(self) -> None:
         """Undo anything the operation created outside the preview savepoint.

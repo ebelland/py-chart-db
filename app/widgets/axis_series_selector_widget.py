@@ -228,6 +228,41 @@ class AxisSeriesSelector(QWidget):
             select_all_series=select_all_series,
         )
 
+    def set_figure_locked(self, locked: bool) -> None:
+        """Show which figure this is, but stop it being changed.
+
+        A series operation is constructed with one figure id and keeps it:
+        ``create_result_axis`` adds to that figure, and the results are written
+        to the axis selected within it. Letting the combo change figures
+        desynchronises the two - the axis list would come from the figure on
+        screen while the results went to the one the dialog was opened on.
+
+        Disabled rather than hidden, because which figure is being operated on
+        is worth showing even when it cannot be changed.
+        """
+        self.figure_combo.setEnabled(not locked)
+        self.figure_combo.setToolTip(
+            _("The operation runs on the figure it was opened from.")
+            if locked
+            else ""
+        )
+
+    def set_series_visible(self, visible: bool) -> None:
+        """Show or hide the series list, for operations that read no series.
+
+        An operation that generates a series rather than transforming one - a
+        plotted function, say - still needs an axis to draw on, so the figure
+        and axis rows stay. A series picker it never reads is a control that
+        does nothing, which is worse than no control at all.
+        """
+        self.series_label.setVisible(visible)
+        for widget in (self.series_list, self.select_all_button, self.clear_button):
+            widget.setVisible(visible and (widget is self.series_list or self._show_buttons))
+
+        section = self.series_list.parentWidget()
+        if section is not None and section.objectName() == "axisSeriesListSection":
+            section.setVisible(visible)
+
     def set_axes(
         self,
         axes: AxisMap,

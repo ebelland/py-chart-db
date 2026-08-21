@@ -168,6 +168,25 @@ def note(text: str) -> str:
     )
 
 
+def raw_note(markup: str) -> str:
+    """Return a muted line whose content is already markup.
+
+    The escaping in :func:`note` is the right default - almost everything
+    passed to it is plain text assembled from data, and markup arriving there
+    would be an injection rather than a formatting choice. But a few strings
+    are authored as HTML: a fit function's ``expression`` is written as
+    ``<b>Constant</b><br>y = C`` precisely so it can render. Sent through
+    ``note`` those tags are escaped and the reader sees the angle brackets.
+
+    Separate function rather than a flag, so that passing untrusted text
+    unescaped has to be spelled out at the call site.
+    """
+    return (
+        f"<div style='color:{_MUTED};padding:2px 0 8px 0;{_FONT}'>"
+        f"{markup}</div>"
+    )
+
+
 def document(title: str, subtitle: str = "", *sections: str) -> str:
     """Wrap sections in the report shell: title, optional subtitle, body."""
     head = f"<div style='font-size:12pt;font-weight:600;color:{_TEXT};'>{html.escape(title)}</div>"

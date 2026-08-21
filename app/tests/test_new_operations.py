@@ -19,6 +19,9 @@ from app.series_operations.series_calculus_dialog import (
     DERIV_GRADIENT,
     DERIV_SAVGOL,
     DERIV_SPLINE,
+    DEST_NEW_AXIS,
+    DEST_NEW_FIGURE,
+    DEST_SAME_AXIS,
     INTEGRAL_CUMULATIVE,
     INTEGRAL_DEFINITE,
     SeriesCalculusDialog,
@@ -521,37 +524,47 @@ def test_a_discovered_function_evaluates_over_a_range() -> None:
 # ======================================================================
 
 class _AxisSpy:
-    """Stands in for the repository and for the base's axis helpers.
+    """Stands in for the repository and for the base's creation helpers.
 
-    A derivative's axis routing is decided entirely from the parameter value
-    and the result metadata, so it can be exercised without a figure.
+    The routing is decided entirely from the parameter value and the result
+    metadata, so it can be exercised without a figure or a database.
     """
 
-    def __init__(self, new_axis: bool) -> None:
-        self.new_axis = new_axis
-        self.created: list[dict] = []
-        self.deleted: list[int] = []
+    def __init__(self) -> None:
+        self.axes: list[dict] = []
+        self.figures: list[dict] = []
+        self.deleted_axes: list[int] = []
+        self.deleted_figures: list[int] = []
         self.labelled: dict | None = None
 
     def create_result_axis(self, **kwargs) -> int:
-        self.created.append(kwargs)
+        self.axes.append(kwargs)
         return 99
+
+    def create_result_figure(self, **kwargs) -> tuple[int, int]:
+        self.figures.append(kwargs)
+        return 42, 99
 
     def update_axis_descriptor(self, **kwargs) -> None:
         self.labelled = kwargs
 
     def delete_axis(self, axis_id: int) -> None:
-        self.deleted.append(axis_id)
+        self.deleted_axes.append(axis_id)
+
+    def delete_figure(self, figure_id: int) -> None:
+        self.deleted_figures.append(figure_id)
 
 
-def _calculus_with_axis(new_axis: bool) -> tuple[SeriesCalculusDialog, _AxisSpy]:
-    spy = _AxisSpy(new_axis)
+def _calculus_with_axis(destination: str) -> tuple[SeriesCalculusDialog, _AxisSpy]:
+    spy = _AxisSpy()
     dialog = _bare(SeriesCalculusDialog)
     dialog._result_axis_id = None
+    dialog._result_figure_id = None
     dialog._applied = False
     dialog._repo = spy
     dialog.create_result_axis = spy.create_result_axis
-    dialog.parameter_values = lambda: {"new_axis": new_axis}
+    dialog.create_result_figure = spy.create_result_figure
+    dialog.parameter_values = lambda: {"destination": destination}
     dialog._model = lambda: DERIV_SAVGOL
     return dialog, spy
 
@@ -572,29 +585,59 @@ def _derivative_result(order: int = 1, model: str = DERIV_SAVGOL):
 def test_calculus_draws_on_a_new_axis_by_default() -> None:
     """A derivative divides by dx, so it rarely shares a scale with its
     source; overlaid, one of the two is a flat line on the zero gridline."""
-    dialog, spy = _calculus_with_axis(True)
+    dialog, spy = _calculus_with_axis(DEST_NEW_AXIS)
     target = dialog.resolve_target_axis_id(7, [_derivative_result()])
 
     assert target == 99
     assert target != 7
-    assert len(spy.created) == 1
+    assert len(spy.axes) == 1
 
 
-def test_calculus_overlays_when_the_checkbox_is_cleared() -> None:
-    dialog, spy = _calculus_with_axis(False)
+def test_calculus_overlays_when_the_same_axis_is_chosen() -> None:
+    dialog, spy = _calculus_with_axis(DEST_SAME_AXIS)
     target = dialog.resolve_target_axis_id(7, [_derivative_result()])
 
     assert target == 7, "must fall back to the selected axis"
-    assert spy.created == []
+    assert spy.axes == []
+    assert spy.figures == []
+
+
+def test_calculus_can_put_the_result_in_a_new_figure() -> None:
+    dialog, spy = _calculus_with_axis(DEST_NEW_FIGURE)
+    target = dialog.resolve_target_axis_id(7, [_derivative_result()])
+
+    assert target == 99
+    assert len(spy.figures) == 1
+    assert spy.axes == [], "a new figure brings its own axis"
+
+
+def test_the_new_figure_is_named_after_the_series_and_the_calculation() -> None:
+    """"Calculus 1" tells nobody anything in a tab bar a week later."""
+    dialog, spy = _calculus_with_axis(DEST_NEW_FIGURE)
+    dialog.resolve_target_axis_id(7, [_derivative_result()])
+
+    name = spy.figures[0]["name"]
+    assert "s" in name
+    assert DERIV_SAVGOL in name
+
+
+def test_discarding_a_new_figure_removes_the_figure_not_just_its_axis() -> None:
+    """Deleting only the axis would leave an empty chart tab behind."""
+    dialog, spy = _calculus_with_axis(DEST_NEW_FIGURE)
+    dialog.resolve_target_axis_id(7, [_derivative_result()])
+    dialog.discard_operation_artifacts()
+
+    assert spy.deleted_figures == [42]
+    assert spy.deleted_axes == []
 
 
 def test_the_result_axis_is_created_once_and_reused() -> None:
     """Otherwise adjusting a parameter repeatedly leaves a trail of axes."""
-    dialog, spy = _calculus_with_axis(True)
+    dialog, spy = _calculus_with_axis(DEST_NEW_AXIS)
     for _ in range(4):
         dialog.resolve_target_axis_id(7, [_derivative_result()])
 
-    assert len(spy.created) == 1
+    assert len(spy.axes) == 1
 
 
 @pytest.mark.parametrize(
@@ -608,7 +651,7 @@ def test_the_result_axis_is_created_once_and_reused() -> None:
 def test_the_new_axis_is_labelled_by_what_was_computed(order, model, expected) -> None:
     """Not by the model name: a first and a second derivative are both
     "Savitzky-Golay" but are not the same quantity."""
-    dialog, spy = _calculus_with_axis(True)
+    dialog, spy = _calculus_with_axis(DEST_NEW_AXIS)
     dialog.resolve_target_axis_id(7, [_derivative_result(order, model)])
 
     assert spy.labelled is not None
@@ -617,17 +660,17 @@ def test_the_new_axis_is_labelled_by_what_was_computed(order, model, expected) -
 
 def test_closing_without_applying_removes_the_axis_it_created() -> None:
     """Creating an axis commits, so the preview savepoint does not cover it."""
-    dialog, spy = _calculus_with_axis(True)
+    dialog, spy = _calculus_with_axis(DEST_NEW_AXIS)
     dialog.resolve_target_axis_id(7, [_derivative_result()])
     dialog.discard_operation_artifacts()
 
-    assert spy.deleted == [99]
+    assert spy.deleted_axes == [99]
 
 
 def test_an_applied_axis_survives_closing() -> None:
-    dialog, spy = _calculus_with_axis(True)
+    dialog, spy = _calculus_with_axis(DEST_NEW_AXIS)
     dialog.resolve_target_axis_id(7, [_derivative_result()])
     dialog._applied = True
     dialog.discard_operation_artifacts()
 
-    assert spy.deleted == [], "after Apply the axis is the user's, not ours"
+    assert spy.deleted_axes == [], "after Apply the axis is the user's, not ours"
