@@ -54,6 +54,15 @@ CONFIG_BACKGROUND_COLOR: Final[str] = "background_color"
 CONFIG_COPY_DPI: Final[str] = "copy_dpi"
 FIGURE_VIEW_OPTIONS_KEY: Final[str] = "view"
 RESIZE_MODES: Final[tuple[str, ...]] = ("FIT", "FIT_PROPORTIONAL", "FIXED")
+
+#: (key, label, tooltip), in the order every picker offers them. Shared so the
+#: Figure Properties combo - the only place this choice is made now - cannot
+#: drift from the mode names ChartPanel itself understands.
+RESIZE_MODE_CHOICES: Final[tuple[tuple[str, str, str], ...]] = (
+    ("FIT_PROPORTIONAL", "Fit proportional", "Fit chart keeping proportions"),
+    ("FIT", "Fit", "Fit chart without keeping proportions"),
+    ("FIXED", "Fixed", "Fixed size with zoom and scrollbars"),
+)
 CHART_AREA_MIN_HEIGHT: Final[int] = 160
 NOTES_MIN_HEIGHT: Final[int] = 0
 NOTES_FIRST_OPEN_MIN_HEIGHT: Final[int] = 80
@@ -1016,8 +1025,16 @@ class ChartPanel(QFrame):
                 action.deleteLater()
 
     def _build_actions_menu(self) -> QMenu:
-        """Create the chart actions menu shared by button and canvas."""
-        self._resize_mode_actions: dict[str, PySide6.QtGui.QAction] = {}
+        """Create the chart actions menu shared by button and canvas.
+
+        Fit / Fit proportional / Fixed used to live here as three checkable
+        entries kept in sync by comparing an action's (translated) label
+        against the resize mode - which meant the checkmarks stopped
+        matching anything the moment the interface language changed. The
+        choice is made from the Figure Properties panel now, as a combo
+        box next to the figure's other display settings; see
+        FigurePropertiesWidget.set_resize_mode_control.
+        """
         menu = create_menu(
             self,
             [
@@ -1025,26 +1042,13 @@ class ChartPanel(QFrame):
                 MenuItem(_("Copy"),_("Copy figure"),PySide6.QtGui.QKeySequence.StandardKey.Copy,self.copy_chart_to_clipboard,False,"copy"),
                 MenuItem(_("Save"),_("Save as picture"), PySide6.QtGui.QKeySequence.StandardKey.SaveAs,self.save_chart_as,False,"save"),
                 None,
-                MenuItem(_("Fit proportional"),_("Fit chart keeping proportions"),None,lambda: self.set_resize_mode("FIT_PROPORTIONAL"),True,None),
-                MenuItem(_("Fit"),_("Fit chart without keeping proportions"),None,lambda: self.set_resize_mode("FIT"),True,None),
-                MenuItem(_("Fixed"),_("Fixed size with zoom and scrollbars"),None,lambda: self.set_resize_mode("FIXED"),True,None),
-                None,
                 MenuItem(_("Delete"),_("Delete this figure"),PySide6.QtGui.QKeySequence.StandardKey.Delete,self.delete_chart,False,"delete"),
             ],
         )
         return menu
 
-    def _sync_resize_mode_actions(self) -> None:
-        """Refresh resize action check marks."""
-        for action in self._actions_menu.actions():
-            action.setChecked(
-                action.text() == "Fit" and self._resize_mode=="FIT" or 
-                action.text() == "Fit proportional" and self._resize_mode=="FIT_PROPORTIONAL" or 
-                action.text() == "Fixed" and self._resize_mode=="FIXED")
-
     def _show_context_menu(self, pos: QPoint) -> None:
         """Show the cached actions menu."""
-        self._sync_resize_mode_actions()
         self._actions_menu.exec(self._canvas.mapToGlobal(pos))
 
     # ------------------------------------------------------------------
@@ -1168,8 +1172,6 @@ class ChartPanel(QFrame):
                 centered=self._resize_mode == "FIT_PROPORTIONAL"
             )
             self._restore_unzoomed_figure_metrics()
-
-        self._sync_resize_mode_actions()
 
         if persist:
             self._persist_chart_panel_config()
@@ -2037,6 +2039,11 @@ class ChartPanel(QFrame):
     def canvas(self) -> FigureCanvasQTAgg:
         """Return the Matplotlib canvas widget."""
         return self._canvas
+
+    @property
+    def resize_mode(self) -> str:
+        """Return this panel's current fit mode, for the properties combo."""
+        return self._resize_mode
 
     def close(self) -> bool:
         """Delete the figure from the repository and close the panel widget."""

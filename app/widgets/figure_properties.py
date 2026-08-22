@@ -7,7 +7,7 @@ callback, which is debounced by the main window.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from matplotlib import rcParams
 from PySide6.QtCore import Qt, Signal
@@ -40,6 +40,7 @@ from app.styles.style import (
     configure_combo_width,
 )
 from app.utils.config import MPLSTYLES_DIR
+from app.widgets.chart_panel import RESIZE_MODE_CHOICES
 from app.utils.figure_metrics import (
     CM_PER_INCH,
     DEFAULT_FIGURE_DPI,
@@ -151,6 +152,8 @@ class FigurePropertiesWidget(QWidget):
         self._fig_width_cm: QDoubleSpinBox
         self._fig_height_cm: QDoubleSpinBox
         self._fig_frameon: QCheckBox
+        self._resize_mode_combo: QComboBox
+        self._on_resize_mode_changed: Callable[[str], None] | None = None
         self._fig_layout_mode: QComboBox
         # Bound before _build_ui rather than declared: the layout combo's
         # currentIndexChanged handler reads them, and a stray signal during
@@ -302,6 +305,25 @@ class FigurePropertiesWidget(QWidget):
 
         self._fig_frameon = QCheckBox(_("Draw figure frame"), opts_section)
 
+        # How the panel shows this figure - it used to be three checkable
+        # entries in ChartPanel's own context menu, kept in sync by comparing
+        # an action's *translated* label against the mode, which stopped
+        # working the moment the interface language changed. One combo, next
+        # to the figure's other display settings, with the mode as the
+        # stored value rather than the label.
+        self._resize_mode_combo = QComboBox(opts_section)
+        self._configure_combo_width(self._resize_mode_combo, minimum_contents_length=14)
+        for value, label, tooltip in RESIZE_MODE_CHOICES:
+            self._resize_mode_combo.addItem(_(label), value)
+            self._resize_mode_combo.setItemData(
+                self._resize_mode_combo.count() - 1,
+                _(tooltip),
+                Qt.ItemDataRole.ToolTipRole,
+            )
+        self._resize_mode_combo.currentIndexChanged.connect(
+            self._on_resize_mode_selected
+        )
+
         self._fig_layout_mode = QComboBox(opts_section)
         self._configure_combo_width(self._fig_layout_mode, minimum_contents_length=14)
         for label, value, tooltip in self.LAYOUT_ENGINES:
@@ -319,6 +341,7 @@ class FigurePropertiesWidget(QWidget):
         form.addRow(_("Width"), self._fig_width_cm)
         form.addRow(_("Height"), self._fig_height_cm)
         form.addRow(_("Frame on"), self._fig_frameon)
+        form.addRow(_("Display"), self._resize_mode_combo)
         form.addRow(_("Figure layout"), self._fig_layout_mode)
         opts_section_lay.addLayout(form)
         lay.addWidget(opts_section)
@@ -391,13 +414,46 @@ class FigurePropertiesWidget(QWidget):
         self._figure_id = int(figure_id)
         self._figure = figure
         self._redraw_callback = redraw_callback
+        # Disabled and unwired until set_resize_mode_control actually attaches
+        # a live callback: a caller that connects a figure without also
+        # calling it - a future one, or a test - must not leave a combo that
+        # looks interactive wired to whichever panel used it last.
+        self._on_resize_mode_changed = None
+        self._resize_mode_combo.setEnabled(False)
         self._apply_persisted_metrics_to_rcparams()
         self._apply_rcparams_to_connected_figure()
         self._reload_from_descriptor()
 
+    def set_resize_mode_control(self, current: str, on_change: Callable[[str], None]) -> None:
+        """Show the panel's current fit mode, and wire changes back to it.
+
+        Called separately from ``set_connected_figure``: the fit mode is
+        state ChartPanel owns and persists itself, not a descriptor key this
+        widget writes through ``figure_options_requested`` - the caller
+        passes ``panel.resize_mode`` and ``panel.set_resize_mode`` directly,
+        the same way it already hands over ``redraw_callback``.
+        """
+        self._on_resize_mode_changed = on_change
+        self._resize_mode_combo.blockSignals(True)
+        try:
+            index = self._resize_mode_combo.findData(current)
+            self._resize_mode_combo.setCurrentIndex(max(0, index))
+        finally:
+            self._resize_mode_combo.blockSignals(False)
+        self._resize_mode_combo.setEnabled(True)
+
+    def _on_resize_mode_selected(self, _index: int) -> None:
+        if self._on_resize_mode_changed is None:
+            return
+        mode = str(self._resize_mode_combo.currentData() or "")
+        if mode:
+            self._on_resize_mode_changed(mode)
+
     def clear_connected_figure(self) -> None:
         self._repo = None
         self._figure_id = None
+        self._on_resize_mode_changed = None
+        self._resize_mode_combo.setEnabled(False)
         self._figure = None
         self._redraw_callback = None
 

@@ -956,6 +956,10 @@ msgid "Direction"
 msgstr "Direzione"
 
 
+msgid "Display"
+msgstr "Visualizzazione"
+
+
 msgid "Distribution fit"
 msgstr "Fit della distribuzione"
 
@@ -3823,4 +3827,5 @@ msgstr "{series}: {error}"
 
 msgid "{series}\nx: {x}\ny: {y}"
 msgstr "{series}\nx: {x}\ny: {y}"
+
 

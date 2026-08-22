@@ -5,94 +5,49 @@ Ranked by priority. P0 = wrong results or blocked work, P3 = nice to have.
 ================================================================
 P0 - BUGS: wrong output, or work that cannot proceed
 ================================================================
-E01  [DONE] table list: a saved query could not be deleted
-     _delete_table ran DROP TABLE on whatever was selected, so a query row
-     dropped nothing and was still there when the list reloaded - no error,
-     no message. It is _delete_selected now, over selected_sources(), which
-     reports each row as (name, is_query), and it asks the question the
-     selection deserves: the table one, the query one ("charts built on it
-     will stop finding their data" - the same wording the query builder
-     uses), or one for a mixed selection.
 
-     E02 (click-to-annotate) is done too: the handler and its three helpers
-     are gone from app/widgets/chart_panel.py. N-7 replaces it with a dialog
-     that asks for the text at the point clicked; the axes-to-descriptor
-     mapping it will want is in that file's history.
-
-E03  Function operation: a control is left behind in the top-left corner
-     app/series_operations/function_dialog.py. A widget built for the dialog
-     but never added to a layout parents itself to the dialog and paints at
-     (0, 0) - the spectral dialog had exactly this with _results_table, which
-     is why that one is explicitly hidden. Look for a widget created in
-     init_operation_widgets that no build_* hook adds.
-
-E04  axes: ticks and grids do not behave
-     Needs pinning down before it can be fixed: which control, which chart
-     type, and what happens instead. Likely candidates are the tick options
-     in axis_properties reaching the renderer as strings, and grid_axis being
-     applied before the axis exists.
-
-E05  axis: manual limits
-     No UI for setting x/y limits by hand; autoscale is the only behaviour.
-
-E06  style pickers: an "auto" option that defers to rcParams
+P0-6  style pickers: an "auto" option that defers to rcParams
      Line style and marker style should be able to say "whatever the style
      sheet says" rather than forcing a concrete value. Default to it, so a
      .mplstyle actually governs the look of a new series.
 
-E07  settings: drop the ChartPanel fit mode
-     It duplicates the chart panel's own context menu, which is where it is
-     actually used.
+P0-7  settings: drop the ChartPanel fit mode
+     The context menu it duplicated is gone (moved to Figure Properties as
+     a combo, see below) - so this is now the *default* a newly-created
+     figure starts with, not a duplicate. Worth keeping under that reading;
+     revisit if it still feels redundant once tried.
 
-E08  figure: width, height and dpi do not take effect
+P0-13 [DONE] ChartPanel: fit mode moved from the popup menu to Figure
+      Properties
+      Was three checkable menu items kept in sync by comparing an action's
+      *translated* label against the mode - so on any language but English
+      the checkmarks silently stopped matching the real mode. Now one combo
+      in Figure Properties ("Display"), storing the mode key rather than
+      the label. ChartPanel.resize_mode is a public property; the wiring is
+      FigurePropertiesWidget.set_resize_mode_control(current, on_change),
+      called by main_window next to the other property widgets - separately
+      from set_connected_figure, since the mode is state ChartPanel owns and
+      persists itself rather than a descriptor key routed through
+      figure_options_requested.
 
-E09  figure: manual spacing is never applied
+P0-8  figure: width, height and dpi do not take effect
+
+P0-11  figure: manual spacing is never applied
      Manual spacing and the four layout engines are both exposed (P3-1); the
      manual numbers appear to be written and then overridden by whichever
      engine is active. Check that choosing manual spacing disables the engine.
 
+P0-05  ChartPanel: selecting Axis:Kwargs while switching panels opens a modal
 
-P0-5  ChartPanel: selecting Axis:Kwargs while switching panels opens a modal
-      [was: "when changing panel and Axis:Kwargs is selected, a modal window
-      is shown!"]
-
-P0-8  renderers: confirm colorby works for every renderer
-      [was: "check if colorby works for all renderers"]
-
-P0-9  properties: mplstyle picker: use a file browser.
+P0-12  properties: mplstyle picker: use a file browser.
 
 P0-10 global: locale must follow the platform locale. Add Auto to settings
 
-
+P0-1after series operations all panels are redrawn
 
 ================================================================
 NEW - requested after the review
 ================================================================
-
-
-N-10  [DONE] demo: one file per subject, ten of them
-      app/data/demo_project.py builds a set rather than a single project:
-      "Sensor network - time series with a gap", "Process run - ready for a
-      control chart", "Peak scan - ready for the Fit operation", and so on,
-      with "Getting started - a bit of everything" first. A file carries only
-      the tables its own figures read, so a one-subject demo has one table
-      instead of six. The first run writes the whole folder and opens the
-      complete one; the rest can be dropped onto the window.
-      Two datasets exist to be operated on rather than looked at: the process
-      run shifts by 2.5 sigma at sample 80 (a control chart demo of a stable
-      process demonstrates nothing), and the peak sits at x=8.2 rather than
-      at the origin, which is where a starting point read off the data earns
-      its keep.
-
-N-11  [DONE] credits dialog
-      app/dialogs/credits_dialog.py over app/utils/credits.py. The libraries
-      are read from requirements.txt and from the installed packages' own
-      metadata - a hand-kept list is wrong within a release, and this page is
-      a licence statement as much as a thank-you. Getting a licence out of
-      the metadata takes three tries in order: License-Expression, then the
-      OSI classifier, then the free-text field but only when it is short -
-      matplotlib, SciPy, pandas and scikit-image all put their entire licence
-      text in that field.
 
 N-4   3D / contour renderer, gridded and scattered
       Two shapes of input, one renderer: values on a regular grid go straight
@@ -114,12 +69,6 @@ N-6   icons: finish the SFSymbol / Segoe Fluent migration
       This is P0-7 plus the rest of it: seven of the failing tests are the
       same cause. Actions naming SVGs that were deleted, win11/macOs icons
       with no common fallback, and icon files nothing asks for any more.
-
-N-7   ChartPanel: annotation dialog from the context menu ("Create annotation")
-      The axis already stores options["annotations"] and base.apply_annotation
-      already draws text, boxed text and arrows; what is missing is a way to
-      make one *where you clicked*, in data coordinates, instead of typing x
-      and y into the properties table.
 
 N-8   ChartPanel: "Add vertical line" / "Add horizontal line"
       Same context menu, with a small dialog for the line style, persisted in

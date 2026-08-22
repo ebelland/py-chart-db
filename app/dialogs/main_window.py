@@ -92,6 +92,12 @@ class MainWindow(QMainWindow):
 
         # Debounce for property-driven chart reloads (see _redraw_properties_chart).
         self._properties_redraw_callback: Any | None = None
+        # The panel itself, kept alongside the raw Figure the other property
+        # widgets get: the fit-mode combo calls panel.set_resize_mode and
+        # panel.resize_mode directly, since that state is not a descriptor
+        # key routed through figure_options_requested like everything else
+        # the figure widget writes.
+        self._properties_panel: ChartPanel | None = None
         self._properties_redraw_timer = QTimer(self)
         self._properties_redraw_timer.setSingleShot(True)
         self._properties_redraw_timer.timeout.connect(self._flush_properties_chart_redraw)
@@ -634,6 +640,7 @@ class MainWindow(QMainWindow):
             figure_id=int(panel.figure_id),
             figure=panel.figure,
             redraw_callback=panel.reload,
+            panel=panel,
         )
 
     def _set_property_widgets_connected(
@@ -642,6 +649,7 @@ class MainWindow(QMainWindow):
         figure_id: int,
         figure: Any,
         redraw_callback: Any | None = None,
+        panel: ChartPanel | None = None,
     ) -> None:
         """Load the direct QToolBox property pages for one chart.
 
@@ -653,12 +661,17 @@ class MainWindow(QMainWindow):
         self._properties_figure_id = int(figure_id)
         self._properties_figure = figure
         self._properties_redraw_callback = redraw_callback
+        self._properties_panel = panel
         for widget in (self._figure_widget, self._axis_widget, self._series_widget):
             widget.set_connected_figure(
                 repo=self._repo,
                 figure_id=figure_id,
                 figure=figure,
                 redraw_callback=self._redraw_properties_chart,
+            )
+        if panel is not None:
+            self._figure_widget.set_resize_mode_control(
+                panel.resize_mode, panel.set_resize_mode
             )
         current_axis_id = self._axis_widget.current_axis_id()
         self._series_widget.set_current_axis_id(current_axis_id)
@@ -671,6 +684,7 @@ class MainWindow(QMainWindow):
         self._properties_figure_id = None
         self._properties_figure = None
         self._properties_redraw_callback = None
+        self._properties_panel = None
         self._figure_widget.clear_connected_figure()
         self._axis_widget.clear_connected_figure()
         self._series_widget.clear_connected_figure()
@@ -703,6 +717,10 @@ class MainWindow(QMainWindow):
                 figure_id=self._properties_figure_id,
                 figure=self._properties_figure,
                 redraw_callback=self._properties_redraw_callback,
+            )
+        if self._properties_panel is not None:
+            self._figure_widget.set_resize_mode_control(
+                self._properties_panel.resize_mode, self._properties_panel.set_resize_mode
             )
         self._series_widget.set_current_axis_id(current_axis_id)
         self._axis_widget.rebuild_kwargs_editor(current_axis_id)
