@@ -27,36 +27,6 @@ P0-9  properties: mplstyle picker does not show folders
 P0-10 global: locale must follow the platform locale
       [was: "local must be set to current platform locale"]
 
-
-================================================================
-P1 - HIGH LEVERAGE: do these before piling on features
-================================================================
-
-P1-1  [DONE] series operations: declarative parameter spec
-      The eight operations run 775-1705 lines each, ~10,000 lines total,
-      against a 964-line base. Most of it is form building, signal wiring
-      and state persistence repeated eight times. Let an operation declare
-      its parameters as data and have the base build the UI:
-
-          PARAMS = (
-              FloatParam("window", label="Window", default=11,
-                         range=(3, 501), odd_only=True),
-              ChoiceParam("mode", label="Method", choices=(...)),
-          )
-
-      Built as parameter_spec.py (plain data, no Qt) + parameter_form.py
-      (the widgets). Outlier converted as proof.
-      CORRECTION to the estimate above: it did NOT collapse the file. Outlier
-      went 790 -> 794 lines. For a three-parameter dialog a declaration with
-      tooltips and visibility rules costs about what the imperative version
-      cost. The gain is in the invariants - visibility rules and widgets are
-      the same data so they cannot drift, a parameter cannot be added without
-      its signal connection, values() always returns every declared name, and
-      odd-window rounding happens in one place. Judge the remaining seven
-      conversions on that, not on line count.
-
-
-
 ================================================================
 NEW - requested after the review
 ================================================================

@@ -44,12 +44,26 @@
       "SFSymbol": "doc.on.doc",
       "SegoeFluent": "E8C8"
     },
+    "credits": {
+      "icon": "info",
+      "text": "Credits",
+      "description": "Who made this, and what it is made of",
+      "SFSymbol": "info.circle",
+      "SegoeFluent": "E946"
+    },
     "delete": {
       "icon": "delete",
       "text": "Delete",
       "description": "Delete the selection",
       "SFSymbol": "trash",
       "SegoeFluent": "E74D"
+    },
+    "dismiss": {
+      "icon": "clear",
+      "text": "Close",
+      "description": "Close this window",
+      "SFSymbol": "xmark.circle",
+      "SegoeFluent": "E711"
     },
     "down": {
       "icon": "down",
@@ -180,13 +194,6 @@
       "SFSymbol": "wrench.and.screwdriver",
       "SegoeFluent": "EA99"
     },
-    "settings": {
-      "icon": "settings",
-      "text": "Settings",
-      "description": "Open the application settings",
-      "SFSymbol": "gearshape",
-      "SegoeFluent": "E713"
-    },
     "paste": {
       "icon": "paste",
       "text": "Paste",
@@ -287,6 +294,13 @@
       "shortcut": "Ctrl+A",
       "SFSymbol": "checkmark",
       "SegoeFluent": "e73e"
+    },
+    "settings": {
+      "icon": "settings",
+      "text": "Settings",
+      "description": "Open the application settings",
+      "SFSymbol": "gearshape",
+      "SegoeFluent": "E713"
     },
     "sql_filter": {
       "icon": "options",
@@ -659,7 +673,7 @@
     },
     "SeriesFitDialog": {
       "x": 517,
-      "y": 172,
+      "y": 268,
       "width": 882,
       "height": 632,
       "maximized": false
@@ -707,10 +721,10 @@
       "maximized": false
     },
     "SeriesFunctionDialog": {
-      "x": 996,
-      "y": 100,
-      "width": 890,
-      "height": 770,
+      "x": 630,
+      "y": 178,
+      "width": 857,
+      "height": 665,
       "maximized": false
     },
     "SeriesControlChartDialog": {
@@ -856,9 +870,12 @@
       "multi_tie_eta": false,
       "multi_apply_btn": false,
       "spin_params": 4,
-      "output_table_edit": "_Fit_Selected_series_y_Custom",
+      "output_table_edit": "_Fit_Selected_series_y_Lineare",
       "max_nfev_edit": "8000",
       "weighted_check": false,
+      "combo_optimizer": "Regione di fiducia (predefinito)",
+      "combo_loss": "Minimi quadrati",
+      "btn_estimate": false,
       "btn_use_fit_params": false,
       "spin_degree": 4,
       "spin_knots": 5,
@@ -945,7 +962,7 @@
     "encoding": "auto",
     "sheet": "Sheet1"
   },
-  "app_style": "automatic",
+  "app_style": "qt:Fusion",
   "language": "it",
   "save_format": "PNG",
   "table_list": {

@@ -260,6 +260,10 @@ msgid "Asymmetric growth curve."
 msgstr "Curva di crescita asimmetrica."
 
 
+msgid "Author"
+msgstr "Autore"
+
+
 msgid "Auto"
 msgstr "Auto"
 
@@ -504,6 +508,10 @@ msgid "Close the current window"
 msgstr "Chiudi la finestra corrente"
 
 
+msgid "Close this window"
+msgstr "Chiudi questa finestra"
+
+
 msgid "Clustering"
 msgstr "Clustering"
 
@@ -518,6 +526,10 @@ msgstr "Colore"
 
 msgid "Cols"
 msgstr "Colonne"
+
+
+msgid "Completions throughout, and the first draft of much of the dialog plumbing."
+msgstr "Completamenti ovunque, e la prima stesura di buona parte dell'impalcatura dei dialoghi."
 
 
 msgid "Compute descriptive statistics, distributions, correlations, and summary metrics."
@@ -538,6 +550,10 @@ msgstr "Costante"
 
 msgid "Constant baseline."
 msgstr "Linea di base costante."
+
+
+msgid "Contribution"
+msgstr "Contributo"
 
 
 msgid "Control Chart"
@@ -666,6 +682,10 @@ msgstr "Crea una nuova scheda grafico dal contesto dati corrente."
 
 msgid "Create new figure (new tab)"
 msgstr "Crea una nuova figura (nuova scheda)"
+
+
+msgid "Credits"
+msgstr "Riconoscimenti"
 
 
 msgid "Cubic"
@@ -852,6 +872,10 @@ msgid "Descriptive statistics"
 msgstr "Statistiche descrittive"
 
 
+msgid "Design, direction, and the domain this exists for."
+msgstr "Progettazione, direzione e il dominio per cui esiste."
+
+
 msgid "Detail"
 msgstr "Dettaglio"
 
@@ -958,6 +982,10 @@ msgstr "Ridisegna i punti che segnalano come marcatori separati."
 
 msgid "Dual annealing"
 msgstr "Ricottura duale"
+
+
+msgid "Each library is used under its own licence, named above and shipped with the package it belongs to. Versions are the ones installed here, not the ones pinned."
+msgstr "Ogni libreria è usata secondo la propria licenza, indicata qui sopra e distribuita insieme al pacchetto a cui appartiene. Le versioni sono quelle installate su questa macchina, non quelle fissate nel file delle dipendenze."
 
 
 msgid "Edit"
@@ -1626,6 +1654,22 @@ msgstr "Minore"
 
 msgid "Levenberg-Marquardt"
 msgstr "Levenberg-Marquardt"
+
+
+msgid "Libraries"
+msgstr "Librerie"
+
+
+msgid "Library"
+msgstr "Libreria"
+
+
+msgid "Licence"
+msgstr "Licenza"
+
+
+msgid "Licences"
+msgstr "Licenze"
 
 
 msgid "Limits at sigma:"
@@ -2504,6 +2548,10 @@ msgid "Right"
 msgstr "Destra"
 
 
+msgid "Role"
+msgstr "Ruolo"
+
+
 msgid "Roles"
 msgstr "Ruoli"
 
@@ -2814,6 +2862,10 @@ msgstr "Nome della serie:"
 
 msgid "Series operation"
 msgstr "Operazione sulla serie"
+
+
+msgid "Series operations, the fit engine, the renderers and most of the test suite, written in conversation."
+msgstr "Le operazioni sulle serie, il motore di fit, i renderer e gran parte della suite di test, scritti in conversazione."
 
 
 msgid "Series properties"
@@ -3156,6 +3208,10 @@ msgid "The classic unbounded least squares. Bounds are ignored."
 msgstr "I classici minimi quadrati senza vincoli. I limiti vengono ignorati."
 
 
+msgid "The dependency list is not available in this build."
+msgstr "L'elenco delle dipendenze non è disponibile in questa build."
+
+
 msgid "The field the SQL buttons below act on."
 msgstr "Seleziona il campo usato dai comandi SQL."
 
@@ -3373,6 +3429,10 @@ msgid "Values used to evaluate the function. Nothing is fitted here."
 msgstr "Valori usati per valutare la funzione. Qui non viene eseguito alcun fit."
 
 
+msgid "Version"
+msgstr "Versione"
+
+
 msgid "View statistical information about the data"
 msgstr "Mostra informazioni statistiche sui dati"
 
@@ -3433,6 +3493,10 @@ msgid "Welcome"
 msgstr "Benvenuto"
 
 
+msgid "What it does"
+msgstr "A cosa serve"
+
+
 msgid "When enabled, applying this dialog again replaces the previously generated preview series."
 msgstr "Se attivo, applicando di nuovo questa finestra la serie di anteprima generata in precedenza viene sostituita."
 
@@ -3447,6 +3511,10 @@ msgstr "Quale distribuzione adattata viene disegnata sull'istogramma. Fit miglio
 
 msgid "Which turning points to look for."
 msgstr "Quali punti di inversione cercare."
+
+
+msgid "Who made this, and what it is made of"
+msgstr "Chi l'ha fatto e di cosa è fatto"
 
 
 msgid "Width"
@@ -3479,6 +3547,10 @@ msgstr "Foglio di lavoro (per sorgenti Excel)"
 
 msgid "Write, validate and save SQL queries"
 msgstr "Scrivi, valida e salva query SQL"
+
+
+msgid "Written by"
+msgstr "Scritto da"
 
 
 msgid "X"
@@ -3577,6 +3649,10 @@ msgid "no timeout"
 msgstr "nessun timeout"
 
 
+msgid "not installed"
+msgstr "non installata"
+
+
 msgid "series"
 msgstr "serie"
 
@@ -3651,3 +3727,5 @@ msgstr "{series}: {error}"
 
 msgid "{series}\nx: {x}\ny: {y}"
 msgstr "{series}\nx: {x}\ny: {y}"
+
+

@@ -24,6 +24,7 @@ from app.data.sqlite_repo import SqliteRepo
 from app.widgets.chart_panel import ChartPanel
 from app.dialogs.create_chart_dialog import NewPlotTabDialog
 from app.dialogs.import_data_dialog import ImportDataDialog, is_importable
+from app.dialogs.credits_dialog import CreditsDialog
 from app.dialogs.query_builder_dialog import QueryBuilderDialog
 from app.widgets.axis_properties import AxisPropertiesWidget
 from app.widgets.figure_properties import FigurePropertiesWidget
@@ -398,6 +399,7 @@ class MainWindow(QMainWindow):
                 None,
                 action_menu_item("settings", self._on_settings),
                 action_menu_item("log_viewer", self._show_log_viewer),
+                action_menu_item("credits", self._on_credits),
             ],
         )
 
@@ -1199,6 +1201,10 @@ class MainWindow(QMainWindow):
                 + ("\n..." if len(report.problems) > 20 else "")
             ),
         )
+    def _on_credits(self) -> None:
+        """Show who made this and what it is made of."""
+        CreditsDialog(parent=self).exec()
+
     def _on_query_builder(self) -> None:
         """Open the query builder and refresh the source lists afterwards."""
         dialog = QueryBuilderDialog(self._repo, parent=self)
