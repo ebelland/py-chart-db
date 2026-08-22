@@ -372,6 +372,41 @@ class TableListPanel(QWidget):
                 tables.append(str(table))
         return tables
 
+    def selected_sources(self) -> list[tuple[str, bool]]:
+        """Return the selected rows as ``(name, is_query)``, in row order.
+
+        The list holds both kinds and they are deleted differently - a saved
+        query is a row in ``__queries__``, not a table, so DROP TABLE on its
+        name matches nothing and leaves it exactly where it was.
+        """
+        selection = self._view.selectionModel()
+        if selection is None:
+            return []
+
+        rows = sorted({index.row() for index in selection.selectedRows(self.COL_TABLE)})
+        sources: list[tuple[str, bool]] = []
+        for row in rows:
+            item = self._model.item(row, self.COL_TABLE)
+            if item is None:
+                continue
+            name = item.data(self.ROLE_TABLE_NAME)
+            if name:
+                sources.append((str(name), bool(item.data(self.ROLE_IS_QUERY))))
+        return sources
+
+    def _current_source(self) -> tuple[str, bool] | None:
+        """Return the current row as ``(name, is_query)``, or None."""
+        row = self._current_row()
+        if row < 0:
+            return None
+        item = self._model.item(row, self.COL_TABLE)
+        if item is None:
+            return None
+        name = item.data(self.ROLE_TABLE_NAME)
+        if not name:
+            return None
+        return str(name), bool(item.data(self.ROLE_IS_QUERY))
+
     def _current_row(self) -> int:
         """Return the current row, falling back to the first selected row."""
         current = self._view.currentIndex()
@@ -447,14 +482,28 @@ class TableListPanel(QWidget):
             return
 
         fn = callable(getattr(parent, "_on_new_plot_tab", None))
-        delete_text = (
-            _("Delete selected tables…") if len(selected_tables) > 1 else _("Delete…")
-        )
-        delete_tip = (
-            _("Delete {count} selected tables").format(count=len(selected_tables))
-            if len(selected_tables) > 1
-            else _("Delete the selected table")
-        )
+        # Named for what is actually selected: "Delete selected tables" over a
+        # saved query is a menu entry that promises the wrong thing.
+        selected_sources = self.selected_sources()
+        has_query = any(is_query for _name, is_query in selected_sources)
+        if len(selected_sources) > 1:
+            delete_text = (
+                _("Delete selected items…") if has_query else _("Delete selected tables…")
+            )
+            delete_tip = (
+                _("Delete {count} selected items").format(count=len(selected_sources))
+                if has_query
+                else _("Delete {count} selected tables").format(
+                    count=len(selected_sources)
+                )
+            )
+        else:
+            delete_text = _("Delete…")
+            delete_tip = (
+                _("Delete the selected saved query")
+                if has_query
+                else _("Delete the selected table")
+            )
 
         items: list[MenuItem | None] = []
         if fn is not None:
@@ -510,7 +559,7 @@ class TableListPanel(QWidget):
                 MenuItem(
                     text=delete_text,
                     tooltip=delete_tip,
-                    callback=self._delete_table,
+                    callback=self._delete_selected,
                     icon="delete",
                 ),
                 None,
@@ -611,41 +660,72 @@ class TableListPanel(QWidget):
         except Exception as exc:  
             applogger.exception(f"Link refresh failed: {exc}")
 
-    def _delete_table(self) -> None:
-        """Delete all selected tables after confirmation."""
+    def _delete_selected(self) -> None:
+        """Delete the selected tables and saved queries, after confirmation.
+
+        Both kinds appear in this list and each needs its own call: deleting a
+        saved query used to run DROP TABLE on its name, which matches nothing,
+        so the row was still there when the list reloaded.
+        """
         if self._repo is None:
             return
 
-        tables = self.selected_tables()
-        if not tables:
-            table, _unused = self._selected_row_info()
-            tables = [table] if table else []
-        if not tables:
+        sources = self.selected_sources()
+        if not sources:
+            current = self._current_source()
+            sources = [current] if current else []
+        if not sources:
             return
 
-        if len(tables) == 1:
-            confirmed = ask(self, "table.confirm_delete", table=tables[0])
-        else:
-            preview = "\n".join(f"- {table}" for table in tables[:12])
-            if len(tables) > 12:
-                preview += f"\n... and {len(tables) - 12} more"
-            confirmed = ask(
-                self, "table.confirm_delete_many", count=len(tables), tables=preview
-            )
-        if not confirmed:
+        if not self._confirm_delete(sources):
             return
 
         try:
-            for table in tables:
-                self._repo.delete_table(table)
+            for name, is_query in sources:
+                if is_query:
+                    self._repo.delete_query(name)
+                    applogger.info("Deleted query '%s'.", name)
+                else:
+                    self._repo.delete_table(name)
             self.reload()
             self.update_parent()
 
             # Ensure dependent previews/listeners are notified after delete.
-            current = self.current
-            self.tableSelected.emit(current or "")
+            current_table = self.current
+            self.tableSelected.emit(current_table or "")
         except Exception as exc:  # noqa: BLE001
-            applogger.exception(f"Delete table failed: {exc}")
+            applogger.exception(f"Delete failed: {exc}")
+
+    def _confirm_delete(self, sources: list[tuple[str, bool]]) -> bool:
+        """Ask before deleting, in the wording the selection deserves.
+
+        A saved query gets its own question because its consequence is
+        different: the table is gone either way, but a chart built on a query
+        stops finding its data.
+        """
+        if len(sources) == 1:
+            name, is_query = sources[0]
+            if is_query:
+                return ask(self, "query.confirm_delete", name=name)
+            return ask(self, "table.confirm_delete", table=name)
+
+        preview = "\n".join(
+            f"- {name}" + (" (query)" if is_query else "")
+            for name, is_query in sources[:12]
+        )
+        if len(sources) > 12:
+            preview += f"\n... and {len(sources) - 12} more"
+
+        if any(is_query for _name, is_query in sources):
+            return ask(
+                self, "source.confirm_delete_many", count=len(sources), sources=preview
+            )
+        return ask(
+            self,
+            "table.confirm_delete_many",
+            count=len(sources),
+            tables=preview,
+        )
         
     def update_parent(self) -> None:
         """Update the parent window's table list and tabs, if they exist."""

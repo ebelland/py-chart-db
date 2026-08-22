@@ -217,6 +217,13 @@ def test_icons_are_cached_by_size_and_ratio(qapp) -> None:
     style._FLUENT_ICON_CACHE.clear()
     style._SF_SYMBOL_ICON_CACHE.clear()
 
+    # One call before the clock starts, for the same reason as the bridge
+    # import above: with the caches just cleared, the first call rasterises a
+    # symbol, and that one drawing is variable enough under a loaded machine
+    # to swamp the thousand cached lookups this budget is about. The whole
+    # finding was that the *cached* path had been costing 338 us a call.
+    style.load_icon("copy")
+
     elapsed = _timed(
         "1k load_icon calls",
         lambda: [style.load_icon("copy") for _ in range(1_000)],

@@ -776,6 +776,10 @@ msgid "Delete selected"
 msgstr "Elimina selezionati"
 
 
+msgid "Delete selected items…"
+msgstr "Elimina gli elementi selezionati…"
+
+
 msgid "Delete selected tables…"
 msgstr "Elimina le tabelle selezionate…"
 
@@ -804,6 +808,10 @@ msgid "Delete the saved query '{name}'?\n\nCharts built on it will stop finding 
 msgstr "Eliminare la query salvata '{name}'?\n\nI grafici che la usano non troveranno più i loro dati."
 
 
+msgid "Delete the selected saved query"
+msgstr "Elimina la query salvata selezionata"
+
+
 msgid "Delete the selected table"
 msgstr "Elimina la tabella selezionata"
 
@@ -830,6 +838,14 @@ msgstr "Eliminare questo grafico?"
 
 msgid "Delete this figure"
 msgstr "Elimina questa figura"
+
+
+msgid "Delete {count} selected items"
+msgstr "Elimina {count} elementi selezionati"
+
+
+msgid "Delete {count} selected items?\n\n{sources}\n\nCharts built on a saved query will stop finding their data."
+msgstr "Eliminare {count} elementi selezionati?\n\n{sources}\n\nI grafici costruiti su una query salvata non troveranno più i loro dati."
 
 
 msgid "Delete {count} selected tables"
@@ -3727,5 +3743,3 @@ msgstr "{series}: {error}"
 
 msgid "{series}\nx: {x}\ny: {y}"
 msgstr "{series}\nx: {x}\ny: {y}"
-
-

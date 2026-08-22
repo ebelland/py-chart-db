@@ -449,124 +449,13 @@ class ChartPanel(QFrame):
                     text.set_picker(True)
                     self._legend_targets[text] = targets
 
-    def _on_button_press(self, event: Any) -> None:
-        """Create an annotation with Ctrl + left click on a data axis.
-
-        The annotation is stored in the descriptor's axis options under the
-        existing ``annotations`` key, then the chart is reloaded.  A plain click
-        remains available for Matplotlib picking and readout; only Ctrl-click is
-        intercepted for annotation creation.
-        """
-        if int(getattr(event, "button", 0) or 0) != 1:
-            return
-        if not self._event_has_ctrl_modifier(event):
-            return
-        if getattr(event, "inaxes", None) is None:
-            return
-        if getattr(event, "xdata", None) is None or getattr(event, "ydata", None) is None:
-            return
-
-        axis_desc = self._descriptor_axis_for_matplotlib_axes(event.inaxes)
-        if axis_desc is None:
-            self.selection_changed.emit(_("No descriptor axis found for annotation."))
-            return
-
-        try:
-            x_value = float(event.xdata)
-            y_value = float(event.ydata)
-        except (TypeError, ValueError):
-            return
-
-        annotation = {
-            "x": x_value,
-            "y": y_value,
-            "type": "arrow",
-            "text": _("Annotation"),
-            "kwargs": {
-                "xytext": [10, 10],
-                "textcoords": "offset points",
-                "arrowprops": {"arrowstyle": "->"},
-            },
-        }
-
-        if self._append_axis_annotation(axis_desc, annotation):
-            self.selection_changed.emit(
-                _("Annotation added at x: {x}, y: {y}").format(
-                    x=axis_text(event.inaxes.xaxis, x_value),
-                    y=axis_text(event.inaxes.yaxis, y_value),
-                )
-            )
-            self.reload()
-
-    def _event_has_ctrl_modifier(self, event: Any) -> bool:
-        """Return True when Ctrl was held for a Matplotlib mouse event."""
-        key = str(getattr(event, "key", "") or "").lower()
-        if "control" in key or key == "ctrl":
-            return True
-        try:
-            return bool(QApplication.keyboardModifiers() & Qt.KeyboardModifier.ControlModifier)
-        except Exception:
-            return False
-
-    def _descriptor_axis_for_matplotlib_axes(self, axes: Any) -> Any | None:
-        """Map a Matplotlib Axes object back to its axis descriptor.
-
-        The descriptor order is the authoritative chart-axis order.  Extra
-        Matplotlib axes such as twinx/colorbar axes may exist, so this resolves
-        by the clicked axes' position among the rendered axes and then indexes
-        into the descriptor axes sorted by ``axis_index``.
-        """
-        descriptor = self._repo.load_figure_descriptor(self._figure_id)
-        if descriptor is None:
-            return None
-        descriptor_axes = sorted(
-            list(getattr(descriptor, "axes", []) or []),
-            key=lambda item: int(getattr(item, "axis_index", 0) or 0),
-        )
-        if not descriptor_axes:
-            return None
-        try:
-            rendered_index = list(self._figure.axes).index(axes)
-        except ValueError:
-            return None
-        if rendered_index < 0 or rendered_index >= len(descriptor_axes):
-            return None
-        return descriptor_axes[rendered_index]
-
-    def _append_axis_annotation(self, axis_desc: Any, annotation: dict[str, Any]) -> bool:
-        """Append one annotation to one axis descriptor and persist it."""
-        axis_id = int(getattr(axis_desc, "id"))
-        options_obj = getattr(axis_desc, "options", None)
-        options = dict(options_obj) if isinstance(options_obj, dict) else {}
-        annotations_obj = options.get("annotations", [])
-        annotations = list(annotations_obj) if isinstance(annotations_obj, list) else []
-        annotations.append(annotation)
-        options["annotations"] = annotations
-
-        # Repository method names have varied in this project.  Try the known
-        # axis-option setters before failing visibly in the log.
-        for method_name in (
-            "set_axis_options",
-            "update_axis_options",
-            "save_axis_options",
-        ):
-            method = getattr(self._repo, method_name, None)
-            if not callable(method):
-                continue
-            try:
-                method(axis_id, options)
-                return True
-            except TypeError:
-                try:
-                    method(axis_id=axis_id, options=options)
-                    return True
-                except TypeError:
-                    continue
-        applogger.error(
-            "Could not persist annotation for axis_id=%s: no supported axis option setter found.",
-            axis_id,
-        )
-        return False
+    # Ctrl + left click used to append an annotation to the axis options here
+    # and reload. It is gone: the text was the fixed word "Annotation", there
+    # was no way to edit it, and nothing on the chart deleted it - the only
+    # way back was the annotations table in the axis properties. A dialog that
+    # asks for the text at the point clicked replaces it (see N-7 in
+    # todo.txt); the axes-to-descriptor mapping it will need is in this file's
+    # history.
 
     def _on_pick(self, event: Any) -> None:
         """Describe the clicked point, or the clicked group of points.
@@ -1001,7 +890,6 @@ class ChartPanel(QFrame):
         # data coordinates.  This is deliberately a mouse-button event, not
         # a pick event, so it works even when there is no marker exactly
         # under the cursor.
-        self._canvas.mpl_connect("button_press_event", self._on_button_press)
         # Hover readout. Throttled and blitted; see _on_motion.
         self._canvas.mpl_connect("motion_notify_event", self._on_motion)
         # Any of these repaints the canvas, so the cached background that
