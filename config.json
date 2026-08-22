@@ -657,7 +657,7 @@
     },
     "SeriesClusterDialog": {
       "x": 322,
-      "y": 292,
+      "y": 388,
       "width": 760,
       "height": 680,
       "maximized": false
@@ -726,10 +726,10 @@
       "maximized": false
     },
     "SeriesFunctionDialog": {
-      "x": 630,
-      "y": 178,
-      "width": 857,
-      "height": 665,
+      "x": 411,
+      "y": 207,
+      "width": 970,
+      "height": 711,
       "maximized": false
     },
     "SeriesControlChartDialog": {

@@ -22,8 +22,10 @@ import math
 import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.figure import Figure
+from matplotlib.ticker import NullLocator
 
 from app.scanners.axis_renderer_scanner import get_renderer, import_class_from_file
+from app.charts import axis_options
 from app.charts.base import SeriesData
 from app.data.descriptors import AxisDescriptor, FigureDescriptor, SeriesDescriptor
 from app.data.sqlite_repo import SqliteRepo
@@ -576,35 +578,76 @@ def _apply_inversion(ax: Any, options: dict[str, Any]) -> None:
             applogger.exception("Failed to set %s axis direction", axis_name)
 
 
-def _apply_ticks(ax: Any, options: dict[str, Any]) -> None:
-    """Apply minor ticks, tick direction, size, and label rotation."""
-    if bool(options.get("minor_ticks", False)):
+def _wanted_minor_ticks(options: dict[str, Any], axis: str) -> bool | None:
+    """Return True to force minor ticks on *axis*, False to remove them, None
+    to leave the style sheet alone.
+
+    A minor grid counts as wanting them: a grid on ticks that do not exist
+    draws nothing, which reads as a broken setting rather than an empty one.
+    """
+    setting = axis_options.tick_setting(options, axis, "minor")
+    if setting == axis_options.OFF:
+        return False
+    if setting != axis_options.AUTO:
+        return True
+
+    grid = axis_options.grid_setting(options, axis, "minor")
+    if grid not in (axis_options.AUTO, axis_options.OFF):
+        return True
+    return None
+
+
+def _apply_minor_ticks(ax: Any, options: dict[str, Any]) -> None:
+    """Turn minor ticks on or off per axis.
+
+    ``minorticks_on`` is per *axes* and picks the locator that suits each
+    scale - AutoMinorLocator is simply wrong on a log axis - so the way to get
+    them on one axis only is to switch both on and then take back the one that
+    was asked to stay off.
+    """
+    wanted = {axis: _wanted_minor_ticks(options, axis) for axis in axis_options.AXES}
+    if any(state is True for state in wanted.values()):
         try:
             ax.minorticks_on()
         except Exception:
             applogger.exception("Failed to enable minor ticks")
 
-    params: dict[str, Any] = {}
+    for axis, state in wanted.items():
+        if state is not False:
+            continue
+        axis_object = ax.xaxis if axis == "x" else ax.yaxis
+        try:
+            axis_object.set_minor_locator(NullLocator())
+        except Exception:
+            applogger.exception("Failed to remove minor ticks from %s", axis)
 
-    direction = str(options.get("tick_direction", "") or "").strip().lower()
-    if direction:
-        if direction in TICK_DIRECTIONS:
-            params["direction"] = direction
-        else:
-            applogger.warning("Unknown tick direction: %r", direction)
+
+def _apply_ticks(ax: Any, options: dict[str, Any]) -> None:
+    """Apply the four tick settings, then tick size and label rotation."""
+    _apply_minor_ticks(ax, options)
+
+    for axis in axis_options.AXES:
+        for which in axis_options.WHICH:
+            setting = axis_options.tick_setting(options, axis, which)
+            if setting == axis_options.AUTO:
+                continue
+
+            if setting == axis_options.OFF:
+                # Length zero rather than hiding the labels with them: "no
+                # ticks" is about the marks, and a chart with no numbers on it
+                # is a different request.
+                _tick_params(ax, axis=axis, which=which, length=0.0)
+                continue
+
+            if setting != axis_options.ON:
+                _tick_params(ax, axis=axis, which=which, direction=setting)
 
     length = options.get("tick_length")
     if length is not None:
         try:
-            params["length"] = float(length)
+            _tick_params(ax, axis="both", which="both", length=float(length))
         except (TypeError, ValueError):
             applogger.warning("Invalid tick length: %r", length)
-
-    if params:
-        try:
-            ax.tick_params(axis="both", which="both", **params)
-        except Exception:
-            applogger.exception("Failed to apply tick parameters")
 
     rotation = options.get("x_tick_rotation")
     if rotation is not None:
@@ -621,33 +664,39 @@ def _apply_ticks(ax: Any, options: dict[str, Any]) -> None:
                     label.set_horizontalalignment("right")
 
 
-def _apply_grid(ax: Any, options: dict[str, Any]) -> None:
-    """Apply the grid, including which ticks and which axes it follows."""
-    if not bool(options.get("grid", False)):
-        return
-
-    which = str(options.get("grid_which", "major") or "major").strip().lower()
-    if which not in GRID_WHICH:
-        applogger.warning("Unknown grid_which: %r", which)
-        which = "major"
-
-    axis = str(options.get("grid_axis", "both") or "both").strip().lower()
-    if axis not in GRID_AXES:
-        applogger.warning("Unknown grid_axis: %r", axis)
-        axis = "both"
-
-    # A minor grid without minor ticks draws nothing, which reads as a broken
-    # setting rather than an empty one.
-    if which in {"minor", "both"}:
-        try:
-            ax.minorticks_on()
-        except Exception:
-            applogger.exception("Failed to enable minor ticks for the minor grid")
-
+def _tick_params(ax: Any, **kwargs: Any) -> None:
+    """Call ``tick_params`` and report a failure rather than raising."""
     try:
-        ax.grid(True, which=which, axis=axis)
+        ax.tick_params(**kwargs)
     except Exception:
-        applogger.exception("Failed to apply the axis grid")
+        applogger.exception("Failed to apply tick parameters: %r", kwargs)
+
+
+def _apply_grid(ax: Any, options: dict[str, Any]) -> None:
+    """Apply the four grid settings.
+
+    Each one is applied, including the ones that say off: the previous
+    version returned early when the grid was not wanted, so it could only ever
+    add a grid. Against a style sheet with ``axes.grid: True`` - which the
+    shipped ones have - that made "no grid" impossible to express.
+    """
+    for axis in axis_options.AXES:
+        for which in axis_options.WHICH:
+            setting = axis_options.grid_setting(options, axis, which)
+            if setting == axis_options.AUTO:
+                continue
+
+            try:
+                if setting == axis_options.OFF:
+                    ax.grid(False, which=which, axis=axis)
+                elif setting == axis_options.ON:
+                    ax.grid(True, which=which, axis=axis)
+                else:
+                    ax.grid(True, which=which, axis=axis, linestyle=setting)
+            except Exception:
+                applogger.exception(
+                    "Failed to apply the %s %s grid", axis, which
+                )
 
 
 def _apply_spines(ax: Any, options: dict[str, Any]) -> None:
@@ -667,7 +716,13 @@ def _apply_spines(ax: Any, options: dict[str, Any]) -> None:
 
 
 def _apply_limits(ax: Any, options: dict[str, Any]) -> None:
-    """Apply optional axis limits."""
+    """Apply the view range: the xlim/ylim pairs, then the manual limits.
+
+    The pairs come first because the mode is the later, finer answer: it says
+    which axis is manual at all, and either end of a manual axis may be left
+    empty to keep that end automatic - ``set_xlim`` takes None for exactly
+    that.
+    """
     xlim = options.get("xlim")
     ylim = options.get("ylim")
 
@@ -682,6 +737,39 @@ def _apply_limits(ax: Any, options: dict[str, Any]) -> None:
             ax.set_ylim(float(ylim[0]), float(ylim[1]))
         except (TypeError, ValueError):
             applogger.warning("Invalid ylim: %r", ylim)
+
+    for axis in axis_options.AXES:
+        if axis_options.is_automatic(options, axis):
+            continue
+
+        low = axis_options.manual_limit(options, axis, "min")
+        high = axis_options.manual_limit(options, axis, "max")
+        if low is None and high is None:
+            continue
+
+        if low is not None and high is not None:
+            if low == high:
+                applogger.warning(
+                    "Ignoring the manual %s limits: both ends are %g", axis, low
+                )
+                continue
+            if low > high:
+                # Reversed limits invert the axis, which has its own control
+                # and would then be applied twice. Order them and say so.
+                applogger.warning(
+                    "Manual %s limits were reversed (%g, %g); using them in "
+                    "order. Use the axis direction option to invert.",
+                    axis,
+                    low,
+                    high,
+                )
+                low, high = high, low
+
+        setter = ax.set_xlim if axis == "x" else ax.set_ylim
+        try:
+            setter(low, high)
+        except Exception:
+            applogger.exception("Failed to set the manual %s limits", axis)
 
 
 def _apply_pickradius(ax: Any, options: dict[str, Any]) -> None:

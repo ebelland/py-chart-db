@@ -214,6 +214,31 @@ def test_the_fit_algorithms_are_translated() -> None:
     assert sorted(missing) == []
 
 
+def test_the_axis_grid_and_tick_choices_are_translated() -> None:
+    """Eight combos in the axis properties read their labels from data.
+
+    app/charts/axis_options.py holds the vocabulary the widget shows and the
+    renderer applies, so the labels reach the user as ``_(label)`` with no
+    literal at the call site - the same blind spot as PARAMS and the function
+    library.
+    """
+    from app.charts import axis_options
+
+    catalog = i18n._parse_po(PO_PATH)
+    missing = {
+        label
+        for choices in (
+            axis_options.GRID_CHOICES,
+            axis_options.TICK_CHOICES,
+            axis_options.LIMIT_CHOICES,
+        )
+        for _value, label in choices
+        if label and label not in catalog
+    }
+
+    assert sorted(missing) == []
+
+
 def test_the_catalogue_has_no_empty_translations() -> None:
     """An empty msgstr silently falls back, so it reads as untranslated."""
     catalog = i18n._parse_po(PO_PATH)

@@ -174,6 +174,7 @@ class SeriesFunctionDialog(SeriesOperationDialogBase):
             width=820,
             height=680,
         )
+        self.axis_series_panel.setVisible(False)
         self._reload_function_tree()
         self.refresh_results()
 
@@ -284,9 +285,15 @@ class SeriesFunctionDialog(SeriesOperationDialogBase):
             self._function_tree.setCurrentItem(first)
 
     def _first_function_item(self) -> QTreeWidgetItem | None:
+        """Return the first function under the first non-empty category.
+
+        ``topLevelItem`` returns None for an index the tree does not have, and
+        the count can change under a signal while this walks it, so the result
+        is checked rather than assumed - which is also what the type says.
+        """
         for index in range(self._function_tree.topLevelItemCount()):
             parent = self._function_tree.topLevelItem(index)
-            if parent.childCount():
+            if parent is not None and parent.childCount():
                 return parent.child(0)
         return None
 

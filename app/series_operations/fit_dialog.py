@@ -487,7 +487,7 @@ class SeriesFitDialog(SeriesOperationDialogBase):
 
     def _hide_model_options(self) -> None:
         for w in (self._lbl_degree, self._spin_degree, self._lbl_knots, self._spin_knots, self._lbl_spacing, self._combo_knot_spacing):
-            w.hide()
+            w.hide()    
 
     def _current_table(self) -> str:
         """Return a stable source table label for results/reporting."""

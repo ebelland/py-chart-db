@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QFormLayout,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -34,6 +35,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.logs.logger import applogger
+from app.charts import axis_options
 from app.charts.render_figure import (
     GRID_AXES,
     GRID_WHICH,
@@ -64,6 +66,9 @@ MAX_QT_HEIGHT: Final[int] = 16_777_215
 # The editor offers exactly what the renderer knows how to apply, so the two
 # cannot drift: these come straight from render_figure.
 AXIS_SCALES: Final[tuple[str, ...]] = SUPPORTED_AXIS_SCALES
+#: Kept for the figure options elsewhere in this module; the axis grid and
+#: tick controls now come from app.charts.axis_options, which is the same
+#: vocabulary the renderer applies.
 GRID_WHICH_CHOICES: Final[tuple[str, ...]] = GRID_WHICH
 GRID_AXIS_CHOICES: Final[tuple[str, ...]] = GRID_AXES
 # The empty entry means "leave the Matplotlib default alone".
@@ -400,18 +405,16 @@ class AxisPropertiesWidget(QWidget):
         form = QFormLayout()
         stdSizeAndlayout(form)
 
-        self._grid_check = QCheckBox(_("Show grid"), section)
-        self._grid_which_combo = QComboBox(section)
-        self._grid_axis_combo = QComboBox(section)
-        for combo, values in (
-            (self._grid_which_combo, GRID_WHICH_CHOICES),
-            (self._grid_axis_combo, GRID_AXIS_CHOICES),
-        ):
-            self._configure_combo_width(combo, minimum_contents_length=10)
-            for value in values:
-                combo.addItem(value, value)
-
-        self._minor_ticks_check = QCheckBox(_("Minor ticks"), section)
+        # Four grid settings and four tick settings: one per axis, per tick
+        # class. One switch for the whole axes could not say "x major and y
+        # minor", and - being a boolean - could not say "off" at all against a
+        # style sheet that turns the grid on.
+        self._grid_combos = self._build_setting_combos(
+            section, axis_options.GRID_CHOICES
+        )
+        self._tick_combos = self._build_setting_combos(
+            section, axis_options.TICK_CHOICES
+        )
 
         self._tick_direction_combo = QComboBox(section)
         self._configure_combo_width(self._tick_direction_combo, minimum_contents_length=10)
@@ -446,15 +449,97 @@ class AxisPropertiesWidget(QWidget):
             spine_layout.addWidget(check)
         spine_layout.addStretch(1)
 
-        form.addRow(_("Grid"), self._grid_check)
-        form.addRow(_("Grid ticks"), self._grid_which_combo)
-        form.addRow(_("Grid axis"), self._grid_axis_combo)
-        form.addRow(_("Ticks"), self._minor_ticks_check)
+        form.addRow(_("Grid"), self._build_setting_grid(section, self._grid_combos))
+        form.addRow(_("Ticks"), self._build_setting_grid(section, self._tick_combos))
         form.addRow(_("Tick direction"), self._tick_direction_combo)
         form.addRow(_("Tick length"), self._tick_length_spin)
         form.addRow(_("X tick rotation"), self._x_tick_rotation_spin)
         form.addRow(_("Hide spines"), spine_row)
+
+        self._limits_mode_combo = QComboBox(section)
+        self._configure_combo_width(self._limits_mode_combo, minimum_contents_length=18)
+        for value, label in axis_options.LIMIT_CHOICES:
+            self._limits_mode_combo.addItem(_(label), value)
+        self._limits_mode_combo.currentIndexChanged.connect(
+            self._update_limit_control_state
+        )
+
+        self._limit_spins: dict[tuple[str, str], QDoubleSpinBox] = {}
+        limit_rows: dict[str, QWidget] = {}
+        for axis in axis_options.AXES:
+            row = QWidget(section)
+            row_layout = QHBoxLayout(row)
+            stdSizeAndlayout(row_layout)
+            for edge in ("min", "max"):
+                spin = QDoubleSpinBox(section)
+                stdSizeAndlayout(spin)
+                # Wide enough for real data - counts, wavelengths, timestamps
+                # as seconds - and six decimals for the small end of it.
+                spin.setRange(-1.0e15, 1.0e15)
+                spin.setDecimals(6)
+                spin.setSpecialValueText(_("(auto)"))
+                # The bottom of the range doubles as "not set", so an axis can
+                # have one end fixed and the other left to the data.
+                spin.setValue(spin.minimum())
+                self._limit_spins[(axis, edge)] = spin
+                row_layout.addWidget(spin)
+            row_layout.addStretch(1)
+            limit_rows[axis] = row
+
+        form.addRow(_("Limits"), self._limits_mode_combo)
+        form.addRow(_("X range"), limit_rows["x"])
+        form.addRow(_("Y range"), limit_rows["y"])
+        self._update_limit_control_state()
         return form
+
+    def _build_setting_combos(
+        self, section: QWidget, choices: tuple[tuple[str, str], ...]
+    ) -> dict[tuple[str, str], QComboBox]:
+        """Return one combo per (axis, tick class), all offering *choices*."""
+        combos: dict[tuple[str, str], QComboBox] = {}
+        for axis in axis_options.AXES:
+            for which in axis_options.WHICH:
+                combo = QComboBox(section)
+                self._configure_combo_width(combo, minimum_contents_length=12)
+                for value, label in choices:
+                    combo.addItem(_(label), value)
+                combos[(axis, which)] = combo
+        return combos
+
+    def _build_setting_grid(
+        self, section: QWidget, combos: dict[tuple[str, str], QComboBox]
+    ) -> QWidget:
+        """Lay four settings out as the 2x2 they are: axis across, class down.
+
+        Four labelled rows would take four times the height and would still
+        leave the reader to work out that they are the same question asked
+        four times.
+        """
+        holder = QWidget(section)
+        layout = QGridLayout(holder)
+        stdSizeAndlayout(layout)
+
+        for column, axis in enumerate(axis_options.AXES, start=1):
+            label = QLabel(axis.upper(), holder)
+            label.setProperty("muted", True)
+            layout.addWidget(label, 0, column)
+
+        for row, which in enumerate(axis_options.WHICH, start=1):
+            label = QLabel(_("Major") if which == "major" else _("Minor"), holder)
+            label.setProperty("muted", True)
+            layout.addWidget(label, row, 0)
+            for column, axis in enumerate(axis_options.AXES, start=1):
+                layout.addWidget(combos[(axis, which)], row, column)
+
+        layout.setColumnStretch(len(axis_options.AXES) + 1, 1)
+        return holder
+
+    def _update_limit_control_state(self) -> None:
+        """Enable only the limit boxes the chosen mode actually reads."""
+        mode = str(self._limits_mode_combo.currentData() or axis_options.LIMITS_AUTO)
+        options = {"limits_mode": mode}
+        for (axis, _edge), spin in self._limit_spins.items():
+            spin.setEnabled(not axis_options.is_automatic(options, axis))
 
     def _update_scale_control_state(self) -> None:
         """Enable only the scale parameters the selected scales actually use."""
@@ -480,10 +565,6 @@ class AxisPropertiesWidget(QWidget):
             self._linthresh_spin,
             self._invert_x_check,
             self._invert_y_check,
-            self._grid_check,
-            self._grid_which_combo,
-            self._grid_axis_combo,
-            self._minor_ticks_check,
             self._tick_direction_combo,
             self._tick_length_spin,
             self._x_tick_rotation_spin,
@@ -491,6 +572,10 @@ class AxisPropertiesWidget(QWidget):
             self._hide_spine_right_check,
             self._hide_spine_bottom_check,
             self._hide_spine_left_check,
+            self._limits_mode_combo,
+            *self._grid_combos.values(),
+            *self._tick_combos.values(),
+            *self._limit_spins.values(),
         )
 
     @staticmethod
@@ -530,11 +615,27 @@ class AxisPropertiesWidget(QWidget):
         self._invert_x_check.setChecked(bool(options.get("invert_x", False)))
         self._invert_y_check.setChecked(bool(options.get("invert_y", False)))
 
-        self._grid_check.setChecked(bool(options.get("grid", False)))
-        self._select_combo_value(self._grid_which_combo, options.get("grid_which"), "major")
-        self._select_combo_value(self._grid_axis_combo, options.get("grid_axis"), "both")
+        # Through axis_options so a figure saved before these existed opens
+        # with the settings it actually had, rather than with four Autos.
+        for key, combo in self._grid_combos.items():
+            self._select_combo_value(
+                combo, axis_options.grid_setting(options, *key), axis_options.AUTO
+            )
+        for key, combo in self._tick_combos.items():
+            self._select_combo_value(
+                combo, axis_options.tick_setting(options, *key), axis_options.AUTO
+            )
 
-        self._minor_ticks_check.setChecked(bool(options.get("minor_ticks", False)))
+        self._select_combo_value(
+            self._limits_mode_combo,
+            axis_options.limits_mode(options),
+            axis_options.LIMITS_AUTO,
+        )
+        for (axis, edge), spin in self._limit_spins.items():
+            value = axis_options.manual_limit(options, axis, edge)
+            spin.setValue(spin.minimum() if value is None else value)
+        self._update_limit_control_state()
+
         self._select_combo_value(
             self._tick_direction_combo, options.get("tick_direction", ""), ""
         )
@@ -593,15 +694,42 @@ class AxisPropertiesWidget(QWidget):
             ),
             "invert_x": bool(self._invert_x_check.isChecked()),
             "invert_y": bool(self._invert_y_check.isChecked()),
-            "grid": bool(self._grid_check.isChecked()),
-            "grid_which": str(self._grid_which_combo.currentData() or "major"),
-            "grid_axis": str(self._grid_axis_combo.currentData() or "both"),
-            "minor_ticks": bool(self._minor_ticks_check.isChecked()),
             "tick_direction": str(self._tick_direction_combo.currentData() or ""),
             "tick_length": tick_length if tick_length > 0.0 else None,
             "x_tick_rotation": float(self._x_tick_rotation_spin.value()),
         }
         payload["y_linthresh"] = payload["x_linthresh"]
+
+        for (axis, which), combo in self._grid_combos.items():
+            payload[axis_options.grid_key(axis, which)] = str(
+                combo.currentData() or axis_options.AUTO
+            )
+        for (axis, which), combo in self._tick_combos.items():
+            payload[axis_options.tick_key(axis, which)] = str(
+                combo.currentData() or axis_options.AUTO
+            )
+
+        # The legacy keys are written as the four settings imply, so a figure
+        # edited here still renders in a build that predates them - and so
+        # nothing downstream reads a stale "grid: True" that the user has
+        # since turned off.
+        payload["grid"] = False
+        payload["grid_which"] = "major"
+        payload["grid_axis"] = "both"
+        payload["minor_ticks"] = any(
+            str(self._tick_combos[(axis, "minor")].currentData() or axis_options.AUTO)
+            not in (axis_options.AUTO, axis_options.OFF)
+            for axis in axis_options.AXES
+        )
+
+        mode = str(self._limits_mode_combo.currentData() or axis_options.LIMITS_AUTO)
+        payload["limits_mode"] = mode
+        for (axis, edge), spin in self._limit_spins.items():
+            automatic = axis_options.is_automatic({"limits_mode": mode}, axis)
+            unset = spin.value() <= spin.minimum()
+            payload[axis_options.limit_key(axis, edge)] = (
+                None if automatic or unset else float(spin.value())
+            )
 
         for name, check in self._spine_checks().items():
             payload[f"hide_spine_{name}"] = bool(check.isChecked())

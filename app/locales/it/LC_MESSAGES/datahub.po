@@ -24,6 +24,10 @@ msgid "(Embedded style)"
 msgstr "(Stile incorporato)"
 
 
+msgid "(auto)"
+msgstr "(auto)"
+
+
 msgid "(none)"
 msgstr "(nessuno)"
 
@@ -272,6 +276,18 @@ msgid "Automatic"
 msgstr "Automatico"
 
 
+msgid "Automatic (both axes)"
+msgstr "Automatici (entrambi gli assi)"
+
+
+msgid "Automatic x, manual y"
+msgstr "X automatico, Y manuale"
+
+
+msgid "Automatic y, manual x"
+msgstr "Y automatico, X manuale"
+
+
 msgid "Axis / Series"
 msgstr "Asse / Serie"
 
@@ -330,6 +346,10 @@ msgstr "CDF beta scalata"
 
 msgid "Beta PDF scaled"
 msgstr "PDF beta scalata"
+
+
+msgid "Both sides"
+msgstr "Su entrambi i lati"
 
 
 msgid "Bottom"
@@ -720,6 +740,14 @@ msgid "Dark"
 msgstr "Scuro"
 
 
+msgid "Dash-dot"
+msgstr "Tratto-punto"
+
+
+msgid "Dashed"
+msgstr "Tratteggiata"
+
+
 msgid "Data"
 msgstr "Dati"
 
@@ -950,6 +978,10 @@ msgstr "Dogleg box"
 
 msgid "Dose response power"
 msgstr "Risposta alla dose (legge di potenza)"
+
+
+msgid "Dotted"
+msgstr "Punteggiata"
 
 
 msgid "Double exponential decay"
@@ -1320,6 +1352,10 @@ msgid "Freundlich"
 msgstr "Freundlich"
 
 
+msgid "From the style"
+msgstr "Dallo stile"
+
+
 msgid "From x:"
 msgstr "Da x:"
 
@@ -1548,6 +1584,10 @@ msgid "Insert the selected rcParam into the editor"
 msgstr "Inserisce nell'editor il rcParam selezionato"
 
 
+msgid "Inside"
+msgstr "Interni"
+
+
 msgid "Interpolate"
 msgstr "Interpola"
 
@@ -1688,6 +1728,10 @@ msgid "Licences"
 msgstr "Licenze"
 
 
+msgid "Limits"
+msgstr "Limiti"
+
+
 msgid "Limits at sigma:"
 msgstr "Limiti a sigma:"
 
@@ -1788,6 +1832,14 @@ msgid "Main table:"
 msgstr "Tabella principale:"
 
 
+msgid "Major"
+msgstr "Principali"
+
+
+msgid "Manual (both axes)"
+msgstr "Manuali (entrambi gli assi)"
+
+
 msgid "Manual spacing"
 msgstr "Spaziatura manuale"
 
@@ -1858,6 +1910,10 @@ msgstr "Larghezza minima:"
 
 msgid "Minimum:"
 msgstr "Minimo:"
+
+
+msgid "Minor"
+msgstr "Secondari"
 
 
 msgid "Minor ticks"
@@ -2084,6 +2140,14 @@ msgid "ORDER BY with an explicit direction"
 msgstr "ORDER BY con direzione esplicita"
 
 
+msgid "Off"
+msgstr "Disattivata"
+
+
+msgid "On"
+msgstr "Attiva"
+
+
 msgid "One-sample t-test"
 msgstr "Test t a un campione"
 
@@ -2158,6 +2222,10 @@ msgstr "Outlier"
 
 msgid "Output table:"
 msgstr "Tabella di output:"
+
+
+msgid "Outside"
+msgstr "Esterni"
 
 
 msgid "PSD, CSD, coherence, spectra and correlations"
@@ -3040,6 +3108,10 @@ msgid "Soft L1 (robust)"
 msgstr "Soft L1 (robusta)"
 
 
+msgid "Solid"
+msgstr "Continua"
+
+
 msgid "Some series could not be processed:\n\n{errors}"
 msgstr "Alcune serie non sono state elaborate:\n\n{errors}"
 
@@ -3581,6 +3653,10 @@ msgid "X log base"
 msgstr "Base del logaritmo X"
 
 
+msgid "X range"
+msgstr "Intervallo X"
+
+
 msgid "X range:"
 msgstr "Intervallo X:"
 
@@ -3607,6 +3683,10 @@ msgstr "Etichetta Y"
 
 msgid "Y log base"
 msgstr "Base del logaritmo Y"
+
+
+msgid "Y range"
+msgstr "Intervallo Y"
 
 
 msgid "Y scale"
@@ -3743,3 +3823,4 @@ msgstr "{series}: {error}"
 
 msgid "{series}\nx: {x}\ny: {y}"
 msgstr "{series}\nx: {x}\ny: {y}"
+
