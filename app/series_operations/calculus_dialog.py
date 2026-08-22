@@ -23,7 +23,7 @@ nothing if the signal does not return to zero: a constant offset contributes
 offset x width to the result, which for a broad peak on a raised baseline is
 most of the answer.  So the integral offers to remove a baseline first.
 
-Peak finding lives next door in ``peaks_dialog``; find a peak there,
+Peak finding lives next door in ``series_peaks_dialog``; find a peak there,
 read its bounds, integrate between them here.
 """
 
@@ -95,9 +95,11 @@ CALCULUS_DOCS = {
     ),
 }
 
-DEST_SAME_AXIS = "same_axis"
-DEST_NEW_AXIS = "new_axis"
-DEST_NEW_FIGURE = "new_figure"
+# Re-exported from the base so this module's callers and tests can name them
+# without reaching through the class.
+DEST_SAME_AXIS = SeriesOperationDialogBase.DEST_SAME_AXIS
+DEST_NEW_AXIS = SeriesOperationDialogBase.DEST_NEW_AXIS
+DEST_NEW_FIGURE = SeriesOperationDialogBase.DEST_NEW_FIGURE
 
 BASELINE_NONE = "none"
 BASELINE_MINIMUM = "minimum"
@@ -194,9 +196,7 @@ class SeriesCalculusDialog(SeriesOperationDialogBase):
             ),
             visible_for={"model": INTEGRALS},
         ),
-        ChoiceParam(
-            "destination",
-            "Draw on:",
+        SeriesOperationDialogBase.destination_param(
             tooltip=(
                 "A derivative or an integral rarely shares a scale with the "
                 "series it came from - d/dx of a slow drift is near zero "
@@ -204,12 +204,7 @@ class SeriesCalculusDialog(SeriesOperationDialogBase):
                 "Same axis overlays them when the ranges are comparable; a new "
                 "figure keeps the result out of this chart entirely."
             ),
-            choices=(
-                ("New axis in this figure", DEST_NEW_AXIS),
-                ("Same axis as the source", DEST_SAME_AXIS),
-                ("New figure", DEST_NEW_FIGURE),
-            ),
-            default_value=DEST_NEW_AXIS,
+            default=SeriesOperationDialogBase.DEST_NEW_AXIS,
         ),
         BoolParam(
             "simpson",
@@ -598,28 +593,15 @@ class SeriesCalculusDialog(SeriesOperationDialogBase):
         A new axis on the same figure, not a new tab: the result is a second
         view of this chart's data and belongs beside it.
         """
-        destination = str(self.parameter_values().get("destination", DEST_NEW_AXIS))
-
-        if destination == DEST_SAME_AXIS:
-            return selected_axis_id
-
-        if self._result_axis_id is None:
-            if destination == DEST_NEW_FIGURE:
-                self._result_figure_id, self._result_axis_id = self.create_result_figure(
-                    name=self._result_figure_name(results),
-                    chart_type="Scatter Plot",
-                    title=self._model(),
-                    options={"grid": True, "linestyle": "-", "marker": ""},
-                )
-            else:
-                self._result_axis_id = self.create_result_axis(
-                    chart_type="Scatter Plot",
-                    title=self._model(),
-                    options={"grid": True, "linestyle": "-", "marker": ""},
-                )
-
+        axis_id = self.resolve_destination_axis(
+            selected_axis_id,
+            chart_type="Scatter Plot",
+            title=self._model(),
+            figure_name=self._result_figure_name(results),
+            options={"grid": True, "linestyle": "-", "marker": ""},
+        )
         self._label_result_axis(results)
-        return self._result_axis_id
+        return axis_id
 
     def _result_figure_name(self, results: Sequence[Any]) -> str:
         """Name the new figure after the series and the calculation.
@@ -659,32 +641,8 @@ class SeriesCalculusDialog(SeriesOperationDialogBase):
             applogger.exception("Failed to label the calculus result axis")
 
     def discard_operation_artifacts(self) -> None:
-        """Delete the axis this dialog created, when Apply never happened.
-
-        Creating an axis commits, so it is not covered by the preview
-        savepoint: closing without applying has to remove it by hand or an
-        empty axis is left behind.
-        """
-        if self._applied or self._result_axis_id is None:
-            return
-
-        axis_id = self._result_axis_id
-        figure_id = self._result_figure_id
-        self._result_axis_id = None
-        self._result_figure_id = None
-
-        try:
-            # A whole figure when that is what was made: deleting only its axis
-            # would leave an empty chart tab behind, which is worse than the
-            # axis it was meant to clean up.
-            if figure_id is not None:
-                self._repo.delete_figure(figure_id)
-                applogger.info("Discarded the unapplied calculus figure %s.", figure_id)
-            else:
-                self._repo.delete_axis(axis_id)
-                applogger.info("Discarded the unapplied calculus axis %s.", axis_id)
-        except Exception:
-            applogger.exception("Failed to discard calculus axis %s", axis_id)
+        """Remove the axis or figure this dialog made, when Apply never ran."""
+        self.discard_result_target()
 
     # ------------------------------------------------------------------
     # Results

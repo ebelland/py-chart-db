@@ -44,12 +44,24 @@ msgid "3 is the Shewhart convention: on a stable normal process it gives about o
 msgstr "3 è la convenzione di Shewhart: su un processo normale e stabile dà circa un falso allarme ogni 370 punti, il che bilancia i segnali mancati e le false segnalazioni."
 
 
+msgid "A JOIN needs at least two tables."
+msgstr "Servono almeno due tabelle per un JOIN."
+
+
+msgid "A UNION needs at least two tables."
+msgstr "Servono almeno due tabelle per una UNION."
+
+
 msgid "A derivative or an integral rarely shares a scale with the series it came from - d/dx of a slow drift is near zero beside data in the thousands - so a new axis is the default. Same axis overlays them when the ranges are comparable; a new figure keeps the result out of this chart entirely."
 msgstr "Una derivata o un integrale raramente condivide la scala della serie di origine - la d/dx di una deriva lenta è quasi zero accanto a dati dell'ordine delle migliaia - quindi l'impostazione predefinita è un nuovo asse. Stesso asse sovrappone le curve quando gli intervalli sono confrontabili; nuova figura tiene il risultato del tutto fuori da questo grafico."
 
 
 msgid "A derivative or an integral rarely shares a scale with the series it came from - d/dx of a slow drift is near zero beside data in the thousands. On by default for that reason; turn it off to overlay when the ranges happen to be comparable."
 msgstr "Una derivata o un integrale raramente condivide la scala della serie di origine: la d/dx di una deriva lenta è quasi zero accanto a dati dell'ordine delle migliaia. Per questo è attivo per impostazione predefinita; disattivalo per sovrapporre le curve quando gli intervalli sono confrontabili."
+
+
+msgid "A drawn function is usually meant to be compared with the data, so the same axis is the default here. A new axis or figure keeps it separate when the scales do not match."
+msgstr "Una funzione tracciata di solito serve a essere confrontata con i dati, quindi qui l'impostazione predefinita è lo stesso asse. Un nuovo asse o una nuova figura la tengono separata quando le scale non corrispondono."
 
 
 msgid "A new language is applied the next time the app starts."
@@ -334,6 +346,14 @@ msgstr "Minimi quadrati con vincoli. La scelta giusta per la maggior parte dei f
 
 msgid "Browse…"
 msgstr "Sfoglia…"
+
+
+msgid "Build a JOIN"
+msgstr "Crea JOIN"
+
+
+msgid "Build a UNION"
+msgstr "Crea UNION"
 
 
 msgid "Build a multi-peak expression"
@@ -1088,6 +1108,14 @@ msgid "Features:"
 msgstr "Feature:"
 
 
+msgid "Field to join on:"
+msgstr "Campo da unire:"
+
+
+msgid "Fields:"
+msgstr "campi:"
+
+
 msgid "Figure layout"
 msgstr "Disposizione della figura"
 
@@ -1142,6 +1170,10 @@ msgstr "Cerca:"
 
 msgid "First row is header"
 msgstr "La prima riga è l'intestazione"
+
+
+msgid "First table:"
+msgstr "Prima tabella:"
 
 
 msgid "First-order approach to a plateau."
@@ -1504,6 +1536,10 @@ msgid "Invert Y"
 msgstr "Inverti Y"
 
 
+msgid "JOIN type:"
+msgstr "Tipo di JOIN:"
+
+
 msgid "JSON starting parameters for nonlinear series_fit models."
 msgstr "Parametri iniziali in JSON per i modelli series_fit non lineari."
 
@@ -1680,6 +1716,14 @@ msgid "MC resamples:"
 msgstr "Ricampionamenti MC:"
 
 
+msgid "Main field:"
+msgstr "Campo principale:"
+
+
+msgid "Main table:"
+msgstr "Tabella principale:"
+
+
 msgid "Manual spacing"
 msgstr "Spaziatura manuale"
 
@@ -1846,6 +1890,14 @@ msgstr "Nuova figura"
 
 msgid "New plot"
 msgstr "Nuovo grafico"
+
+
+msgid "New query"
+msgstr "Aggiungi query"
+
+
+msgid "New query, not saved yet."
+msgstr "Query nuova, non ancora salvata."
 
 
 msgid "No axes found"
@@ -2108,8 +2160,16 @@ msgid "Pick a built-in model to populate the expression and parameters."
 msgstr "Scegli un modello predefinito per popolare espressione e parametri."
 
 
+msgid "Pick a saved query."
+msgstr "Seleziona una query salvata."
+
+
 msgid "Pick a scanned function model to populate the formula and parameters."
 msgstr "Scegli un modello di funzione rilevato per compilare la formula e i parametri."
+
+
+msgid "Pick a table and a field."
+msgstr "Seleziona una tabella e un campo."
 
 
 msgid "Pick radius"
@@ -2412,6 +2472,10 @@ msgid "Result preview"
 msgstr "Anteprima del risultato"
 
 
+msgid "Result preview:"
+msgstr "anteprima:"
+
+
 msgid "Results"
 msgstr "Risultati"
 
@@ -2482,6 +2546,10 @@ msgstr "Query SQL"
 
 msgid "SQL query (SELECT / WITH ...)"
 msgstr "Query SQL (SELECT / WITH ...)"
+
+
+msgid "SQL:"
+msgstr "sql:"
 
 
 msgid "Same axis as the source"
@@ -2558,6 +2626,10 @@ msgstr "Salva su file"
 
 msgid "Saved queries"
 msgstr "Query salvate"
+
+
+msgid "Saved queries:"
+msgstr "query salvate:"
 
 
 msgid "Scale and direction"
@@ -2638,6 +2710,10 @@ msgstr "Cerca proprietà..."
 
 msgid "Searches the whole box with a population, then fits locally. Use when the starting point is a guess."
 msgstr "Esplora tutto il dominio con una popolazione, poi fa un fit locale. Da usare quando il punto di partenza è solo un'ipotesi."
+
+
+msgid "Second table:"
+msgstr "Seconda tabella:"
 
 
 msgid "Second-order numerator over first-order denominator."
@@ -2880,6 +2956,10 @@ msgid "Snippets"
 msgstr "Frammenti"
 
 
+msgid "Snippets:"
+msgstr "frammenti:"
+
+
 msgid "Soft L1 (robust)"
 msgstr "Soft L1 (robusta)"
 
@@ -3020,8 +3100,16 @@ msgid "Table"
 msgstr "Tabella"
 
 
+msgid "Table to join:"
+msgstr "Tabella da unire:"
+
+
 msgid "Tables"
 msgstr "Tabelle"
+
+
+msgid "Tables:"
+msgstr "tabelle:"
 
 
 msgid "Take the sampling frequency from the spacing of the x role."
@@ -3060,6 +3148,10 @@ msgid "The classic unbounded least squares. Bounds are ignored."
 msgstr "I classici minimi quadrati senza vincoli. I limiti vengono ignorati."
 
 
+msgid "The field the SQL buttons below act on."
+msgstr "Seleziona il campo usato dai comandi SQL."
+
+
 msgid "The latest fit has no parameters to copy."
 msgstr "L’ultimo fit non ha parametri da copiare."
 
@@ -3086,6 +3178,10 @@ msgstr "Lo stile e la lingua vengono applicati al prossimo avvio dell'applicazio
 
 msgid "The style stack is empty."
 msgstr "La pila degli stili è vuota."
+
+
+msgid "The tables have no fields in common to UNION."
+msgstr "Le tabelle non hanno campi comuni per la UNION."
 
 
 msgid "The upper and lower limits. Without them the chart is a run chart - the points, but nothing to judge them against."
@@ -3199,6 +3295,10 @@ msgstr "Bilaterale"
 
 msgid "Type"
 msgstr "Tipo"
+
+
+msgid "Type:"
+msgstr "Tipo:"
 
 
 msgid "UNION ALL of two tables with the same columns"
@@ -3543,3 +3643,5 @@ msgstr "{series}: {error}"
 
 msgid "{series}\nx: {x}\ny: {y}"
 msgstr "{series}\nx: {x}\ny: {y}"
+
+

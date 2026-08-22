@@ -44,7 +44,7 @@ from app.utils.series_validation import (
     validate_xy,
 )
 from app.series_operations.parameter_form import ParameterForm
-from app.series_operations.parameter_spec import Param, defaults
+from app.series_operations.parameter_spec import ChoiceParam, Param, defaults
 from app.utils.messages import show_message
 from app.utils.dialog_state import (
     restore_dialog_state,
@@ -263,6 +263,12 @@ class SeriesOperationDialogBase(QDialog):
     #: never reads is worse than no picker.
     SHOWS_SERIES_SELECTOR: bool = True
 
+    #: Whether the Axis / Series page appears in the toolbox at all. The
+    #: selector itself is still built and still answers selected_axis_id(),
+    #: because _run_operation needs an axis to write to - this only decides
+    #: whether the user is shown a page they have no decision to make on.
+    SHOWS_AXIS_SERIES_PAGE: bool = True
+
     #: Declared parameters.  An operation that sets this gets its parameter
     #: form built, wired and read back for free; see ``parameter_spec``.
     #: Leaving it empty keeps the old behaviour, where the subclass overrides
@@ -378,7 +384,12 @@ class SeriesOperationDialogBase(QDialog):
                 QSizePolicy.Policy.Expanding,
             )
 
-        left_toolbox.addItem(self.axis_series_panel, _("Axis / Series"))
+        # The Axis / Series page is omitted entirely for an operation that
+        # selects nothing. Hiding the page's widget is not enough - a QToolBox
+        # keeps the header button for a hidden page, leaving a section that
+        # opens onto nothing.
+        if self.SHOWS_AXIS_SERIES_PAGE:
+            left_toolbox.addItem(self.axis_series_panel, _("Axis / Series"))
         left_toolbox.addItem(self.model_panel, _("Model"))
         left_toolbox.addItem(self.parameters_panel, _("Parameters"))
         left_toolbox.setCurrentIndex(0)
@@ -802,6 +813,118 @@ class SeriesOperationDialogBase(QDialog):
             figure_id,
         )
         return axis_id
+
+    # ------------------------------------------------------------------
+    # Where results are drawn
+    # ------------------------------------------------------------------
+
+    #: The three places a generated result can go. Shared because the choice
+    #: is the same wherever it appears, and two operations offering the same
+    #: decision under different words would be worse than either.
+    DEST_SAME_AXIS: str = "same_axis"
+    DEST_NEW_AXIS: str = "new_axis"
+    DEST_NEW_FIGURE: str = "new_figure"
+
+    @classmethod
+    def destination_param(
+        cls,
+        *,
+        name: str = "destination",
+        label: str = "Draw on:",
+        tooltip: str = "",
+        default: str | None = None,
+    ) -> Param:
+        """Return the declared destination choice, worded once.
+
+        Operations differ in *why* they default one way or another - a
+        derivative needs its own scale, a drawn function usually belongs
+        beside the data it is being compared with - so the default and the
+        tooltip are arguments, while the options themselves are not.
+        """
+        return ChoiceParam(
+            name,
+            label,
+            tooltip=tooltip,
+            choices=(
+                ("New axis in this figure", cls.DEST_NEW_AXIS),
+                ("Same axis as the source", cls.DEST_SAME_AXIS),
+                ("New figure", cls.DEST_NEW_FIGURE),
+            ),
+            default_value=default or cls.DEST_NEW_AXIS,
+        )
+
+    def resolve_destination_axis(
+        self,
+        selected_axis_id: int,
+        *,
+        chart_type: str,
+        title: str = "",
+        figure_name: str = "",
+        options: Mapping[str, Any] | None = None,
+        parameter: str = "destination",
+    ) -> int:
+        """Return the axis to draw on, honouring the declared destination.
+
+        Creates the axis or figure once and reuses it, so adjusting a
+        parameter repeatedly does not leave a trail of empty axes behind. The
+        ids are remembered on the dialog so ``discard_result_target`` can undo
+        them if Apply never happens.
+        """
+        destination = str(self.parameter_values().get(parameter, self.DEST_NEW_AXIS))
+        if destination == self.DEST_SAME_AXIS:
+            return selected_axis_id
+
+        if getattr(self, "_result_axis_id", None) is None:
+            if destination == self.DEST_NEW_FIGURE:
+                self._result_figure_id, self._result_axis_id = self.create_result_figure(
+                    name=figure_name or title or self.operation_label,
+                    chart_type=chart_type,
+                    title=title,
+                    options=options,
+                )
+            else:
+                self._result_figure_id = None
+                self._result_axis_id = self.create_result_axis(
+                    chart_type=chart_type,
+                    title=title,
+                    options=options,
+                )
+
+        # Falls back to the selected axis when creation failed: an
+        # operation that cannot make its own axis should still draw
+        # somewhere rather than raise on the way to the chart.
+        return (
+            int(self._result_axis_id)
+            if self._result_axis_id is not None
+            else selected_axis_id
+        )
+
+    def discard_result_target(self) -> None:
+        """Remove an axis or figure this dialog made, when Apply never ran.
+
+        A whole figure when that is what was made: deleting only its axis
+        would leave an empty chart tab behind, which is worse than the axis it
+        was meant to clean up.
+        """
+        if getattr(self, "_applied", False):
+            return
+
+        axis_id = getattr(self, "_result_axis_id", None)
+        figure_id = getattr(self, "_result_figure_id", None)
+        if axis_id is None and figure_id is None:
+            return
+
+        self._result_axis_id = None
+        self._result_figure_id = None
+        try:
+            if figure_id is not None:
+                self._repo.delete_figure(int(figure_id))
+                applogger.info("Discarded the unapplied figure %s.", figure_id)
+            elif axis_id is not None:
+                self._repo.delete_axis(int(axis_id))
+                applogger.info("Discarded the unapplied axis %s.", axis_id)
+        except Exception:
+            applogger.exception("Failed to discard the unapplied result target")
 
     def create_result_figure(
         self,

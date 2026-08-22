@@ -82,8 +82,13 @@ class SeriesFunctionDialog(SeriesOperationDialogBase):
     # requirements the base applies to selected series never come into play,
     # and the series picker has nothing to pick. The figure and axis rows stay:
     # a generated curve still has to be drawn somewhere.
+    # The whole Axis / Series page goes: there is no series to pick, and where
+    # the curve is drawn is asked for under Parameters instead, where the rest
+    # of the decisions are. The selector is still built and still answers
+    # selected_axis_id(), which is what "same axis" resolves to.
     INPUT_MINIMUM_POINTS = 0
     SHOWS_SERIES_SELECTOR = False
+    SHOWS_AXIS_SERIES_PAGE = False
 
     PARAMS = (
         FloatParam(
@@ -118,6 +123,14 @@ class SeriesFunctionDialog(SeriesOperationDialogBase):
             maximum=1_000_000,
             step=50,
         ),
+        SeriesOperationDialogBase.destination_param(
+            tooltip=(
+                "A drawn function is usually meant to be compared with the "
+                "data, so the same axis is the default here. A new axis or "
+                "figure keeps it separate when the scales do not match."
+            ),
+            default=SeriesOperationDialogBase.DEST_SAME_AXIS,
+        ),
         ChoiceParam(
             "spacing",
             "Spacing:",
@@ -149,6 +162,9 @@ class SeriesFunctionDialog(SeriesOperationDialogBase):
         self._parameter_form: QFormLayout | None = None
         self._scanner = FunctionScanner()
         self._selected_function: dict[str, Any] = {}
+        self._result_axis_id: int | None = None
+        self._result_figure_id: int | None = None
+        self._applied = False
 
         super().__init__(
             repo=repo,
@@ -247,18 +263,13 @@ class SeriesFunctionDialog(SeriesOperationDialogBase):
             self._function_tree.clear()
             catalog = self._scanner.catalog()
             for category, functions in catalog.items():
-                # Translated for display only: the payload under UserRole
-                # keeps the English name, which is the function's identity.
-                parent = QTreeWidgetItem([_(str(category)), ""])
+                parent = QTreeWidgetItem([category, ""])
                 # Categories are grouping only; making them selectable invites
                 # a click that silently does nothing.
                 parent.setFlags(parent.flags() & ~Qt.ItemFlag.ItemIsSelectable)
                 for payload in functions:
                     child = QTreeWidgetItem(
-                        [
-                            _(str(payload.get("name", ""))),
-                            _(str(payload.get("description", ""))),
-                        ]
+                        [str(payload.get("name", "")), str(payload.get("description", ""))]
                     )
                     child.setData(0, Qt.ItemDataRole.UserRole, payload)
                     parent.addChild(child)
@@ -428,6 +439,31 @@ class SeriesFunctionDialog(SeriesOperationDialogBase):
     # Results
     # ------------------------------------------------------------------
 
+    def resolve_target_axis_id(
+        self,
+        selected_axis_id: int,
+        results: Sequence[Any],
+    ) -> int:
+        """Draw where the destination setting says.
+
+        Defaults to the selected axis, unlike Calculus: a plotted function is
+        usually a reference curve meant to sit on top of the measurements, and
+        putting it somewhere else by default would defeat the point of drawing
+        it.
+        """
+        name = str(results[0].function_name) if results else "Function"
+        return self.resolve_destination_axis(
+            selected_axis_id,
+            chart_type="Scatter Plot",
+            title=name,
+            figure_name=name,
+            options={"grid": True, "linestyle": "-", "marker": ""},
+        )
+
+    def discard_operation_artifacts(self) -> None:
+        """Remove the axis or figure this dialog made, when Apply never ran."""
+        self.discard_result_target()
+
     def selected_series(self) -> list[Any]:
         """No source series: this operation generates one.
 
@@ -435,6 +471,12 @@ class SeriesFunctionDialog(SeriesOperationDialogBase):
         empty selection is the normal state here rather than an error.
         """
         return []
+
+    def apply(self) -> bool:
+        """Apply, and keep any axis or figure this dialog created."""
+        applied = super().apply()
+        self._applied = self._applied or applied
+        return applied
 
     def result_to_frame(self, result: FunctionResult) -> pd.DataFrame:
         return result.to_frame()

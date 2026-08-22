@@ -1,34 +1,15 @@
 py-chart-db TODO
 Ranked by priority. P0 = wrong results or blocked work, P3 = nice to have.
-Items marked [was:] came from the original list; the rest are from the
-codebase review. Ready-to-paste Claude commands are at the bottom.
-
-DONE so far: P0-1, P1-1, P1-2, P1-3, P1-4, P1-5, P1-6, N-1, N-2, and the
-localization and documentation items (P2-14, and §5.1/5.2/7.2/7.4 of
-docs/DEVELOPMENT.md).
-Completed entries are kept below, marked [DONE], with what was actually built
-and anything learned that changes a neighbouring item - deleting them loses
-the reason the next item is shaped the way it is.
 
 
 ================================================================
 P0 - BUGS: wrong output, or work that cannot proceed
 ================================================================
 
-P0-4  ChartPanel: picker errors
-      [was: "picker errors"]
-      See also P1-5: patches are deliberately unpickable, which is separate.
 
 P0-5  ChartPanel: selecting Axis:Kwargs while switching panels opens a modal
       [was: "when changing panel and Axis:Kwargs is selected, a modal window
       is shown!"]
-
-P0-6  query builder: snippets are inserted with no separator
-      _insert_snippet only prepends a newline when cursor.position() > 0, so
-      inserting at the start of a non-empty editor produces
-      `...b."<key>"SELECT * FROM "calibration"` - invalid SQL glued together.
-      The endswith("\n") test also inspects the whole document rather than
-      the text at the cursor, so mid-document inserts misjudge it too.
 
 P0-7  five actions name SVG files that no longer exist
       nav_data->data, import->import, query_builder/sql_select->query,
@@ -80,82 +61,45 @@ P1-1  [DONE] series operations: declarative parameter spec
 NEW - requested after the review
 ================================================================
 
-N-1   [DONE] series operation: control charts (JMP-style)
-      app/series_operations/control_chart_dialog.py. Individuals
-      (I-MR), moving range, X-bar & R, X-bar & S, with the Nelson run rules.
-      The one thing not to "simplify" later: sigma is estimated from
-      WITHIN-subgroup variation - average moving range over d2, or average
-      within-subgroup range/s - never from the standard deviation of all the
-      data. A process that drifted has a large overall SD *because* it
-      drifted, so limits built from it swallow the drift and the chart says
-      the process is fine. Measured on a +6 sigma shift: overall SD 3.12,
-      within-sigma 0.95, 38 signals. Using the overall SD would have given 0.
-      The SPC constants are tabulated, not computed - d2 and d3 have no
-      elementary form and every other tool uses the same table.
-      Violations carry every rule a point broke; the rule numbers are
-      historical, not a severity ranking, so reporting only the lowest hid
-      rule 7 behind rule 2.
-      NOT covered: attribute charts (p, np, c, u). They need counts and a
-      sample size per point rather than a measurement, so they want their own
-      role mapping - a separate piece of work, not a model to bolt on.
 
-N-2   [DONE] series operation: plot functions without fitting
-      app/series_operations/function_dialog.py. Same FunctionScanner
-      the fit dialog uses, so all 56 functions across 10 categories are
-      available and a class dropped into user_functions.py appears with no
-      registration. Range as from/to/points/spacing (linear or log), function
-      parameters in an editable table, no optimiser.
-      It reads no source series and generates one, so it overrides
-      selected_series() to return []; _run_operation resolves the target from
-      the selected axis, which is unaffected.
+N-4   3D / contour renderer, gridded and scattered
+      Two shapes of input, one renderer: values on a regular grid go straight
+      to contour/contourf, and scattered x/y/z has to be interpolated onto one
+      first (griddata, or a triangulation with tricontour - the triangulation
+      is honest about where there is no data, the grid is not). Deciding which
+      case is in front of you is the part worth getting right: a "grid" that
+      is only nearly regular must not be treated as one.
+      Pairs with the heatmap/imshow line under P2-1.
 
-N-2b  [DONE] Calculus: draw on a new axis by default
-      A derivative divides by dx and an integral accumulates, so neither
-      shares a scale with its source - overlaid, one of the two is a flat
-      line on the zero gridline. "Draw on a new axis" is on by default, with
-      a checkbox to overlay when the ranges happen to be comparable. The axis
-      is created once and reused, labelled dy/dx, d2y/dx2 or the integral
-      sign from the result rather than from the model name, and removed again
-      if the dialog closes without Apply.
-      Found while doing this: PARAMS labels and tooltips are class data, so
-      the _() sweep never saw them and 47 strings across the new operations
-      would have shipped in English with nothing failing. There is now a test
-      that discovers every operation's PARAMS rather than hand-listing them,
-      so the next operation is covered the day it is written. This closes the
-      gap left open under P2-14 for parameters; renderer/operation
-      Description attributes are still open.
+N-5   sqlite_repo: 3013 lines in one module
+      Split by subject rather than by size - connection and pragmas, tables
+      and import links, descriptors, saved queries, maintenance - and keep
+      SqliteRepo as the one class the application talks to, so no call site
+      changes. The dataclass with a mutable OrderedDict field and the series
+      cache belong with the connection, not with the descriptors.
 
-N-2c  [DONE] operation dialogs: figure locked, series hidden where unused,
-      and a new-figure destination
-      - The Figure combo is disabled in every operation. It was a live bug,
-        not just clutter: a dialog is constructed with one figure_id and
-        create_result_axis writes to it, so changing the combo listed one
-        figure's axes while the results went to another's. Disabled rather
-        than hidden - which figure is being operated on is worth seeing.
-      - Function hides the series list (SHOWS_SERIES_SELECTOR = False); it
-        generates a series rather than reading one. Figure and axis rows stay,
-        because a generated curve still has to be drawn somewhere.
-      - Calculus's new-axis checkbox became a three-way choice: new axis in
-        this figure (default), same axis, or new figure. create_result_figure
-        is on the base for any operation to use.
-      Found while doing this: _open_series_operation reloaded the panel but
-      never the tabs, so a figure created by an operation stayed invisible
-      until restart.
+N-6   icons: finish the SFSymbol / Segoe Fluent migration
+      This is P0-7 plus the rest of it: seven of the failing tests are the
+      same cause. Actions naming SVGs that were deleted, win11/macOs icons
+      with no common fallback, and icon files nothing asks for any more.
 
-N-1b  [DONE] control charts: draw the centre line, limits and zones
-      Four checkboxes in the parameters - centre line, control limits, the one
-      and two sigma lines, and highlighting the flagged points. Limits and
-      centre default on: without them the chart is a run chart, which shows
-      the same numbers and answers a different question.
-      Needed a base change: result_series_specs() (plural) alongside the
-      existing singular hook, defaulting to one so nothing else moved. Both
-      preview and apply iterate it, so a line is previewed, cleaned up and
-      applied on exactly the same path as the data.
-      All the lines are columns of the one result table and every series is a
-      plain "SELECT x, <column> AS y", so the renderer needs no special case
-      and switching a line on later is a descriptor change, not a
-      recomputation. The flagged points get a violation_y column that is NULL
-      elsewhere, so they draw alone without a second table.
+N-7   ChartPanel: annotation dialog from the context menu ("Create annotation")
+      The axis already stores options["annotations"] and base.apply_annotation
+      already draws text, boxed text and arrows; what is missing is a way to
+      make one *where you clicked*, in data coordinates, instead of typing x
+      and y into the properties table.
+
+N-8   ChartPanel: "Add vertical line" / "Add horizontal line"
+      Same context menu, with a small dialog for the line style, persisted in
+      the axis options like the annotations are - so they survive a reload and
+      can be edited from the properties panel afterwards. A new options key
+      ("lines") drawn by the base renderer beside apply_annotations.
+
+N-9   documentation
+      docs/DEVELOPMENT.md is behind the renames, the fit rework and the new
+      startup path; and there is no user manual at all. The manual should be
+      one HTML file, built from the same catalogue the UI reads so the two
+      cannot drift.
 
 N-3   attribute control charts (p, np, c, u)
       The half of SPC N-1 does not cover. These plot a proportion or a count
@@ -223,7 +167,13 @@ P2-12 series operations: inline preview plot beside the numeric results
       legible with a small plot next to it.
 
 P2-13 style.py: read presentation straight from config.json
-      [was: "simplify style.py"]
+
+P2-14 [DONE] localization of the catalogues
+      Operation Names/Descriptions and the whole function library (57 names,
+      57 descriptions, 10 categories) are translated, and two tests walk the
+      scanners rather than a hand-written list so anything added later is
+      covered the day it is written. Renderer Category/Description are the
+      last block still in English.
 
 
 ================================================================
@@ -278,8 +228,6 @@ Requires ~/.local/bin on PATH:
 
 # --- P0, all still open ---
 
-claude "Fix P0-6 in todo.txt: _insert_snippet in app/dialogs/query_builder_dialog.py glues SQL together when inserting at position 0 of a non-empty editor. Separate the snippet from the text on both sides of the cursor, and test the text at the cursor rather than the whole document. Add a test."
-
 claude "Fix P0-7 in todo.txt: five actions in config.json name SVG files that were deleted. Either clear their icon fields for consistency with the rest of the SFSymbol/Fluent migration, or restore the SVGs as a fallback for platforms that are neither macOS nor Windows. Recommend which and explain the tradeoff before changing anything."
 
 claude "Fix P0-3 in todo.txt: the marker and line style pickers are never enabled. Find the root cause before changing anything, and tell me what it was."
@@ -308,4 +256,8 @@ claude "Fix P2-6 and P2-7 in todo.txt: the table list and table preview widgets 
 
 claude "Implement P2-9 in todo.txt: split config.json into user settings and application config. Per-session window geometry currently dirties the working tree on every run; that half should not be tracked in git."
 
-claude "Finish the localization gap noted under P2-14: renderer and operation Description attributes are class data, so the _() sweep cannot see them. Name them in test_labels_held_in_tables_are_translated_too the way the settings dialog tables already are, and translate them."
+claude "Implement N-4 in todo.txt: a contour renderer for gridded and scattered data. Read app/charts/base.py for the renderer contract and app/charts/histogram.py for a renderer that reads one role; the new part is deciding whether the input is on a grid."
+
+claude "Implement N-7 and N-8 in todo.txt: an annotation dialog and horizontal/vertical reference lines from the ChartPanel context menu, both persisted in the axis options. app/charts/base.py already draws options[\"annotations\"]; the lines want the same treatment."
+
+claude "Implement N-5 in todo.txt: split app/data/sqlite_repo.py by subject, keeping SqliteRepo as the single class every call site already uses."

@@ -628,10 +628,10 @@
   "last_database": "/Users/ebelland/Desktop/py-chart-db/Demo Project.dhub",
   "window_geometry": {
     "main_window": {
-      "x": 47,
-      "y": 126,
-      "width": 1397,
-      "height": 882,
+      "x": 280,
+      "y": 62,
+      "width": 1640,
+      "height": 959,
       "maximized": false
     },
     "SeriesInterpolateDialog": {
@@ -642,8 +642,8 @@
       "maximized": false
     },
     "SeriesClusterDialog": {
-      "x": 434,
-      "y": 329,
+      "x": 322,
+      "y": 292,
       "width": 760,
       "height": 680,
       "maximized": false
@@ -663,8 +663,8 @@
       "maximized": false
     },
     "SeriesFitDialog": {
-      "x": 624,
-      "y": 327,
+      "x": 517,
+      "y": 172,
       "width": 882,
       "height": 632,
       "maximized": false
@@ -685,42 +685,42 @@
     },
     "SeriesOutlierDialog": {
       "x": 202,
-      "y": 271,
+      "y": 367,
       "width": 731,
       "height": 640,
       "maximized": false
     },
     "query_builder_dialog": {
-      "x": 166,
-      "y": 297,
-      "width": 977,
-      "height": 598,
+      "x": 401,
+      "y": 199,
+      "width": 766,
+      "height": 492,
       "maximized": false
     },
     "SeriesCalculusDialog": {
-      "x": 918,
-      "y": 214,
+      "x": 886,
+      "y": 254,
       "width": 760,
       "height": 640,
       "maximized": false
     },
     "SeriesPeaksDialog": {
-      "x": 345,
-      "y": 399,
+      "x": 257,
+      "y": 210,
       "width": 780,
       "height": 640,
       "maximized": false
     },
     "SeriesFunctionDialog": {
-      "x": 208,
-      "y": 258,
+      "x": 918,
+      "y": 193,
       "width": 820,
       "height": 680,
       "maximized": false
     },
     "SeriesControlChartDialog": {
-      "x": 215,
-      "y": 138,
+      "x": 293,
+      "y": 62,
       "width": 800,
       "height": 660,
       "maximized": false
@@ -729,11 +729,11 @@
   "main_window_splitters": {
     "main": [
       436,
-      955
+      1198
     ],
     "data_page": [
-      282,
-      566
+      308,
+      617
     ]
   },
   "dialog_state": {
@@ -861,7 +861,7 @@
       "multi_tie_eta": false,
       "multi_apply_btn": false,
       "spin_params": 4,
-      "output_table_edit": "_Fit_Selected_series_y_Linear",
+      "output_table_edit": "_Fit_Selected_series_y_Custom",
       "max_nfev_edit": "8000",
       "weighted_check": false,
       "btn_use_fit_params": false,
@@ -904,14 +904,16 @@
     },
     "query_builder_dialog": {
       "splitter": [
-        600,
-        346
+        300,
+        435
       ],
-      "table_combo": "calibration",
-      "editor": "SELECT a.*, b.*\nFROM \"calibration\" AS a\nLEFT JOIN \"<other_table>\" AS b\n  ON a.\"<key>\" = b.\"<key>\"SELECT * FROM \"calibration\""
+      "query_combo": "batch_d_only",
+      "table_combo": "_Fit_Series_y_Saturating_exp",
+      "field_combo": "ppm",
+      "editor": "SELECT yield_pct FROM batch_yields WHERE batch = 'D'"
     },
     "SeriesCalculusDialog": {
-      "model_combo": "Derivative (spline)",
+      "model_combo": "Derivative (Savitzky-Golay)",
       "preview_button": false,
       "copy_html_button": false,
       "apply_button": false,
@@ -932,7 +934,7 @@
       "close_button": false
     },
     "SeriesControlChartDialog": {
-      "model_combo": "X-bar and R",
+      "model_combo": "Individuals (I-MR)",
       "preview_button": false,
       "copy_html_button": false,
       "apply_button": false,
@@ -950,5 +952,8 @@
   },
   "app_style": "automatic",
   "language": "it",
-  "save_format": "PNG"
+  "save_format": "PNG",
+  "table_list": {
+    "show_generated": true
+  }
 }
