@@ -40,7 +40,6 @@ from app.charts.render_figure import (
     GRID_AXES,
     GRID_WHICH,
     SUPPORTED_AXIS_SCALES,
-    TICK_DIRECTIONS,
 )
 from app.styles.style import (
     MARGIN_PANEL,
@@ -72,7 +71,6 @@ AXIS_SCALES: Final[tuple[str, ...]] = SUPPORTED_AXIS_SCALES
 GRID_WHICH_CHOICES: Final[tuple[str, ...]] = GRID_WHICH
 GRID_AXIS_CHOICES: Final[tuple[str, ...]] = GRID_AXES
 # The empty entry means "leave the Matplotlib default alone".
-TICK_DIRECTION_CHOICES: Final[tuple[str, ...]] = ("",) + TICK_DIRECTIONS
 
 def _plain_options(value: object) -> dict[str, Any]:
     """Return a copy of a descriptor/options mapping with strict typing."""
@@ -416,11 +414,6 @@ class AxisPropertiesWidget(QWidget):
             section, axis_options.TICK_CHOICES
         )
 
-        self._tick_direction_combo = QComboBox(section)
-        self._configure_combo_width(self._tick_direction_combo, minimum_contents_length=10)
-        for value in TICK_DIRECTION_CHOICES:
-            self._tick_direction_combo.addItem(value or "(default)", value)
-
         self._tick_length_spin = QDoubleSpinBox(section)
         stdSizeAndlayout(self._tick_length_spin)
         self._tick_length_spin.setRange(0.0, 50.0)
@@ -451,7 +444,6 @@ class AxisPropertiesWidget(QWidget):
 
         form.addRow(_("Grid"), self._build_setting_grid(section, self._grid_combos))
         form.addRow(_("Ticks"), self._build_setting_grid(section, self._tick_combos))
-        form.addRow(_("Tick direction"), self._tick_direction_combo)
         form.addRow(_("Tick length"), self._tick_length_spin)
         form.addRow(_("X tick rotation"), self._x_tick_rotation_spin)
         form.addRow(_("Hide spines"), spine_row)
@@ -565,7 +557,6 @@ class AxisPropertiesWidget(QWidget):
             self._linthresh_spin,
             self._invert_x_check,
             self._invert_y_check,
-            self._tick_direction_combo,
             self._tick_length_spin,
             self._x_tick_rotation_spin,
             self._hide_spine_top_check,
@@ -636,9 +627,6 @@ class AxisPropertiesWidget(QWidget):
             spin.setValue(spin.minimum() if value is None else value)
         self._update_limit_control_state()
 
-        self._select_combo_value(
-            self._tick_direction_combo, options.get("tick_direction", ""), ""
-        )
         self._tick_length_spin.setValue(self._float_option(options, "tick_length", 0.0))
         self._x_tick_rotation_spin.setValue(
             self._float_option(options, "x_tick_rotation", 0.0)
@@ -694,7 +682,6 @@ class AxisPropertiesWidget(QWidget):
             ),
             "invert_x": bool(self._invert_x_check.isChecked()),
             "invert_y": bool(self._invert_y_check.isChecked()),
-            "tick_direction": str(self._tick_direction_combo.currentData() or ""),
             "tick_length": tick_length if tick_length > 0.0 else None,
             "x_tick_rotation": float(self._x_tick_rotation_spin.value()),
         }

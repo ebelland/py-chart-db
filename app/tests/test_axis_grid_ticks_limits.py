@@ -342,6 +342,35 @@ def test_the_stale_legacy_keys_are_rewritten_on_save(widget) -> None:
     assert payload["grid"] is False
 
 
+def test_the_old_tick_direction_combo_is_gone(widget) -> None:
+    """It said the same thing as the four tick controls, less precisely.
+
+    Its value is still read from figures that carry it - see
+    test_an_old_tick_direction_still_applies_to_both_axes - but as the
+    starting value of those four, not as a fifth control that would override
+    them.
+    """
+    assert not hasattr(widget, "_tick_direction_combo")
+
+
+def test_an_old_direction_arrives_in_the_four_tick_controls(widget) -> None:
+    widget._load_extended_axis_options({"tick_direction": "out", "minor_ticks": True})
+
+    assert widget._tick_combos[("x", "major")].currentData() == "out"
+    assert widget._tick_combos[("y", "minor")].currentData() == "out"
+
+
+def test_saving_writes_the_direction_where_the_renderer_now_reads_it(widget) -> None:
+    """Once saved, the four keys carry it and the old one cannot contradict
+    them: axis_options prefers the explicit setting."""
+    widget._load_extended_axis_options({"tick_direction": "in"})
+
+    payload = widget._extended_axis_options_payload()
+
+    assert payload[axis_options.tick_key("x", "major")] == "in"
+    assert "tick_direction" not in payload
+
+
 def test_the_limit_boxes_follow_the_mode(widget) -> None:
     """A box that does nothing in the chosen mode is a box that lies.
 
