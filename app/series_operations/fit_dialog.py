@@ -1063,12 +1063,17 @@ class SeriesFitDialog(SeriesOperationDialogBase):
         function_class = self._selected_function_class()
         if function_class is None:
             return False
+        # Checked before asking for the data, not caught after: with nothing
+        # selected _selected_series_row shows an error box, and a model click
+        # - or simply opening the dialog on an empty figure - must not put a
+        # box in front of someone who has not asked for anything yet.
+        if not self.selected_series():
+            return False
         try:
             x_data, target_data, _clean = self._load_fit_data()
         except Exception:
-            # No series selected yet, or a query that does not run. The
-            # declared defaults stay and nothing is reported: the user has not
-            # asked for anything yet.
+            # A query that does not run, or a series with no numeric columns.
+            # The declared defaults stay, and nothing is reported.
             return False
         if x_data is None or target_data is None:
             return False

@@ -706,16 +706,16 @@
     },
     "SeriesPeaksDialog": {
       "x": 257,
-      "y": 210,
+      "y": 306,
       "width": 780,
       "height": 640,
       "maximized": false
     },
     "SeriesFunctionDialog": {
-      "x": 918,
-      "y": 193,
-      "width": 820,
-      "height": 680,
+      "x": 996,
+      "y": 100,
+      "width": 890,
+      "height": 770,
       "maximized": false
     },
     "SeriesControlChartDialog": {

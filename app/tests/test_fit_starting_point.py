@@ -422,3 +422,78 @@ def test_only_the_least_squares_family_takes_a_loss() -> None:
     with_loss = {o.key for o in OPTIMIZERS if o.supports_loss}
 
     assert with_loss == {"trf", "dogbox"}
+
+
+# ======================================================================
+# The library has to be loadable the way the scanner loads it
+# ======================================================================
+def test_every_function_module_loads_the_way_the_scanner_loads_it() -> None:
+    """The failure this catches empties the fit dialog and says nothing.
+
+    ``FunctionScanner`` loads each file in app/functions by *path*, under a
+    synthetic module name, with nothing added to sys.path. So an import
+    written as ``from functions_base_class import ...`` - a bare module name
+    that resolves only when app/functions happens to be the working directory
+    - raises ModuleNotFoundError inside the loader. Every class in the file
+    then fails to load, the catalogue comes back empty, and the model tree
+    appears with nothing in it: no traceback, no message, no clue.
+    """
+    import importlib.util
+    import sys
+    from pathlib import Path
+
+    functions_dir = Path(__file__).resolve().parent.parent / "functions"
+    failures: list[str] = []
+
+    for path in sorted(functions_dir.glob("*.py")):
+        if path.name.startswith("__"):
+            continue
+        module_name = f"_probe_{path.stem}"
+        spec = importlib.util.spec_from_file_location(module_name, path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        # Registered before exec, exactly as class_discovery._load_class does:
+        # a dataclass resolves its annotations through sys.modules, so a module
+        # missing from it fails on something unrelated to the import under test.
+        sys.modules[module_name] = module
+        try:
+            spec.loader.exec_module(module)
+        except Exception as exc:  # noqa: BLE001
+            failures.append(f"{path.name}: {type(exc).__name__}: {exc}")
+        finally:
+            sys.modules.pop(module_name, None)
+
+    assert failures == []
+
+
+def test_the_catalogue_holds_the_whole_library() -> None:
+    """Empty and nearly-empty look the same in a collapsed tree."""
+    from app.scanners.functions_scanner import FunctionScanner
+
+    catalog = FunctionScanner().catalog()
+    total = sum(len(payloads) for payloads in catalog.values())
+
+    assert len(catalog) >= 10, "a category is missing entirely"
+    assert total >= 50, f"only {total} functions were discovered"
+
+
+def test_every_discovered_function_evaluates() -> None:
+    """A class that loads but cannot be called is a model that fails on Fit."""
+    from app.scanners.functions_scanner import FunctionScanner
+
+    scanner = FunctionScanner()
+    broken: list[str] = []
+
+    for payloads in scanner.catalog().values():
+        for payload in payloads:
+            model = scanner.make_model(payload)
+            p0 = np.asarray(payload.get("p0") or [1.0], dtype=float)
+            try:
+                values = np.asarray(model(X, p0), dtype=float)
+            except Exception as exc:  # noqa: BLE001
+                broken.append(f"{payload['name']}: {type(exc).__name__}: {exc}")
+                continue
+            if values.shape != X.shape:
+                broken.append(f"{payload['name']}: returned {values.shape}, not {X.shape}")
+
+    assert broken == []
