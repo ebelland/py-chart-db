@@ -20,6 +20,17 @@ from app.dialogs.query_builder_dialog import QueryBuilderDialog
 
 @pytest.fixture
 def repo(tmp_db_path: Path) -> SqliteRepo:
+    # From nothing, every time. The test database is a file in the artifacts
+    # directory and survives the run, so a leftover saved query from an
+    # earlier one would be in the list this test counts - which is the kind of
+    # failure that appears only in a full run and never on its own.
+    for path in (
+        tmp_db_path,
+        tmp_db_path.with_suffix(".dhub-wal"),
+        tmp_db_path.with_suffix(".dhub-shm"),
+    ):
+        path.unlink(missing_ok=True)
+
     repo = SqliteRepo(db_path=tmp_db_path)
     repo.query_df("DROP TABLE IF EXISTS batch_yields")
     repo.query_df("DROP TABLE IF EXISTS batch_notes")

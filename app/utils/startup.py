@@ -16,17 +16,18 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QFileDialog, QWidget
 
-from app.data.demo_project import build_demo_project
+from app.data.demo_project import DEMO_PROJECTS, build_demo_projects
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
 from app.utils.config import get_last_database
 from app.utils.i18n import _
 from app.utils.messages import ask, show_message
 
-#: Where a first run writes the demo project.  The home directory, and one
-#: file rather than a folder: startup is the wrong moment to invent a
-#: directory layout in someone's home.
-DEMO_PROJECT_NAME: str = "Data Hub Demo Project.dhub"
+#: Where a first run writes the demo projects.  One folder in the home
+#: directory, because the demo is a *set* now - one file per subject, each
+#: named for what it shows - and ten loose .dhub files in someone's home is
+#: not a gift.
+DEMO_FOLDER_NAME: str = "Data Hub demo projects"
 
 #: The open dialog's filter.  ``.dhub`` first so the file the user is looking
 #: for is the one they see.
@@ -91,21 +92,28 @@ def _offer_the_demo_project(parent: QWidget | None) -> Path | None:
 
     An empty database is a legitimate way to start and a terrible way to be
     introduced: every panel is empty, and nothing in an empty window says what
-    the application is *for*.  The demo is a real project built through the
-    same repository the app uses - tables, saved queries and eight figures -
-    so the first window has something in it to take apart.
+    the application is *for*.  The demo is a set of real projects built through
+    the same repository the app uses, one per subject and each named for what
+    it shows.
+
+    The complete one is what opens; the rest sit beside it in the folder,
+    which is what makes them findable - and they can be dropped straight onto
+    the window.
     """
     if not ask(parent, "startup.offer_demo"):
         return None
 
-    target = Path.home() / DEMO_PROJECT_NAME
-    applogger.info("Building the demo project at %s", target)
+    target = Path.home() / DEMO_FOLDER_NAME
+    applogger.info("Building %d demo projects in %s", len(DEMO_PROJECTS), target)
     try:
-        return build_demo_project(target)
+        written = build_demo_projects(target)
     except Exception as exc:  # noqa: BLE001
-        applogger.exception("Could not build the demo project: %s", exc)
+        applogger.exception("Could not build the demo projects: %s", exc)
         show_message(parent, "startup.demo_failed", error=exc)
         return None
+
+    # The complete project first: see DEMO_PROJECTS.
+    return written[0] if written else None
 
 
 def _ask_for_a_database(parent: QWidget | None) -> Path | None:

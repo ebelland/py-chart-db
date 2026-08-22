@@ -19,6 +19,7 @@ random noise shows the chart types without showing what they are *for*.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -71,7 +72,12 @@ class SeriesSpec:
 
 @dataclass(slots=True)
 class FigureSpec:
-    """One demo figure: a title, a chart type, and its series."""
+    """One demo figure: a title, a chart type, and its series.
+
+    ``key`` names it for a demo project's figure list, and ``tables`` says
+    what it reads - which is what lets a single-subject demo file carry only
+    the tables its own charts need instead of all six.
+    """
 
     name: str
     chart_type: str
@@ -80,6 +86,9 @@ class FigureSpec:
     y_label: str
     series: list[SeriesSpec]
     axis_options: dict[str, Any]
+    key: str = ""
+    tables: tuple[str, ...] = ()
+    queries: tuple[str, ...] = ()
 
 
 # ----------------------------------------------------------------------
@@ -191,6 +200,45 @@ def _scatter_cloud(rng: np.random.Generator, count: int = 2500) -> pd.DataFrame:
 # ----------------------------------------------------------------------
 # Figures
 # ----------------------------------------------------------------------
+def _process_run(rng: np.random.Generator, count: int = 120) -> pd.DataFrame:
+    """A measured process that shifts part-way through.
+
+    Shaped for the Control Chart operation, and shifted on purpose: limits
+    built from the *overall* spread would be wide enough to contain the shift
+    and would declare the process fine, which is the mistake the operation
+    exists to avoid. A demo that only shows a stable process cannot show that.
+    """
+    values = rng.normal(50.0, 1.0, count)
+    values[80:] += 2.5
+
+    return pd.DataFrame(
+        {
+            "sample": np.arange(1, count + 1, dtype=int),
+            "measurement": values,
+        }
+    )
+
+
+def _peak_scan(rng: np.random.Generator, points: int = 240) -> pd.DataFrame:
+    """One peak on a sloping baseline, with noise.
+
+    Shaped for the Fit operation: a Gaussian sitting at x=8.2 rather than at
+    the origin, because that is where a starting point read off the data earns
+    its keep - the declared default puts the curve where there is no signal at
+    all and a local optimiser has no gradient to follow.
+    """
+    x = np.linspace(0.0, 20.0, points)
+    peak = 5.2 * np.exp(-((x - 8.2) ** 2) / (2.0 * 0.9**2))
+    baseline = 1.4 + 0.06 * x
+
+    return pd.DataFrame(
+        {
+            "wavelength_nm": x,
+            "intensity": peak + baseline + rng.normal(0.0, 0.05, points),
+        }
+    )
+
+
 def _figure_specs() -> list[FigureSpec]:
     """Return every demo figure, in the order they appear as tabs."""
     line = {"linestyle": "-", "marker": "", "show_in_legend": True}
@@ -198,6 +246,9 @@ def _figure_specs() -> list[FigureSpec]:
     return [
         FigureSpec(
             name="1 · Sensor network",
+            key="sensors",
+            tables=('sensor_readings',),
+            queries=(),
             chart_type="Time Series",
             title="Hourly temperature by sensor",
             x_label="hours since start",
@@ -227,6 +278,9 @@ def _figure_specs() -> list[FigureSpec]:
         ),
         FigureSpec(
             name="2 · Calibration",
+            key="calibration",
+            tables=('calibration',),
+            queries=(),
             chart_type="Scatter Plot",
             title="Calibration curve with measurement uncertainty",
             x_label="applied (units)",
@@ -247,6 +301,9 @@ def _figure_specs() -> list[FigureSpec]:
         ),
         FigureSpec(
             name="3 · Process spread",
+            key="spread",
+            tables=('batch_yields',),
+            queries=(),
             chart_type="Violin Plot",
             title="Yield distribution per batch",
             x_label="batch",
@@ -273,6 +330,9 @@ def _figure_specs() -> list[FigureSpec]:
         ),
         FigureSpec(
             name="4 · Process summary",
+            key="summary",
+            tables=('batch_yields',),
+            queries=(),
             chart_type="Box Plot",
             title="Yield summary per batch",
             x_label="batch",
@@ -293,6 +353,9 @@ def _figure_specs() -> list[FigureSpec]:
         ),
         FigureSpec(
             name="5 · Particle sizes",
+            key="particles",
+            tables=('particles',),
+            queries=(),
             chart_type="Histogram",
             title="Particle diameter by population",
             x_label="diameter (µm)",
@@ -309,6 +372,9 @@ def _figure_specs() -> list[FigureSpec]:
         ),
         FigureSpec(
             name="6 · Throughput",
+            key="throughput",
+            tables=('throughput',),
+            queries=(),
             chart_type="Bar Chart",
             title="Monthly throughput",
             x_label="month",
@@ -328,6 +394,9 @@ def _figure_specs() -> list[FigureSpec]:
         ),
         FigureSpec(
             name="7 · Operating envelope",
+            key="envelope",
+            tables=('operating_points',),
+            queries=(),
             chart_type="Scatter Plot",
             title="Flow against pressure, coloured by energy",
             x_label="pressure (bar)",
@@ -347,6 +416,9 @@ def _figure_specs() -> list[FigureSpec]:
         ),
         FigureSpec(
             name="8 · Saved query",
+            key="saved_query",
+            tables=('sensor_readings',),
+            queries=('daily_mean_temperature',),
             chart_type="Time Series",
             title="Daily mean temperature (from a saved query)",
             x_label="day",
@@ -354,14 +426,174 @@ def _figure_specs() -> list[FigureSpec]:
             axis_options={"grid": True},
             series=[],  # filled in from the saved query, see build_demo_project
         ),
+        FigureSpec(
+            name="9 · Process run",
+            key="process_run",
+            tables=("process_run",),
+            queries=(),
+            chart_type="Scatter Plot",
+            title="Measurements ready for a control chart",
+            x_label="sample",
+            y_label="measurement",
+            axis_options={"grid": True},
+            series=[
+                SeriesSpec(
+                    name="Run",
+                    sql=(
+                        "SELECT sample AS x, measurement AS y FROM process_run "
+                        "ORDER BY sample"
+                    ),
+                    roles={"x": "x", "y": "y"},
+                    style={"marker": "o", "linestyle": "-", "markersize": 4.0},
+                ),
+            ],
+        ),
+        FigureSpec(
+            name="10 · Peak scan",
+            key="peak_scan",
+            tables=("peak_scan",),
+            queries=(),
+            chart_type="Scatter Plot",
+            title="A peak ready to fit",
+            x_label="wavelength (nm)",
+            y_label="intensity",
+            axis_options={"grid": True},
+            series=[
+                SeriesSpec(
+                    name="Scan",
+                    sql=(
+                        "SELECT wavelength_nm AS x, intensity AS y FROM peak_scan "
+                        "ORDER BY wavelength_nm"
+                    ),
+                    roles={"x": "x", "y": "y"},
+                    style={"marker": ".", "linestyle": "", "markersize": 4.0},
+                ),
+            ],
+        ),
     ]
 
 
 # ----------------------------------------------------------------------
 # Build
 # ----------------------------------------------------------------------
-def build_demo_project(db_path: Path) -> Path:
-    """Create the demo project and return the path actually written."""
+#: Table name -> the function that makes it.  A demo file writes only the
+#: tables its own figures read, which is what keeps a single-subject demo
+#: small enough to open and understand.
+TABLE_BUILDERS: dict[str, Any] = {
+    "sensor_readings": _sensor_network,
+    "calibration": _calibration,
+    "batch_yields": _batches,
+    "throughput": _throughput,
+    "particles": _particles,
+    "operating_points": _scatter_cloud,
+    "process_run": _process_run,
+    "peak_scan": _peak_scan,
+}
+
+#: Saved query name -> its SQL, and the table it reads.
+QUERY_SOURCES: dict[str, tuple[str, str]] = {
+    "daily_mean_temperature": (
+        "SELECT CAST(hour / 24 AS INTEGER) AS day, AVG(temperature) AS mean_c "
+        "FROM sensor_readings GROUP BY day ORDER BY day",
+        "sensor_readings",
+    ),
+    "roof_sensor": (
+        "SELECT hour, temperature FROM sensor_readings WHERE sensor = 'roof'",
+        "sensor_readings",
+    ),
+}
+
+
+@dataclass(frozen=True, slots=True)
+class DemoProject:
+    """One demo file: what it is called, and what it contains.
+
+    The file name is the documentation.  Someone with eight .dhub files in a
+    folder should be able to open the one that answers their question without
+    opening the other seven, which means the name has to say both the subject
+    and what it demonstrates.
+    """
+
+    file_name: str
+    summary: str
+    figures: tuple[str, ...]
+
+    @property
+    def path_name(self) -> str:
+        """Return the file name with its extension."""
+        return f"{self.file_name}.dhub"
+
+
+#: The demo set.  The first is the complete project - every chart type over
+#: every table - and the rest are one subject each.
+DEMO_PROJECTS: tuple[DemoProject, ...] = (
+    DemoProject(
+        "Getting started - a bit of everything",
+        "Every chart type in the set, over six tables and two saved queries.",
+        (),
+    ),
+    DemoProject(
+        "Sensor network - time series with a gap",
+        "Three sensors sampled hourly. One loses power, and the chart draws "
+        "the outage as a gap rather than a line through it.",
+        ("sensors",),
+    ),
+    DemoProject(
+        "Calibration - error bars on both axes",
+        "A calibration run with uncertainty in what was applied and in what "
+        "was measured.",
+        ("calibration",),
+    ),
+    DemoProject(
+        "Batch yields - distributions compared",
+        "The same four batches as a violin plot and as a box plot: one shows "
+        "the shape, the other the summary, and batch D is why that matters.",
+        ("spread", "summary"),
+    ),
+    DemoProject(
+        "Particle sizes - histogram of two populations",
+        "Two overlapping populations in one histogram.",
+        ("particles",),
+    ),
+    DemoProject(
+        "Throughput - bar chart with error bars",
+        "Monthly throughput per line, with the spread on each bar.",
+        ("throughput",),
+    ),
+    DemoProject(
+        "Operating points - scatter coloured by a third variable",
+        "Flow against pressure, with energy as colour and weight as marker "
+        "size: four variables on two axes.",
+        ("envelope",),
+    ),
+    DemoProject(
+        "Saved query - a chart built on a query",
+        "A daily average that is computed on every read rather than stored, "
+        "so editing the query updates the chart.",
+        ("saved_query",),
+    ),
+    DemoProject(
+        "Process run - ready for a control chart",
+        "A process that shifts part-way through. Run Series operations, "
+        "Control Chart on the series to see the shift caught.",
+        ("process_run",),
+    ),
+    DemoProject(
+        "Peak scan - ready for the Fit operation",
+        "One Gaussian peak on a sloping baseline. Run Series operations, "
+        "Fit and pick Gaussian peak: the starting values come from the data.",
+        ("peak_scan",),
+    ),
+)
+
+
+def build_demo_project(db_path: Path, figures: Sequence[str] = ()) -> Path:
+    """Create a demo project and return the path actually written.
+
+    ``figures`` selects by key; empty means every figure, which is the
+    complete project. Only the tables and saved queries those figures read are
+    written, so a single-subject file carries one table rather than six.
+    """
     rng = np.random.default_rng(SEED)
 
     db_path = SqliteRepo.ensure_dhub_extension(Path(db_path))
@@ -369,47 +601,57 @@ def build_demo_project(db_path: Path) -> Path:
     if db_path.exists():
         db_path.unlink()
 
+    specs = _figure_specs()
+    if figures:
+        wanted = tuple(figures)
+        specs = [spec for spec in specs if spec.key in wanted]
+
+    wanted_queries = {name for spec in specs for name in spec.queries}
+    wanted_tables = {name for spec in specs for name in spec.tables}
+    # A saved query needs its own source table even when no figure reads that
+    # table directly.
+    wanted_tables.update(
+        QUERY_SOURCES[name][1] for name in wanted_queries if name in QUERY_SOURCES
+    )
+
     repo = SqliteRepo(db_path=db_path)
 
     tables = {
-        "sensor_readings": _sensor_network(rng),
-        "calibration": _calibration(rng),
-        "batch_yields": _batches(rng),
-        "throughput": _throughput(rng),
-        "particles": _particles(rng),
-        "operating_points": _scatter_cloud(rng),
+        name: builder(rng)
+        for name, builder in TABLE_BUILDERS.items()
+        if name in wanted_tables
     }
     for name, frame in tables.items():
         repo.import_dataframe(frame, table_name=name, normalize_columns=False)
         applogger.info("Demo: wrote table %s (%d rows)", name, len(frame))
 
     # Saved queries: one aggregate that would be tedious to rebuild by hand,
-    # and one filter, to show both uses.
-    repo.save_query(
-        "daily_mean_temperature",
-        "SELECT CAST(hour / 24 AS INTEGER) AS day, AVG(temperature) AS mean_c "
-        "FROM sensor_readings GROUP BY day ORDER BY day",
-    )
-    repo.save_query(
-        "roof_sensor",
-        "SELECT hour, temperature FROM sensor_readings WHERE sensor = 'roof'",
-    )
-
-    specs = _figure_specs()
+    # and one filter, to show both uses. The complete project gets both; a
+    # single-subject file gets only what its own figures read, because a query
+    # nothing charts is a loose end in a file meant to be read.
+    for name, (sql, source_table) in QUERY_SOURCES.items():
+        if source_table not in wanted_tables:
+            continue
+        if figures and name not in wanted_queries:
+            continue
+        repo.save_query(name, sql)
 
     # The saved-query figure is built from the source itself, which is exactly
     # what the chart dialog does: the subquery is inlined so the series stays
     # self-contained.
-    query_source = repo.get_data_source("daily_mean_temperature")
-    if query_source is not None:
-        specs[-1].series = [
-            SeriesSpec(
-                name="Daily mean",
-                sql=f'SELECT "day" AS x, "mean_c" AS y FROM {query_source.from_clause()}',
-                roles={"x": "x", "y": "y"},
-                style={"linestyle": "-", "marker": "o", "show_rolling": False},
-            )
-        ]
+    for spec in specs:
+        if spec.key != "saved_query":
+            continue
+        query_source = repo.get_data_source("daily_mean_temperature")
+        if query_source is not None:
+            spec.series = [
+                SeriesSpec(
+                    name="Daily mean",
+                    sql=f'SELECT "day" AS x, "mean_c" AS y FROM {query_source.from_clause()}',
+                    roles={"x": "x", "y": "y"},
+                    style={"linestyle": "-", "marker": "o", "show_rolling": False},
+                )
+            ]
 
     for spec in specs:
         _create_figure(repo, spec)
@@ -418,6 +660,24 @@ def build_demo_project(db_path: Path) -> Path:
     applogger.info("Demo project check: %s", report.summary())
     repo.close()
     return db_path
+
+
+def build_demo_projects(directory: Path) -> list[Path]:
+    """Write the whole demo set into *directory*, complete project first.
+
+    Several files rather than one, each named for what it shows: a folder of
+    self-describing projects is browsable, and the one that answers today's
+    question can be opened without reading the other nine.
+    """
+    target = Path(directory)
+    target.mkdir(parents=True, exist_ok=True)
+
+    written: list[Path] = []
+    for demo in DEMO_PROJECTS:
+        path = build_demo_project(target / demo.path_name, demo.figures)
+        applogger.info("Demo: wrote %s - %s", path.name, demo.summary)
+        written.append(path)
+    return written
 
 
 def _create_figure(repo: SqliteRepo, spec: FigureSpec) -> int:
@@ -453,14 +713,24 @@ def _create_figure(repo: SqliteRepo, spec: FigureSpec) -> int:
 
 
 def main() -> None:
-    """Write the demo project to the requested path."""
+    """Write the demo project, or the whole set, to the requested path."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--output",
         default="Demo Project.dhub",
         help="Path of the .dhub file to create (overwritten if present).",
     )
+    parser.add_argument(
+        "--all",
+        metavar="DIRECTORY",
+        help="Write every demo project into DIRECTORY, one file per subject.",
+    )
     args = parser.parse_args()
+
+    if args.all:
+        for path in build_demo_projects(Path(args.all)):
+            print(f"Demo project written to {path}")
+        return
 
     written = build_demo_project(Path(args.output))
     print(f"Demo project written to {written}")

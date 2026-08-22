@@ -672,10 +672,10 @@
       "maximized": false
     },
     "SeriesFitDialog": {
-      "x": 517,
-      "y": 268,
-      "width": 882,
-      "height": 632,
+      "x": 519,
+      "y": 160,
+      "width": 957,
+      "height": 851,
       "maximized": false
     },
     "log_viewer": {
@@ -693,15 +693,15 @@
       "maximized": false
     },
     "SeriesOutlierDialog": {
-      "x": 202,
-      "y": 367,
+      "x": 454,
+      "y": 322,
       "width": 731,
       "height": 640,
       "maximized": false
     },
     "query_builder_dialog": {
-      "x": 401,
-      "y": 199,
+      "x": 459,
+      "y": 240,
       "width": 766,
       "height": 492,
       "maximized": false
@@ -737,8 +737,8 @@
   },
   "main_window_splitters": {
     "main": [
-      436,
-      1198
+      601,
+      1033
     ],
     "data_page": [
       308,
@@ -870,10 +870,10 @@
       "multi_tie_eta": false,
       "multi_apply_btn": false,
       "spin_params": 4,
-      "output_table_edit": "_Fit_Selected_series_y_Lineare",
+      "output_table_edit": "_Fit_Series_y_Cubica",
       "max_nfev_edit": "8000",
       "weighted_check": false,
-      "combo_optimizer": "Regione di fiducia (predefinito)",
+      "combo_optimizer": "Simplesso di Nelder-Mead",
       "combo_loss": "Minimi quadrati",
       "btn_estimate": false,
       "btn_use_fit_params": false,
@@ -919,10 +919,10 @@
         300,
         435
       ],
-      "query_combo": "batch_d_only",
+      "query_combo": "lampascione",
       "table_combo": "_Fit_Series_y_Saturating_exp",
       "field_combo": "ppm",
-      "editor": "SELECT yield_pct FROM batch_yields WHERE batch = 'D'"
+      "editor": "SELECT *\nFROM \"_Fit_Series_y_Saturating_exp\""
     },
     "SeriesCalculusDialog": {
       "model_combo": "Derivative (Savitzky-Golay)",
@@ -962,10 +962,10 @@
     "encoding": "auto",
     "sheet": "Sheet1"
   },
-  "app_style": "qt:Fusion",
-  "language": "it",
-  "save_format": "PNG",
+  "app_style": "automatic",
+  "language": "en",
+  "save_format": "SVG",
   "table_list": {
-    "show_generated": true
+    "show_generated": false
   }
 }

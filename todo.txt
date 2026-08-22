@@ -5,32 +5,101 @@ Ranked by priority. P0 = wrong results or blocked work, P3 = nice to have.
 ================================================================
 P0 - BUGS: wrong output, or work that cannot proceed
 ================================================================
+E01  table list: a saved query cannot be deleted
+     app/widgets/table_list.py, _delete_table: it calls repo.delete_table()
+     for every selected row, and a saved query is not a table - the DROP
+     matches nothing and the row is still there afterwards. The row already
+     knows which it is (ROLE_IS_QUERY, set in _fill_row) and the repository
+     already has delete_query(), so this is a branch on that flag plus the
+     right confirmation wording for a query.
+     Note: the same delete now exists in the query builder (beside New), so
+     the two should ask the same question - "charts built on it will stop
+     finding their data" - rather than inventing a second wording.
+
+E02  chart: click-to-annotate creates an annotation nothing can remove
+     app/widgets/chart_panel.py, _on_button_press. Ctrl + left click (which
+     is what Alt + click reaches on this Mac) appends an arrow annotation to
+     the axis options and reloads. The text is the fixed word "Annotation",
+     there is no way to edit it, and nothing deletes it from the chart - the
+     only way back is the annotations table in the axis properties.
+     REMOVE the handler for now. N-7 replaces it with a dialog that asks for
+     the text at the point clicked, and a half-feature that writes into the
+     descriptor is worse than none while that is pending.
+
+E03  Function operation: a control is left behind in the top-left corner
+     app/series_operations/function_dialog.py. A widget built for the dialog
+     but never added to a layout parents itself to the dialog and paints at
+     (0, 0) - the spectral dialog had exactly this with _results_table, which
+     is why that one is explicitly hidden. Look for a widget created in
+     init_operation_widgets that no build_* hook adds.
+
+E04  axes: ticks and grids do not behave
+     Needs pinning down before it can be fixed: which control, which chart
+     type, and what happens instead. Likely candidates are the tick options
+     in axis_properties reaching the renderer as strings, and grid_axis being
+     applied before the axis exists.
+
+E05  axis: manual limits
+     No UI for setting x/y limits by hand; autoscale is the only behaviour.
+
+E06  style pickers: an "auto" option that defers to rcParams
+     Line style and marker style should be able to say "whatever the style
+     sheet says" rather than forcing a concrete value. Default to it, so a
+     .mplstyle actually governs the look of a new series.
+
+E07  settings: drop the ChartPanel fit mode
+     It duplicates the chart panel's own context menu, which is where it is
+     actually used.
+
+E08  figure: width, height and dpi do not take effect
+
+E09  figure: manual spacing is never applied
+     Manual spacing and the four layout engines are both exposed (P3-1); the
+     manual numbers appear to be written and then overridden by whichever
+     engine is active. Check that choosing manual spacing disables the engine.
 
 
 P0-5  ChartPanel: selecting Axis:Kwargs while switching panels opens a modal
       [was: "when changing panel and Axis:Kwargs is selected, a modal window
       is shown!"]
 
-P0-7  five actions name SVG files that no longer exist
-      nav_data->data, import->import, query_builder/sql_select->query,
-      settings->settings, rcparam_reset->reload. All have SFSymbol and
-      SegoeFluent set, so macOS and Windows are fine; any third platform
-      falls through to _svg_icon_or_empty and renders blank.
-
 P0-8  renderers: confirm colorby works for every renderer
       [was: "check if colorby works for all renderers"]
 
-P0-9  properties: mplstyle picker does not show folders
-      [was: "mplstyle: load instead of dropdown list or folders are not
-      shown"]
+P0-9  properties: mplstyle picker: use a file browser.
 
-P0-10 global: locale must follow the platform locale
-      [was: "local must be set to current platform locale"]
+P0-10 global: locale must follow the platform locale. Add Auto to settings
+
+
 
 ================================================================
 NEW - requested after the review
 ================================================================
 
+
+N-10  [DONE] demo: one file per subject, ten of them
+      app/data/demo_project.py builds a set rather than a single project:
+      "Sensor network - time series with a gap", "Process run - ready for a
+      control chart", "Peak scan - ready for the Fit operation", and so on,
+      with "Getting started - a bit of everything" first. A file carries only
+      the tables its own figures read, so a one-subject demo has one table
+      instead of six. The first run writes the whole folder and opens the
+      complete one; the rest can be dropped onto the window.
+      Two datasets exist to be operated on rather than looked at: the process
+      run shifts by 2.5 sigma at sample 80 (a control chart demo of a stable
+      process demonstrates nothing), and the peak sits at x=8.2 rather than
+      at the origin, which is where a starting point read off the data earns
+      its keep.
+
+N-11  [DONE] credits dialog
+      app/dialogs/credits_dialog.py over app/utils/credits.py. The libraries
+      are read from requirements.txt and from the installed packages' own
+      metadata - a hand-kept list is wrong within a release, and this page is
+      a licence statement as much as a thank-you. Getting a licence out of
+      the metadata takes three tries in order: License-Expression, then the
+      OSI classifier, then the free-text field but only when it is short -
+      matplotlib, SciPy, pandas and scikit-image all put their entire licence
+      text in that field.
 
 N-4   3D / contour renderer, gridded and scattered
       Two shapes of input, one renderer: values on a regular grid go straight

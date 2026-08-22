@@ -77,15 +77,16 @@ def test_a_remembered_database_that_is_gone_is_recreated_empty(
     assert no_dialogs["browse"] == 0
 
 
-def test_a_first_run_is_offered_the_demo_project(
+def test_a_first_run_is_offered_the_demo_projects(
     no_dialogs, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    built = tmp_path / "demo.dhub"
+    """And the complete one is the one that opens."""
+    built = [tmp_path / "Getting started.dhub", tmp_path / "One subject.dhub"]
     monkeypatch.setattr(startup, "get_last_database", lambda: "")
     monkeypatch.setattr(startup, "ask", lambda *_a, **_k: True)
-    monkeypatch.setattr(startup, "build_demo_project", lambda _target: built)
+    monkeypatch.setattr(startup, "build_demo_projects", lambda _target: built)
 
-    assert startup.select_database() == built
+    assert startup.select_database() == built[0]
     assert no_dialogs["browse"] == 0, "the demo answered the question"
 
 
@@ -109,7 +110,7 @@ def test_a_demo_that_cannot_be_built_says_so_and_still_offers_the_dialog(
     def explode(_target):
         raise OSError("read-only volume")
 
-    monkeypatch.setattr(startup, "build_demo_project", explode)
+    monkeypatch.setattr(startup, "build_demo_projects", explode)
 
     assert startup.select_database() is None
     assert no_dialogs["message"] == ["startup.demo_failed"]
