@@ -159,6 +159,38 @@ def test_declared_operation_parameters_are_translated() -> None:
     )
 
 
+def test_the_function_library_is_translated() -> None:
+    """A function's name, category and description are class data too.
+
+    The fit dialog and the function dialog both build their tree from
+    ``FunctionScanner``, so these strings reach the user through ``tr(value)``
+    with no literal at the call site - invisible to the sweep above, exactly
+    like the operations' PARAMS. 57 functions in 10 categories would otherwise
+    be the largest block of English left in an Italian window.
+
+    Only the display is translated: the payload keeps the English name, which
+    is what a saved fit refers to. A catalogue whose identities changed with
+    the interface language would lose every fit saved in another one.
+    """
+    from app.scanners.functions_scanner import FunctionScanner
+
+    catalog = i18n._parse_po(PO_PATH)
+    missing: set[str] = set()
+
+    for category, payloads in FunctionScanner().catalog().items():
+        if category and str(category) not in catalog:
+            missing.add(str(category))
+        for payload in payloads:
+            for key in ("name", "description"):
+                text = str(payload.get(key) or "")
+                if text and text not in catalog:
+                    missing.add(text)
+
+    assert sorted(missing) == [], (
+        f"{len(missing)} function-library strings have no Italian"
+    )
+
+
 def test_the_catalogue_has_no_empty_translations() -> None:
     """An empty msgstr silently falls back, so it reads as untranslated."""
     catalog = i18n._parse_po(PO_PATH)

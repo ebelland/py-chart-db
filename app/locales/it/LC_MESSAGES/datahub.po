@@ -120,6 +120,10 @@ msgid "Additional kwargs editor can be inserted here by the host."
 msgstr "Un editor di kwargs aggiuntivo può essere inserito qui dall'host."
 
 
+msgid "Adsorption and surface"
+msgstr "Adsorbimento e superfici"
+
+
 msgid "Algorithm:"
 msgstr "Algoritmo:"
 
@@ -146,6 +150,10 @@ msgstr "Ipotesi alternativa per i test supportati."
 
 msgid "Alternative:"
 msgstr "Alternativa:"
+
+
+msgid "Analyse frequencies"
+msgstr "Analizza le frequenze"
 
 
 msgid "Anderson method:"
@@ -212,8 +220,28 @@ msgid "Apply the changes"
 msgstr "Applica le modifiche"
 
 
+msgid "Arctan sigmoid"
+msgstr "Sigmoide arcotangente"
+
+
+msgid "Arrhenius Kelvin"
+msgstr "Arrhenius in Kelvin"
+
+
+msgid "Arrhenius-type temperature dependence. X is temperature in Kelvin."
+msgstr "Dipendenza dalla temperatura di tipo Arrhenius. La X è la temperatura in Kelvin."
+
+
 msgid "As a fraction of the signal's full range. 0.1 keeps peaks standing at least a tenth of the range above their surroundings."
 msgstr "Come frazione dell'intervallo completo del segnale. 0,1 mantiene i picchi che si elevano almeno di un decimo dell'intervallo rispetto a ciò che li circonda."
+
+
+msgid "Asymmetric Gaussian"
+msgstr "Gaussiana asimmetrica"
+
+
+msgid "Asymmetric growth curve."
+msgstr "Curva di crescita asimmetrica."
 
 
 msgid "Auto"
@@ -260,12 +288,24 @@ msgid "Baseline:"
 msgstr "Linea di base:"
 
 
+msgid "Basic functions"
+msgstr "Funzioni di base"
+
+
 msgid "Batch size for Monte Carlo resampling. Auto lets SciPy choose."
 msgstr "Dimensione del lotto per il ricampionamento Monte Carlo. Auto lascia scegliere a SciPy."
 
 
 msgid "Best fit"
 msgstr "Fit migliore"
+
+
+msgid "Beta CDF scaled"
+msgstr "CDF beta scalata"
+
+
+msgid "Beta PDF scaled"
+msgstr "PDF beta scalata"
 
 
 msgid "Bottom"
@@ -290,6 +330,14 @@ msgstr "Costruisce un'espressione multipicco 1D. Modifica i parametri generati p
 
 msgid "Calculus"
 msgstr "Calcolo"
+
+
+msgid "Cauchy CDF"
+msgstr "CDF di Cauchy"
+
+
+msgid "Cauchy PDF"
+msgstr "PDF di Cauchy"
 
 
 msgid "Centre line"
@@ -432,8 +480,20 @@ msgid "Compute descriptive statistics, distributions, correlations, and summary 
 msgstr "Calcola statistiche descrittive, distribuzioni, correlazioni e metriche di sintesi."
 
 
+msgid "Compute metrics"
+msgstr "Calcola le metriche"
+
+
 msgid "Consecutive points averaged into each plotted subgroup. Rational subgrouping: choose it so variation within a subgroup is only common-cause noise."
 msgstr "Punti consecutivi mediati in ogni sottogruppo tracciato. Sottogruppi razionali: scegli la dimensione in modo che la variazione interna al sottogruppo sia solo rumore di causa comune."
+
+
+msgid "Constant"
+msgstr "Costante"
+
+
+msgid "Constant baseline."
+msgstr "Linea di base costante."
 
 
 msgid "Control Chart"
@@ -442,6 +502,14 @@ msgstr "Carta di controllo"
 
 msgid "Convert to decibels"
 msgstr "Converti in decibel"
+
+
+msgid "Convolution-like Gaussian/Lorentzian Voigt profile."
+msgstr "Profilo di Voigt, convoluzione di gaussiana e lorentziana."
+
+
+msgid "Cooperative saturation curve."
+msgstr "Curva di saturazione cooperativa."
 
 
 msgid "Copy"
@@ -470,6 +538,14 @@ msgstr "Matrice di correlazione"
 
 msgid "Correlation tests"
 msgstr "Test di correlazione"
+
+
+msgid "Cosine"
+msgstr "Coseno"
+
+
+msgid "Cosine oscillation."
+msgstr "Oscillazione cosinusoidale."
 
 
 msgid "Could not build the demo project:\n{error}"
@@ -548,6 +624,10 @@ msgid "Create new figure (new tab)"
 msgstr "Crea una nuova figura (nuova scheda)"
 
 
+msgid "Cubic"
+msgstr "Cubica"
+
+
 msgid "Curve"
 msgstr "Curva"
 
@@ -558,6 +638,10 @@ msgstr "Soglia di taglio per i criteri distance/inconsistent. Lascia auto per la
 
 msgid "DPI"
 msgstr "DPI"
+
+
+msgid "Damped sine"
+msgstr "Sinusoide smorzata"
 
 
 msgid "Damping (sigma):"
@@ -724,6 +808,10 @@ msgid "Detect and hide outliers in a series"
 msgstr "Rileva e nascondi gli outlier di una serie"
 
 
+msgid "Detect anomalies"
+msgstr "Rileva le anomalie"
+
+
 msgid "Detect outliers in the series."
 msgstr "Rileva gli outlier della serie."
 
@@ -734,6 +822,10 @@ msgstr "Rileva il numero di parametri dall’espressione"
 
 msgid "Detrend:"
 msgstr "Detrend:"
+
+
+msgid "Differentiate or integrate"
+msgstr "Deriva o integra"
 
 
 msgid "Direction"
@@ -754,6 +846,18 @@ msgstr "Documentazione:"
 
 msgid "Documentation"
 msgstr "Documentazione"
+
+
+msgid "Dose response power"
+msgstr "Risposta alla dose (legge di potenza)"
+
+
+msgid "Double exponential decay"
+msgstr "Decadimento biesponenziale"
+
+
+msgid "Double logistic pulse"
+msgstr "Impulso a doppia logistica"
 
 
 msgid "Down"
@@ -800,6 +904,10 @@ msgid "Edit the chart display settings"
 msgstr "Modifica le impostazioni di visualizzazione"
 
 
+msgid "Empirical adsorption isotherm."
+msgstr "Isoterma di adsorbimento empirica."
+
+
 msgid "Encoding"
 msgstr "Codifica"
 
@@ -814,6 +922,10 @@ msgstr "Garantisci la colonna ClusterId"
 
 msgid "Ensure Hide column"
 msgstr "Garantisci la colonna Hide"
+
+
+msgid "Error-function sigmoid"
+msgstr "Sigmoide con funzione errore"
 
 
 msgid "Estimate missing values and resample data using interpolation techniques."
@@ -832,6 +944,10 @@ msgid "Eval X:"
 msgstr "X di valutazione:"
 
 
+msgid "Example user-defined linear function. Edit or replace this class."
+msgstr "Esempio di funzione lineare definita dall'utente. Modificala o sostituisci la classe."
+
+
 msgid "Example: {\"a\": 1.0, \"b\": 0.1}"
 msgstr "Esempio: {\"a\": 1.0, \"b\": 0.1}"
 
@@ -842,6 +958,26 @@ msgstr "Escludi dai limiti i punti segnalati:"
 
 msgid "Explicit X values where Y is evaluated."
 msgstr "Valori X espliciti in cui viene valutata Y."
+
+
+msgid "Exponential decay"
+msgstr "Decadimento esponenziale"
+
+
+msgid "Exponential growth"
+msgstr "Crescita esponenziale"
+
+
+msgid "Exponential increase with offset."
+msgstr "Crescita esponenziale con offset."
+
+
+msgid "Exponential survival"
+msgstr "Sopravvivenza esponenziale"
+
+
+msgid "Exponentially damped sinusoid."
+msgstr "Sinusoide smorzata esponenzialmente."
 
 
 msgid "Export CSV"
@@ -928,6 +1064,10 @@ msgid "Figure:"
 msgstr "Figura:"
 
 
+msgid "Fill missing values"
+msgstr "Riempi i valori mancanti"
+
+
 msgid "Filter"
 msgstr "Filtra"
 
@@ -944,12 +1084,20 @@ msgid "Filter the model catalog by name."
 msgstr "Filtra il catalogo dei modelli per nome."
 
 
+msgid "Find and measure peaks"
+msgstr "Trova e misura i picchi"
+
+
 msgid "Find:"
 msgstr "Cerca:"
 
 
 msgid "First row is header"
 msgstr "La prima riga è l'intestazione"
+
+
+msgid "First-order approach to a plateau."
+msgstr "Avvicinamento del primo ordine a un plateau."
 
 
 msgid "Fit"
@@ -972,6 +1120,10 @@ msgid "Fit chart without keeping proportions"
 msgstr "Adatta il grafico senza mantenere le proporzioni"
 
 
+msgid "Fit data models"
+msgstr "Adatta modelli ai dati"
+
+
 msgid "Fit mathematical models to the selected data and compare their performance."
 msgstr "Adatta modelli matematici ai dati selezionati e confronta le loro prestazioni."
 
@@ -992,6 +1144,10 @@ msgid "Fit, keeping proportions"
 msgstr "Adatta mantenendo le proporzioni"
 
 
+msgid "Five-parameter logistic curve with asymmetry."
+msgstr "Curva logistica a cinque parametri con asimmetria."
+
+
 msgid "Fixed"
 msgstr "Fisso"
 
@@ -1008,6 +1164,10 @@ msgid "Flags runs, trends and other patterns that stay inside the limits - the s
 msgstr "Segnala sequenze, tendenze e altri andamenti che restano entro i limiti: i segnali che una carta basata solo sui limiti non vede."
 
 
+msgid "Flexible peak shape between Gaussian-like and Lorentzian-like profiles."
+msgstr "Forma di picco flessibile tra profili gaussiani e lorentziani."
+
+
 msgid "Fluent (Windows 11)"
 msgstr "Fluent (Windows 11)"
 
@@ -1016,12 +1176,20 @@ msgid "Fold the negative frequencies onto the positive ones. Correct for real-va
 msgstr "Ripiega le frequenze negative su quelle positive. Corretto per segnali a valori reali."
 
 
+msgid "Four-parameter logistic curve."
+msgstr "Curva logistica a quattro parametri."
+
+
 msgid "Fraction of each segment shared with the next."
 msgstr "Frazione di ciascun segmento condivisa con il successivo."
 
 
 msgid "Frame on"
 msgstr "Cornice attiva"
+
+
+msgid "Freundlich"
+msgstr "Freundlich"
 
 
 msgid "From x:"
@@ -1038,6 +1206,34 @@ msgstr "Espressione della funzione"
 
 msgid "Function expression with evaluated parameters"
 msgstr "Espressione della funzione con i parametri valutati"
+
+
+msgid "Gamma CDF"
+msgstr "CDF gamma"
+
+
+msgid "Gamma PDF"
+msgstr "PDF gamma"
+
+
+msgid "Gaussian peak"
+msgstr "Picco gaussiano"
+
+
+msgid "Gaussian peak with different left and right widths."
+msgstr "Picco gaussiano con larghezze diverse a sinistra e a destra."
+
+
+msgid "Gaussian process window"
+msgstr "Finestra di processo gaussiana"
+
+
+msgid "Generalized logistic with an additional shape parameter."
+msgstr "Logistica generalizzata con un parametro di forma aggiuntivo."
+
+
+msgid "Gompertz growth"
+msgstr "Crescita di Gompertz"
 
 
 msgid "Goodness of fit"
@@ -1068,8 +1264,16 @@ msgid "Grid ticks"
 msgstr "Tacche della griglia"
 
 
+msgid "Group similar data"
+msgstr "Raggruppa dati simili"
+
+
 msgid "Group similar data points into clusters"
 msgstr "Raggruppa i punti simili in cluster"
+
+
+msgid "Growth and saturation"
+msgstr "Crescita e saturazione"
 
 
 msgid "Guess starting parameters"
@@ -1112,6 +1316,10 @@ msgid "Highlight the flagged points:"
 msgstr "Evidenzia i punti segnalati:"
 
 
+msgid "Hill"
+msgstr "Hill"
+
+
 msgid "How densely to sample. A curve with sharp features needs more; a straight line needs two."
 msgstr "Densità di campionamento. Una curva con dettagli marcati ne richiede di più; una retta ne richiede due."
 
@@ -1126,6 +1334,14 @@ msgstr "Quante scale valutare, con spaziatura logaritmica, tra il periodo più l
 
 msgid "How the candidates are ordered. AIC is the default because the KS statistic alone always favours the distributions with the most free parameters, whatever the data really is."
 msgstr "Come vengono ordinate le candidate. AIC è il valore predefinito perché la sola statistica KS favorisce sempre le distribuzioni con più parametri liberi, qualunque siano davvero i dati."
+
+
+msgid "Hyperbolic saturation."
+msgstr "Saturazione iperbolica."
+
+
+msgid "Hyperbolic tangent transition."
+msgstr "Transizione con tangente iperbolica."
 
 
 msgid "IQR multiplier:"
@@ -1200,6 +1416,14 @@ msgid "Invalid entries"
 msgstr "Voci non valide"
 
 
+msgid "Inverse relation with offset."
+msgstr "Relazione inversa con offset."
+
+
+msgid "Inverse temperature linear"
+msgstr "Lineare in temperatura inversa"
+
+
 msgid "Invert Hide 0 <-> 1"
 msgstr "Inverti Hide 0 <-> 1"
 
@@ -1260,6 +1484,14 @@ msgid "LEFT JOIN keeping every row of the chosen table"
 msgstr "LEFT JOIN che mantiene tutte le righe della tabella scelta"
 
 
+msgid "Langmuir"
+msgstr "Langmuir"
+
+
+msgid "Langmuir adsorption/saturation model."
+msgstr "Modello di adsorbimento/saturazione di Langmuir."
+
+
 msgid "Language"
 msgstr "Lingua"
 
@@ -1292,8 +1524,16 @@ msgid "Linear"
 msgstr "Lineare"
 
 
+msgid "Linear chirp"
+msgstr "Chirp lineare"
+
+
 msgid "Linear regression slope"
 msgstr "Pendenza della regressione lineare"
+
+
+msgid "Linear relation versus inverse temperature."
+msgstr "Relazione lineare rispetto all'inverso della temperatura."
 
 
 msgid "Load a .mplstyle file into the editor"
@@ -1316,8 +1556,36 @@ msgid "Logarithmic"
 msgstr "Logaritmica"
 
 
+msgid "Logarithmic adsorption-like response."
+msgstr "Risposta logaritmica di tipo adsorbimento."
+
+
 msgid "Logarithmic puts equal numbers of points in each decade, which is what a curve plotted on a log axis needs. It requires a range strictly above zero."
 msgstr "La spaziatura logaritmica mette lo stesso numero di punti in ogni decade, come richiede una curva tracciata su un asse logaritmico. Richiede un intervallo strettamente maggiore di zero."
+
+
+msgid "Logistic 4P"
+msgstr "Logistica a 4 parametri"
+
+
+msgid "Logistic 5P asymmetric"
+msgstr "Logistica a 5 parametri asimmetrica"
+
+
+msgid "Lognormal CDF"
+msgstr "CDF lognormale"
+
+
+msgid "Lognormal PDF"
+msgstr "PDF lognormale"
+
+
+msgid "Lorentzian peak"
+msgstr "Picco lorentziano"
+
+
+msgid "Lorentzian peak with full width at half maximum."
+msgstr "Picco lorentziano con larghezza totale a metà altezza."
 
 
 msgid "Lower control limit"
@@ -1384,6 +1652,10 @@ msgid "Method:"
 msgstr "Metodo:"
 
 
+msgid "Michaelis-Menten"
+msgstr "Michaelis-Menten"
+
+
 msgid "Minimum samples for DBSCAN/OPTICS core points."
 msgstr "Campioni minimi per i punti core di DBSCAN/OPTICS."
 
@@ -1414,6 +1686,10 @@ msgstr "Espressione del modello che usa x (o xy), i parametri p[0], p[1]... e he
 
 msgid "Model:"
 msgstr "Modello:"
+
+
+msgid "Monitor process stability"
+msgstr "Monitora la stabilità del processo"
 
 
 msgid "More accurate on smooth data than the trapezoidal rule. Assumes the curve is well approximated by parabolas."
@@ -1542,6 +1818,18 @@ msgstr "Nessuna serie selezionata."
 
 msgid "None"
 msgstr "Nessuna"
+
+
+msgid "Normal CDF"
+msgstr "CDF normale"
+
+
+msgid "Normal PDF"
+msgstr "PDF normale"
+
+
+msgid "Normal-CDF-like transition."
+msgstr "Transizione simile alla CDF normale."
 
 
 msgid "Normalisation:"
@@ -1708,12 +1996,24 @@ msgid "Peak family:"
 msgstr "Famiglia di picchi:"
 
 
+msgid "Peak functions"
+msgstr "Funzioni di picco"
+
+
 msgid "Peaks"
 msgstr "Picchi"
 
 
 msgid "Peaks:"
 msgstr "Picchi:"
+
+
+msgid "Pearson VII peak"
+msgstr "Picco Pearson VII"
+
+
+msgid "Periodic functions"
+msgstr "Funzioni periodiche"
 
 
 msgid "Pick a built-in model to populate the expression and parameters."
@@ -1738,6 +2038,10 @@ msgstr "Inserisci il nome della tabella."
 
 msgid "Plot"
 msgstr "Grafico"
+
+
+msgid "Plot a function"
+msgstr "Traccia una funzione"
 
 
 msgid "Point"
@@ -1768,6 +2072,10 @@ msgid "Points:"
 msgstr "Punti:"
 
 
+msgid "Poisson yield"
+msgstr "Resa di Poisson"
+
+
 msgid "Polynomial degree (for polynomial-family models)."
 msgstr "Grado del polinomio (per i modelli della famiglia polinomiale)."
 
@@ -1778,6 +2086,18 @@ msgstr "Grado del polinomio per polyfit di NumPy."
 
 msgid "Polynomial order:"
 msgstr "Grado del polinomio:"
+
+
+msgid "Power law"
+msgstr "Legge di potenza"
+
+
+msgid "Power relation with offset."
+msgstr "Relazione di potenza con offset."
+
+
+msgid "Power-law process response to dose or time."
+msgstr "Risposta di processo a legge di potenza rispetto a dose o tempo."
 
 
 msgid "Preview"
@@ -1800,6 +2120,10 @@ msgid "Preview the result"
 msgstr "Anteprima del risultato"
 
 
+msgid "Process response with an optimum x value and symmetric fall-off."
+msgstr "Risposta di processo con un valore ottimo di x e calo simmetrico."
+
+
 msgid "Projection"
 msgstr "Proiezione"
 
@@ -1814,6 +2138,18 @@ msgstr "Prominenza (relativa)"
 
 msgid "Prominence measures a peak against its own surroundings and survives a sloping baseline. Height compares it to zero, which only means something when the baseline is at zero."
 msgstr "La prominenza misura un picco rispetto a ciò che lo circonda e regge anche con una linea di base inclinata. L'altezza lo confronta con lo zero, il che ha senso solo se la linea di base è a zero."
+
+
+msgid "Pseudo-Voigt peak"
+msgstr "Picco pseudo-Voigt"
+
+
+msgid "Pulse with separate rising and falling logistic edges."
+msgstr "Impulso con fronti di salita e di discesa logistici distinti."
+
+
+msgid "Quadratic"
+msgstr "Quadratica"
 
 
 msgid "Query Builder"
@@ -1836,8 +2172,20 @@ msgid "Rank by:"
 msgstr "Ordina per:"
 
 
+msgid "Rational 2/1"
+msgstr "Razionale 2/1"
+
+
+msgid "Reciprocal"
+msgstr "Reciproca"
+
+
 msgid "Recomputes the limits without the points they flagged. Use only when the flagged points have an assigned cause you have removed; otherwise it hides the problem."
 msgstr "Ricalcola i limiti senza i punti che hanno segnalato. Usalo solo quando i punti segnalati hanno una causa identificata che hai rimosso; altrimenti nasconde il problema."
+
+
+msgid "Reduce noise"
+msgstr "Riduci il rumore"
 
 
 msgid "Reduce noise and highlight underlying trends through signal smoothing."
@@ -1854,6 +2202,10 @@ msgstr "Valore di riferimento:"
 
 msgid "Refresh data table"
 msgstr "Aggiorna la tabella dati"
+
+
+msgid "Reliability models"
+msgstr "Modelli di affidabilità"
 
 
 msgid "Reload"
@@ -1972,6 +2324,10 @@ msgid "Reveal periodic patterns, dominant frequencies, and spectral characterist
 msgstr "Individua schemi periodici, frequenze dominanti e caratteristiche spettrali dei dati."
 
 
+msgid "Richards generalized logistic"
+msgstr "Logistica generalizzata di Richards"
+
+
 msgid "Right"
 msgstr "Destra"
 
@@ -2028,6 +2384,10 @@ msgid "Same axis as the source"
 msgstr "Stesso asse dell'origine"
 
 
+msgid "Sample user linear"
+msgstr "Esempio di lineare utente"
+
+
 msgid "Samples per Welch segment. Longer segments resolve finer frequency detail; shorter ones average away more noise."
 msgstr "Campioni per segmento di Welch. Segmenti più lunghi risolvono dettagli in frequenza più fini; segmenti più corti mediano via più rumore."
 
@@ -2038,6 +2398,10 @@ msgstr "Campioni per unità di x, usati quando non è ricavata."
 
 msgid "Sampling rate:"
 msgstr "Frequenza di campionamento:"
+
+
+msgid "Saturating exponential"
+msgstr "Esponenziale saturante"
 
 
 msgid "Save"
@@ -2096,6 +2460,58 @@ msgid "Scale and direction"
 msgstr "Scala e direzione"
 
 
+msgid "Scaled Cauchy cumulative distribution plus offset."
+msgstr "Distribuzione cumulata di Cauchy scalata più offset."
+
+
+msgid "Scaled Cauchy density plus offset."
+msgstr "Densità di Cauchy scalata più offset."
+
+
+msgid "Scaled Weibull cumulative distribution plus offset."
+msgstr "Distribuzione cumulata di Weibull scalata più offset."
+
+
+msgid "Scaled Weibull density plus offset."
+msgstr "Densità di Weibull scalata più offset."
+
+
+msgid "Scaled beta cumulative distribution over a finite interval."
+msgstr "Distribuzione cumulata beta scalata su un intervallo finito."
+
+
+msgid "Scaled beta density over a finite x interval."
+msgstr "Densità beta scalata su un intervallo finito di x."
+
+
+msgid "Scaled gamma cumulative distribution plus offset."
+msgstr "Distribuzione cumulata gamma scalata più offset."
+
+
+msgid "Scaled gamma density plus offset."
+msgstr "Densità gamma scalata più offset."
+
+
+msgid "Scaled lognormal cumulative distribution plus offset."
+msgstr "Distribuzione cumulata lognormale scalata più offset."
+
+
+msgid "Scaled lognormal density plus offset."
+msgstr "Densità lognormale scalata più offset."
+
+
+msgid "Scaled natural logarithm plus offset.  X is clipped positive for numerical safety."
+msgstr "Logaritmo naturale scalato più offset.  La X è limitata ai valori positivi per sicurezza numerica."
+
+
+msgid "Scaled normal cumulative distribution plus offset."
+msgstr "Distribuzione cumulata normale scalata più offset."
+
+
+msgid "Scaled normal probability density plus offset."
+msgstr "Densità di probabilità normale scalata più offset."
+
+
 msgid "Scales:"
 msgstr "Scale:"
 
@@ -2114,6 +2530,14 @@ msgstr "Cerca modelli..."
 
 msgid "Search properties..."
 msgstr "Cerca proprietà..."
+
+
+msgid "Second-order numerator over first-order denominator."
+msgstr "Numeratore di secondo grado su denominatore di primo grado."
+
+
+msgid "Second-order polynomial."
+msgstr "Polinomio di secondo grado."
 
 
 msgid "Segment length:"
@@ -2158,6 +2582,10 @@ msgstr "Seleziona file"
 
 msgid "Select one or more source series."
 msgstr "Seleziona una o più serie di origine."
+
+
+msgid "Semiconductor and process"
+msgstr "Semiconduttori e processo"
 
 
 msgid "Series"
@@ -2272,12 +2700,36 @@ msgid "Sigma estimate"
 msgstr "Stima di sigma"
 
 
+msgid "Sigmoidal curves"
+msgstr "Curve sigmoidali"
+
+
 msgid "Sign test"
 msgstr "Test dei segni"
 
 
 msgid "Signal"
 msgstr "Segnale"
+
+
+msgid "Simple Poisson yield relation versus area or defect opportunity."
+msgstr "Relazione di resa di Poisson rispetto all'area o alle opportunità di difetto."
+
+
+msgid "Sine"
+msgstr "Seno"
+
+
+msgid "Sine with linearly changing frequency."
+msgstr "Sinusoide con frequenza che varia linearmente."
+
+
+msgid "Single exponential decay with offset."
+msgstr "Decadimento esponenziale singolo con offset."
+
+
+msgid "Sinusoidal oscillation."
+msgstr "Oscillazione sinusoidale."
 
 
 msgid "Skip last rows"
@@ -2298,6 +2750,10 @@ msgstr "Applica uno smoothing a una serie"
 
 msgid "Smooth s:"
 msgstr "s di smoothing:"
+
+
+msgid "Smooth transition with heavier tails than logistic."
+msgstr "Transizione morbida con code più pesanti della logistica."
 
 
 msgid "Smoothing"
@@ -2380,6 +2836,10 @@ msgid "Start params:"
 msgstr "Parametri iniziali:"
 
 
+msgid "Statistical distributions"
+msgstr "Distribuzioni statistiche"
+
+
 msgid "Statistics"
 msgstr "Statistiche"
 
@@ -2394,6 +2854,10 @@ msgstr "Passo:"
 
 msgid "Straight line between endpoints"
 msgstr "Retta fra gli estremi"
+
+
+msgid "Straight line with intercept and slope."
+msgstr "Retta con intercetta e pendenza."
 
 
 msgid "Style"
@@ -2420,8 +2884,16 @@ msgid "Summary"
 msgstr "Riepilogo"
 
 
+msgid "Survival/reliability curve for constant hazard rate."
+msgstr "Curva di sopravvivenza/affidabilità a tasso di guasto costante."
+
+
 msgid "Symlog threshold"
 msgstr "Soglia symlog"
+
+
+msgid "Symmetric Gaussian peak with offset."
+msgstr "Picco gaussiano simmetrico con offset."
 
 
 msgid "Table"
@@ -2436,12 +2908,20 @@ msgid "Take the sampling frequency from the spacing of the x role."
 msgstr "Ricava la frequenza di campionamento dalla spaziatura del ruolo x."
 
 
+msgid "Tanh sigmoid"
+msgstr "Sigmoide a tangente iperbolica"
+
+
 msgid "Taper applied to each segment before the FFT."
 msgstr "Finestra applicata a ogni segmento prima della FFT."
 
 
 msgid "Target"
 msgstr "Destinazione"
+
+
+msgid "Temkin"
+msgstr "Temkin"
 
 
 msgid "Text"
@@ -2491,6 +2971,10 @@ msgstr "Non c'è ancora nessun database.\n\nVuoi creare il progetto dimostrativo
 
 msgid "These entries are not valid and were not applied:\n{entries}"
 msgstr "Queste voci non sono valide e non sono state applicate:\n{entries}"
+
+
+msgid "Third-order polynomial."
+msgstr "Polinomio di terzo grado."
 
 
 msgid "This function takes no parameters."
@@ -2573,6 +3057,10 @@ msgid "Try every SciPy distribution"
 msgstr "Prova tutte le distribuzioni di SciPy"
 
 
+msgid "Two exponential time constants plus offset."
+msgstr "Due costanti di tempo esponenziali più offset."
+
+
 msgid "Two-sided"
 msgstr "Bilaterale"
 
@@ -2629,6 +3117,10 @@ msgid "Use latest fitted parameters"
 msgstr "Usa gli ultimi parametri ottimizzati"
 
 
+msgid "User functions"
+msgstr "Funzioni utente"
+
+
 msgid "Value"
 msgstr "Valore"
 
@@ -2649,8 +3141,36 @@ msgid "Visible"
 msgstr "Visibile"
 
 
+msgid "Voigt peak"
+msgstr "Picco di Voigt"
+
+
 msgid "WHERE with the comparisons spelled out"
 msgstr "WHERE con i confronti esplicitati"
+
+
+msgid "Weibull CDF"
+msgstr "CDF di Weibull"
+
+
+msgid "Weibull PDF"
+msgstr "PDF di Weibull"
+
+
+msgid "Weibull hazard"
+msgstr "Tasso di guasto di Weibull"
+
+
+msgid "Weibull instantaneous hazard model."
+msgstr "Modello del tasso di guasto istantaneo di Weibull."
+
+
+msgid "Weibull reliability/survival curve."
+msgstr "Curva di affidabilità/sopravvivenza di Weibull."
+
+
+msgid "Weibull survival"
+msgstr "Sopravvivenza di Weibull"
 
 
 msgid "Weight residuals by magnitude when computing RMSE/R²."
@@ -2659,6 +3179,10 @@ msgstr "Pesa i residui in base alla grandezza nel calcolo di RMSE/R²."
 
 msgid "Weighted RMSE/R²"
 msgstr "RMSE/R² pesati"
+
+
+msgid "Weighted blend of Gaussian and Lorentzian components."
+msgstr "Miscela pesata di componente gaussiana e lorentziana."
 
 
 msgid "Welcome"
@@ -2883,4 +3407,5 @@ msgstr "{series}: {error}"
 
 msgid "{series}\nx: {x}\ny: {y}"
 msgstr "{series}\nx: {x}\ny: {y}"
+
 

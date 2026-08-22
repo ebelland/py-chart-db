@@ -378,10 +378,14 @@ class SeriesFitDialog(SeriesOperationDialogBase):
     def _build_model_catalog(self) -> None:
         self._models_tree.clear()
         for cat_name, models in self._catalog_data().items():
-            cat = QTreeWidgetItem([cat_name])
+            # Translated for display only. The payload keeps the English name,
+            # which is what a saved fit refers to and what the search below
+            # falls back on - a catalogue whose identities changed with the
+            # interface language would lose every fit saved in another one.
+            cat = QTreeWidgetItem([_(str(cat_name))])
             self._models_tree.addTopLevelItem(cat)
             for payload in models:
-                item = QTreeWidgetItem([str(payload["name"])])
+                item = QTreeWidgetItem([_(str(payload["name"]))])
                 item.setData(0, Qt.ItemDataRole.UserRole, payload)
                 cat.addChild(item)
             cat.setExpanded(False)
@@ -467,7 +471,7 @@ class SeriesFitDialog(SeriesOperationDialogBase):
         self._populate_params_defaults()
 
         expression_html = str(payload.get("expression", "")).strip()
-        description = str(payload.get("description", "")).strip()
+        description = _(str(payload.get("description", "")).strip())
         if description:
             description_html = f'<div style="color:#666; margin-top:6px;">{html_escape(description)}</div>'
             expression_html = f"{expression_html}{description_html}" if expression_html else description_html

@@ -247,13 +247,18 @@ class SeriesFunctionDialog(SeriesOperationDialogBase):
             self._function_tree.clear()
             catalog = self._scanner.catalog()
             for category, functions in catalog.items():
-                parent = QTreeWidgetItem([category, ""])
+                # Translated for display only: the payload under UserRole
+                # keeps the English name, which is the function's identity.
+                parent = QTreeWidgetItem([_(str(category)), ""])
                 # Categories are grouping only; making them selectable invites
                 # a click that silently does nothing.
                 parent.setFlags(parent.flags() & ~Qt.ItemFlag.ItemIsSelectable)
                 for payload in functions:
                     child = QTreeWidgetItem(
-                        [str(payload.get("name", "")), str(payload.get("description", ""))]
+                        [
+                            _(str(payload.get("name", ""))),
+                            _(str(payload.get("description", ""))),
+                        ]
                     )
                     child.setData(0, Qt.ItemDataRole.UserRole, payload)
                     parent.addChild(child)
