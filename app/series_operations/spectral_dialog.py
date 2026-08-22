@@ -1051,6 +1051,12 @@ class SeriesSpectralDialog(SeriesOperationDialogBase):
             style=style,
         )
 
+    #: format_results below returns a report built with report_html, and
+    #: saying so is what stops the base escaping it. Without this the chart's
+    #: notes pane showed the markup as text - "<html><body style=..." - because
+    #: results_report_html ran it through plain_to_html.
+    RESULTS_ARE_HTML = True
+
     def format_results(self, results: Sequence[SpectralResult]) -> str:
         """Return an HTML summary of the computed estimates."""
         if not results:
