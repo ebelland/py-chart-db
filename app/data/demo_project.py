@@ -1,8 +1,13 @@
 """Build a demo ``.dhub`` project showing what the application can do.
 
+Shipped rather than kept with the tests, because the application offers it:
+the first run of a fresh install has no database, and an empty one shows
+nothing at all - so startup offers to build this instead (see
+``app/utils/startup.py``).
+
 Run it directly::
 
-    python -m app.tests.make_demo_project --output "Demo Project.dhub"
+    python -m app.data.demo_project --output "Demo Project.dhub"
 
 Everything is written through :class:`SqliteRepo`, not by hand-crafted SQL, so
 the demo exercises the same code path the application uses and cannot drift

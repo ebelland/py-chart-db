@@ -23,7 +23,7 @@ from app.dialogs.log_viewer_dialog import LogViewerDialog
 from app.data.sqlite_repo import SqliteRepo
 from app.widgets.chart_panel import ChartPanel
 from app.dialogs.create_chart_dialog import NewPlotTabDialog
-from app.dialogs.import_data_dialog import ImportDataDialog
+from app.dialogs.import_data_dialog import ImportDataDialog, is_importable
 from app.dialogs.query_builder_dialog import QueryBuilderDialog
 from app.widgets.axis_properties import AxisPropertiesWidget
 from app.widgets.figure_properties import FigurePropertiesWidget
@@ -96,6 +96,9 @@ class MainWindow(QMainWindow):
         self._properties_redraw_timer.timeout.connect(self._flush_properties_chart_redraw)
 
         self.statusBar().showMessage("Ready")
+
+        # Files can be dropped on the window: see dropEvent.
+        self.setAcceptDrops(True)
 
         # Keep the whole window shrinkable.
         self.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Expanding)
@@ -1055,9 +1058,16 @@ class MainWindow(QMainWindow):
             applogger.exception("Failed to open database: %s", exc)
             show_message(self, "database.open_failed", error=exc)
 
-    def _on_import_data(self) -> None:
-        """Open the import dialog and refresh UI if import succeeds."""
+    def _on_import_data(self, source_path: Path | None = None) -> None:
+        """Open the import dialog and refresh UI if import succeeds.
+
+        ``source_path`` is the file a drop arrived with; the dialog then opens
+        already showing it, with its preview and its default table name, which
+        is the whole point of dropping it rather than browsing for it.
+        """
         dlg = ImportDataDialog(self._repo, parent=self)
+        if source_path is not None:
+            dlg.load_file(source_path)
         if dlg.exec():
             self._table_panel.reload()
             self._reload_tabs()
@@ -1209,6 +1219,97 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     # Qt events
     # ------------------------------------------------------------------
+    @staticmethod
+    def dropped_paths(event: Any) -> list[Path]:
+        """Return the local files carried by a drag, in the order dropped.
+
+        Local files only: a drag from a browser carries a URL that names a
+        file on a web server, and ``toLocalFile`` returns an empty string for
+        it rather than something ``open()`` would fail on later.
+        """
+        data = event.mimeData()
+        if data is None or not data.hasUrls():
+            return []
+        return [
+            Path(local)
+            for url in data.urls()
+            if (local := url.toLocalFile())
+        ]
+
+    @classmethod
+    def accepted_drop(cls, paths: list[Path]) -> tuple[str, list[Path]]:
+        """Classify a drop as ``("database"|"import"|"", paths)``.
+
+        A ``.dhub`` is a project to open, anything the import readers know is
+        data to import, and everything else is refused - refused *before* the
+        cursor changes, so the window says no by not offering to accept it
+        rather than by a box after the fact.
+
+        A database wins over data files dropped with it, and only one at a
+        time: opening two projects at once has no meaning, and importing into
+        a database that is about to be closed has less.
+        """
+        databases = [path for path in paths if path.suffix.lower() == ".dhub"]
+        if len(databases) == 1:
+            return "database", databases
+
+        importable = [path for path in paths if is_importable(path)]
+        if importable and not databases:
+            return "import", importable
+
+        return "", []
+
+    def dragEnterEvent(self, event: Any) -> None:  # noqa: N802
+        """Accept a drag only when the drop would actually do something."""
+        kind, _paths = self.accepted_drop(self.dropped_paths(event))
+        if kind:
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event: Any) -> None:  # noqa: N802
+        """Keep the acceptance while the cursor moves over the window."""
+        self.dragEnterEvent(event)
+
+    def dropEvent(self, event: Any) -> None:  # noqa: N802
+        """Open a dropped project, or import dropped data files.
+
+        Several data files are handled one dialog at a time, in the order they
+        were dropped, and cancelling one stops the rest: cancel means "not
+        this", and the natural reading of it on the second of four files is
+        "stop", not "carry on with the next one".
+        """
+        kind, paths = self.accepted_drop(self.dropped_paths(event))
+        if not kind:
+            event.ignore()
+            return
+
+        event.acceptProposedAction()
+
+        if kind == "database":
+            applogger.info("Opening dropped database: %s", paths[0])
+            try:
+                self._switch_database(paths[0])
+            except Exception as exc:  # noqa: BLE001
+                applogger.exception("Failed to open the dropped database: %s", exc)
+                show_message(self, "database.open_failed", error=exc)
+            return
+
+        for path in paths:
+            applogger.info("Importing dropped file: %s", path)
+            if not self._import_one_dropped_file(path):
+                break
+
+    def _import_one_dropped_file(self, path: Path) -> bool:
+        """Import one dropped file; False when the user cancelled."""
+        dialog = ImportDataDialog(self._repo, parent=self)
+        dialog.load_file(path)
+        if not dialog.exec():
+            return False
+        self._table_panel.reload()
+        self._reload_tabs()
+        return True
+
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
         """Persist the window layout, then collect resources and close."""
         applogger.info("Closing main window")

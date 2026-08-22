@@ -2,7 +2,7 @@
 
 Run it directly::
 
-    python -m app.tests.make_demo_project --output "Demo Project.dhub"
+    python _make_demo_project.py --output "Demo Project.dhub"
 
 Everything is written through :class:`SqliteRepo`, not by hand-crafted SQL, so
 the demo exercises the same code path the application uses and cannot drift

@@ -98,12 +98,12 @@ class MessageSpec:
         ``ask`` and ``show_message`` receive placeholder values through
         ``**fields``.  That means the correct call is::
 
-            ask(parent, "axis.delete", axis="name")
+            ask(parent, "axis.confirm_delete", axis="name")
 
         Some call sites already have a dictionary and pass it as one keyword::
 
             values = {"axis": "name"}
-            ask(parent, "axis.delete", fields=values)
+            ask(parent, "axis.confirm_delete", fields=values)
 
         In that case the collected ``fields`` value is
         ``{"fields": {"axis": "name"}}``.  ``str.format`` cannot fill
@@ -166,7 +166,7 @@ class MessageSpec:
 
         Preferred usage passes placeholders as normal keywords::
 
-            ask(self, "axis.delete", axis="name")
+            ask(self, "axis.confirm_delete", axis="name")
 
         If a wrapper already has a dictionary, it can pass it as
         ``fields=that_dict`` and it will be unwrapped before formatting.

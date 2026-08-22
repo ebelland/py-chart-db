@@ -28,8 +28,28 @@ msgid "(none)"
 msgstr "(nessuno)"
 
 
+msgid "0 interpolates every point exactly; larger values allow the spline to depart from noisy data."
+msgstr "0 interpola esattamente ogni punto; valori maggiori permettono alla spline di discostarsi da dati rumorosi."
+
+
+msgid "1 for the slope, 2 for the curvature."
+msgstr "1 per la pendenza, 2 per la curvatura."
+
+
 msgid "1, 2.5, 10 or one per line"
 msgstr "1, 2.5, 10 oppure uno per riga"
+
+
+msgid "3 is the Shewhart convention: on a stable normal process it gives about one false alarm per 370 points, which balances missed signals against chasing noise."
+msgstr "3 è la convenzione di Shewhart: su un processo normale e stabile dà circa un falso allarme ogni 370 punti, il che bilancia i segnali mancati e le false segnalazioni."
+
+
+msgid "A derivative or an integral rarely shares a scale with the series it came from - d/dx of a slow drift is near zero beside data in the thousands - so a new axis is the default. Same axis overlays them when the ranges are comparable; a new figure keeps the result out of this chart entirely."
+msgstr "Una derivata o un integrale raramente condivide la scala della serie di origine - la d/dx di una deriva lenta è quasi zero accanto a dati dell'ordine delle migliaia - quindi l'impostazione predefinita è un nuovo asse. Stesso asse sovrappone le curve quando gli intervalli sono confrontabili; nuova figura tiene il risultato del tutto fuori da questo grafico."
+
+
+msgid "A derivative or an integral rarely shares a scale with the series it came from - d/dx of a slow drift is near zero beside data in the thousands. On by default for that reason; turn it off to overlay when the ranges happen to be comparable."
+msgstr "Una derivata o un integrale raramente condivide la scala della serie di origine: la d/dx di una deriva lenta è quasi zero accanto a dati dell'ordine delle migliaia. Per questo è attivo per impostazione predefinita; disattivalo per sovrapporre le curve quando gli intervalli sono confrontabili."
 
 
 msgid "A new language is applied the next time the app starts."
@@ -66,6 +86,10 @@ msgstr "Aggiunge alla figura corrente un asse che mostra le serie analizzate. L'
 
 msgid "Add an item"
 msgstr "Aggiunge un elemento"
+
+
+msgid "Add annotation"
+msgstr "Aggiungi annotazione"
 
 
 msgid "Add at least one series before applying."
@@ -140,6 +164,22 @@ msgid "Anderson-Darling normality"
 msgstr "Normalità di Anderson-Darling"
 
 
+msgid "Annotation"
+msgstr "Annotazione"
+
+
+msgid "Annotation added at x: {x}, y: {y}"
+msgstr "Annotazione aggiunta a x: {x}, y: {y}"
+
+
+msgid "Annotations"
+msgstr "Annotazioni"
+
+
+msgid "Annotations are stored in axis options. Kwargs must be JSON, for example: {\"xytext\": [10, 10], \"textcoords\": \"offset points\"}."
+msgstr "Le annotazioni sono salvate nelle opzioni dell'asse. I kwargs devono essere in JSON, per esempio: {\"xytext\": [10, 10], \"textcoords\": \"offset points\"}."
+
+
 msgid "App style"
 msgstr "Stile dell'applicazione"
 
@@ -160,8 +200,20 @@ msgid "Apply"
 msgstr "Applica"
 
 
+msgid "Apply Nelson rules:"
+msgstr "Applica le regole di Nelson:"
+
+
+msgid "Apply multi-peak"
+msgstr "Applica multi-picco"
+
+
 msgid "Apply the changes"
 msgstr "Applica le modifiche"
+
+
+msgid "As a fraction of the signal's full range. 0.1 keeps peaks standing at least a tenth of the range above their surroundings."
+msgstr "Come frazione dell'intervallo completo del segnale. 0,1 mantiene i picchi che si elevano almeno di un decimo dell'intervallo rispetto a ciò che li circonda."
 
 
 msgid "Auto"
@@ -204,6 +256,10 @@ msgid "BIC (penalises them harder)"
 msgstr "BIC (li penalizza più severamente)"
 
 
+msgid "Baseline:"
+msgstr "Linea di base:"
+
+
 msgid "Batch size for Monte Carlo resampling. Auto lets SciPy choose."
 msgstr "Dimensione del lotto per il ricampionamento Monte Carlo. Auto lascia scegliere a SciPy."
 
@@ -220,12 +276,28 @@ msgid "Boundary:"
 msgstr "Condizione al contorno:"
 
 
+msgid "Browse…"
+msgstr "Sfoglia…"
+
+
 msgid "Build a multi-peak expression"
 msgstr "Costruisci un’espressione multi-picco"
 
 
 msgid "Builds a 1D multi-peak expression. Edit generated parameters before fitting."
 msgstr "Costruisce un'espressione multipicco 1D. Modifica i parametri generati prima del fit."
+
+
+msgid "Calculus"
+msgstr "Calcolo"
+
+
+msgid "Centre line"
+msgstr "Linea centrale"
+
+
+msgid "Chart"
+msgstr "Carta"
 
 
 msgid "Chart Options"
@@ -268,8 +340,16 @@ msgid "Choose how generated X values are built."
 msgstr "Scegli come vengono costruiti i valori X generati."
 
 
+msgid "Choose the calculation."
+msgstr "Scegli il calcolo da eseguire."
+
+
 msgid "Choose the clustering algorithm family."
 msgstr "Scegli la famiglia di algoritmi di clustering."
+
+
+msgid "Choose the control chart."
+msgstr "Scegli la carta di controllo."
 
 
 msgid "Choose the exact scipy.cluster function/workflow to use."
@@ -352,6 +432,14 @@ msgid "Compute descriptive statistics, distributions, correlations, and summary 
 msgstr "Calcola statistiche descrittive, distribuzioni, correlazioni e metriche di sintesi."
 
 
+msgid "Consecutive points averaged into each plotted subgroup. Rational subgrouping: choose it so variation within a subgroup is only common-cause noise."
+msgstr "Punti consecutivi mediati in ogni sottogruppo tracciato. Sottogruppi razionali: scegli la dimensione in modo che la variazione interna al sottogruppo sia solo rumore di causa comune."
+
+
+msgid "Control Chart"
+msgstr "Carta di controllo"
+
+
 msgid "Convert to decibels"
 msgstr "Converti in decibel"
 
@@ -364,6 +452,10 @@ msgid "Copy figure"
 msgstr "Copia figura"
 
 
+msgid "Copy parameters"
+msgstr "Copia i parametri"
+
+
 msgid "Copy to the clipboard"
 msgstr "Copia negli appunti"
 
@@ -372,8 +464,16 @@ msgid "Correlation / association"
 msgstr "Correlazione / associazione"
 
 
+msgid "Correlation matrix"
+msgstr "Matrice di correlazione"
+
+
 msgid "Correlation tests"
 msgstr "Test di correlazione"
+
+
+msgid "Could not build the demo project:\n{error}"
+msgstr "Impossibile creare il progetto dimostrativo:\n{error}"
 
 
 msgid "Could not build the preview:\n{error}"
@@ -436,12 +536,20 @@ msgid "Create a new plot tab"
 msgstr "Crea una nuova scheda grafico"
 
 
+msgid "Create a new plot tab for the current table"
+msgstr "Crea una nuova scheda grafico per la tabella corrente"
+
+
 msgid "Create a new plot tab from the current data context."
 msgstr "Crea una nuova scheda grafico dal contesto dati corrente."
 
 
 msgid "Create new figure (new tab)"
 msgstr "Crea una nuova figura (nuova scheda)"
+
+
+msgid "Curve"
+msgstr "Curva"
 
 
 msgid "Cut threshold for distance/inconsistent criteria. Leave at auto for median linkage distance."
@@ -496,6 +604,10 @@ msgid "Delete"
 msgstr "Elimina"
 
 
+msgid "Delete axis"
+msgstr "Elimina asse"
+
+
 msgid "Delete chart"
 msgstr "Elimina grafico"
 
@@ -512,12 +624,28 @@ msgid "Delete query"
 msgstr "Elimina query"
 
 
+msgid "Delete selected"
+msgstr "Elimina selezionati"
+
+
+msgid "Delete selected tables…"
+msgstr "Elimina le tabelle selezionate…"
+
+
+msgid "Delete series"
+msgstr "Elimina serie"
+
+
 msgid "Delete table"
 msgstr "Elimina tabella"
 
 
 msgid "Delete tables"
 msgstr "Elimina tabelle"
+
+
+msgid "Delete the axis '{axis}'?"
+msgstr "Eliminare l'asse '{axis}'?"
 
 
 msgid "Delete the column '{column}'? This cannot be undone."
@@ -528,8 +656,16 @@ msgid "Delete the saved query '{name}'?\n\nCharts built on it will stop finding 
 msgstr "Eliminare la query salvata '{name}'?\n\nI grafici che la usano non troveranno più i loro dati."
 
 
+msgid "Delete the selected table"
+msgstr "Elimina la tabella selezionata"
+
+
 msgid "Delete the selection"
 msgstr "Elimina la selezione"
+
+
+msgid "Delete the series '{series}'?"
+msgstr "Eliminare la serie '{series}'?"
 
 
 msgid "Delete the table '{table}'?"
@@ -548,20 +684,40 @@ msgid "Delete this figure"
 msgstr "Elimina questa figura"
 
 
+msgid "Delete {count} selected tables"
+msgstr "Elimina {count} tabelle selezionate"
+
+
 msgid "Delete {count} selected tables?\n\n{tables}"
 msgstr "Eliminare le {count} tabelle selezionate?\n\n{tables}"
+
+
+msgid "Delete…"
+msgstr "Elimina…"
 
 
 msgid "Delimiter"
 msgstr "Delimitatore"
 
 
+msgid "Derivative order:"
+msgstr "Ordine della derivata:"
+
+
 msgid "Derive from the x role"
 msgstr "Ricava dal ruolo x"
 
 
+msgid "Description"
+msgstr "Descrizione"
+
+
 msgid "Descriptive statistics"
 msgstr "Statistiche descrittive"
+
+
+msgid "Detail"
+msgstr "Dettaglio"
 
 
 msgid "Detect and hide outliers in a series"
@@ -608,6 +764,34 @@ msgid "Draw figure frame"
 msgstr "Disegna la cornice della figura"
 
 
+msgid "Draw on a new axis:"
+msgstr "Disegna su un nuovo asse:"
+
+
+msgid "Draw on:"
+msgstr "Disegna su:"
+
+
+msgid "Draw the centre line:"
+msgstr "Traccia la linea centrale:"
+
+
+msgid "Draw the control limits:"
+msgstr "Traccia i limiti di controllo:"
+
+
+msgid "Draw the located peaks as markers rather than writing a table of measurements."
+msgstr "Disegna i picchi individuati come marcatori invece di scrivere una tabella di misure."
+
+
+msgid "Draw the one and two sigma lines:"
+msgstr "Traccia le linee a uno e due sigma:"
+
+
+msgid "Draws the signalling points again as separate markers."
+msgstr "Ridisegna i punti che segnalano come marcatori separati."
+
+
 msgid "Edit"
 msgstr "Modifica"
 
@@ -618,6 +802,10 @@ msgstr "Modifica le impostazioni di visualizzazione"
 
 msgid "Encoding"
 msgstr "Codifica"
+
+
+msgid "End of the range to evaluate over."
+msgstr "Fine dell'intervallo su cui valutare la funzione."
 
 
 msgid "Ensure ClusterId column"
@@ -636,12 +824,20 @@ msgid "Estimates"
 msgstr "Stime"
 
 
+msgid "Estimator"
+msgstr "Stimatore"
+
+
 msgid "Eval X:"
 msgstr "X di valutazione:"
 
 
 msgid "Example: {\"a\": 1.0, \"b\": 0.1}"
 msgstr "Esempio: {\"a\": 1.0, \"b\": 0.1}"
+
+
+msgid "Exclude flagged points from the limits:"
+msgstr "Escludi dai limiti i punti segnalati:"
 
 
 msgid "Explicit X values where Y is evaluated."
@@ -666,6 +862,22 @@ msgstr "Esporta come file CSV"
 
 msgid "Export as an Excel workbook"
 msgstr "Esporta come cartella di lavoro Excel"
+
+
+msgid "Export current table as Excel file"
+msgstr "Esporta la tabella corrente come file Excel"
+
+
+msgid "Export current table as comma separated text file"
+msgstr "Esporta la tabella corrente come file di testo separato da virgole"
+
+
+msgid "Export → CSV…"
+msgstr "Esporta → CSV…"
+
+
+msgid "Export → XLSX…"
+msgstr "Esporta → XLSX…"
 
 
 msgid "Express the result as 10*log10 of the value."
@@ -724,8 +936,16 @@ msgid "Filter by name or category. Sections with no match are hidden."
 msgstr "Filtra per nome o categoria. Le sezioni senza corrispondenze vengono nascoste."
 
 
+msgid "Filter by:"
+msgstr "Filtra per:"
+
+
 msgid "Filter the model catalog by name."
 msgstr "Filtra il catalogo dei modelli per nome."
+
+
+msgid "Find:"
+msgstr "Cerca:"
 
 
 msgid "First row is header"
@@ -784,6 +1004,10 @@ msgid "Fixed size, with zoom and scrollbars"
 msgstr "Dimensione fissa, con zoom e barre di scorrimento"
 
 
+msgid "Flags runs, trends and other patterns that stay inside the limits - the signals a limits-only chart misses."
+msgstr "Segnala sequenze, tendenze e altri andamenti che restano entro i limiti: i segnali che una carta basata solo sui limiti non vede."
+
+
 msgid "Fluent (Windows 11)"
 msgstr "Fluent (Windows 11)"
 
@@ -798,6 +1022,22 @@ msgstr "Frazione di ciascun segmento condivisa con il successivo."
 
 msgid "Frame on"
 msgstr "Cornice attiva"
+
+
+msgid "From x:"
+msgstr "Da x:"
+
+
+msgid "Function"
+msgstr "Funzione"
+
+
+msgid "Function expression"
+msgstr "Espressione della funzione"
+
+
+msgid "Function expression with evaluated parameters"
+msgstr "Espressione della funzione con i parametri valutati"
 
 
 msgid "Goodness of fit"
@@ -816,6 +1056,14 @@ msgid "Grid axis"
 msgstr "Asse della griglia"
 
 
+msgid "Grid cells this axis spans from its position, so it can take up more room than the other axes in the figure."
+msgstr "Celle della griglia occupate da questo asse a partire dalla sua posizione, così da poter occupare più spazio degli altri assi della figura."
+
+
+msgid "Grid position"
+msgstr "Posizione nella griglia"
+
+
 msgid "Grid ticks"
 msgstr "Tacche della griglia"
 
@@ -832,8 +1080,16 @@ msgid "Guess starting parameters for nonlinear models."
 msgstr "Stima i parametri iniziali per i modelli non lineari."
 
 
+msgid "Half-prominence bounds"
+msgstr "Limiti a metà prominenza"
+
+
 msgid "Height"
 msgstr "Altezza"
+
+
+msgid "Height (absolute)"
+msgstr "Altezza (assoluta)"
 
 
 msgid "Hide axis"
@@ -850,6 +1106,14 @@ msgstr "Impossibile nascondere le righe"
 
 msgid "Hide spines"
 msgstr "Nascondi i bordi degli assi"
+
+
+msgid "Highlight the flagged points:"
+msgstr "Evidenzia i punti segnalati:"
+
+
+msgid "How densely to sample. A curve with sharp features needs more; a straight line needs two."
+msgstr "Densità di campionamento. Una curva con dettagli marcati ne richiede di più; una retta ne richiede due."
 
 
 msgid "How knots are distributed along X."
@@ -894,6 +1158,10 @@ msgstr "Deduci dall’espressione"
 
 msgid "Info"
 msgstr "Informazioni"
+
+
+msgid "Initial value, bounds and fixed flag for each function parameter. Apply runs the fit with these settings."
+msgstr "Valore iniziale, limiti e blocco per ogni parametro della funzione. Applica esegue il fit con queste impostazioni."
 
 
 msgid "Initial value, bounds and fixed flag for each parameter. Apply runs the fit with these settings."
@@ -964,6 +1232,14 @@ msgid "KS statistic (closest curve)"
 msgstr "Statistica KS (curva più vicina)"
 
 
+msgid "Keeps the most prominent peaks when many are found."
+msgstr "Mantiene i picchi più prominenti quando ne vengono trovati molti."
+
+
+msgid "Kind"
+msgstr "Tipo"
+
+
 msgid "Knots:"
 msgstr "Nodi:"
 
@@ -974,6 +1250,10 @@ msgstr "Kolmogorov-Smirnov contro normale"
 
 msgid "Kurtosis test"
 msgstr "Test di curtosi"
+
+
+msgid "Kwargs JSON"
+msgstr "Kwargs JSON"
 
 
 msgid "LEFT JOIN keeping every row of the chosen table"
@@ -1000,8 +1280,16 @@ msgid "Less"
 msgstr "Minore"
 
 
+msgid "Limits at sigma:"
+msgstr "Limiti a sigma:"
+
+
 msgid "Line style"
 msgstr "Stile della linea"
+
+
+msgid "Linear"
+msgstr "Lineare"
 
 
 msgid "Linear regression slope"
@@ -1024,6 +1312,18 @@ msgid "Log viewer"
 msgstr "Visualizzatore log"
 
 
+msgid "Logarithmic"
+msgstr "Logaritmica"
+
+
+msgid "Logarithmic puts equal numbers of points in each decade, which is what a curve plotted on a log axis needs. It requires a range strictly above zero."
+msgstr "La spaziatura logaritmica mette lo stesso numero di punti in ogni decade, come richiede una curva tracciata su un asse logaritmico. Richiede un intervallo strettamente maggiore di zero."
+
+
+msgid "Lower control limit"
+msgstr "Limite di controllo inferiore"
+
+
 msgid "MC batch:"
 msgstr "Lotto MC:"
 
@@ -1032,12 +1332,24 @@ msgid "MC resamples:"
 msgstr "Ricampionamenti MC:"
 
 
+msgid "Manual spacing"
+msgstr "Spaziatura manuale"
+
+
+msgid "Mark peaks only:"
+msgstr "Segna solo i picchi:"
+
+
 msgid "Marker"
 msgstr "Marcatore"
 
 
 msgid "Match the model"
 msgstr "Segui il modello"
+
+
+msgid "Matplotlib Style (*.mplstyle);;All Files (*)"
+msgstr "Stile Matplotlib (*.mplstyle);;Tutti i file (*)"
 
 
 msgid "Matplotlib Style Editor"
@@ -1076,6 +1388,18 @@ msgid "Minimum samples for DBSCAN/OPTICS core points."
 msgstr "Campioni minimi per i punti core di DBSCAN/OPTICS."
 
 
+msgid "Minimum separation:"
+msgstr "Separazione minima:"
+
+
+msgid "Minimum width:"
+msgstr "Larghezza minima:"
+
+
+msgid "Minimum:"
+msgstr "Minimo:"
+
+
 msgid "Minor ticks"
 msgstr "Tacche secondarie"
 
@@ -1090,6 +1414,10 @@ msgstr "Espressione del modello che usa x (o xy), i parametri p[0], p[1]... e he
 
 msgid "Model:"
 msgstr "Modello:"
+
+
+msgid "More accurate on smooth data than the trapezoidal rule. Assumes the curve is well approximated by parabolas."
+msgstr "Più accurata del metodo dei trapezi su dati regolari. Presuppone che la curva sia ben approssimata da parabole."
 
 
 msgid "Morlet central frequency w0. Higher values resolve frequency more finely at the cost of time resolution; 6 is the usual compromise and the value at which the wavelet is near-admissible."
@@ -1136,12 +1464,20 @@ msgid "New"
 msgstr "Nuovo"
 
 
+msgid "New axis in this figure"
+msgstr "Nuovo asse in questa figura"
+
+
 msgid "New column name:"
 msgstr "Nome della nuova colonna:"
 
 
 msgid "New database"
 msgstr "Nuovo database"
+
+
+msgid "New figure"
+msgstr "Nuova figura"
 
 
 msgid "New plot"
@@ -1160,6 +1496,10 @@ msgid "No current figure selected."
 msgstr "Nessuna figura corrente selezionata."
 
 
+msgid "No descriptor axis found for annotation."
+msgstr "Nessun asse del descrittore trovato per l'annotazione."
+
+
 msgid "No fit results"
 msgstr "Nessun risultato di fit"
 
@@ -1176,12 +1516,32 @@ msgid "No parameters"
 msgstr "Nessun parametro"
 
 
+msgid "No peaks passed the filter. Lower the minimum, or switch from height to prominence if the baseline is not at zero."
+msgstr "Nessun picco ha superato il filtro. Abbassa il minimo, oppure passa da altezza a prominenza se la linea di base non è a zero."
+
+
+msgid "No points signal. The process is in statistical control - which says it is stable, not that it meets any specification."
+msgstr "Nessun punto segnala. Il processo è in controllo statistico: significa che è stabile, non che rispetti una specifica."
+
+
 msgid "No renderer roles declared."
 msgstr "Nessun ruolo del renderer dichiarato."
 
 
+msgid "No results for this selection."
+msgstr "Nessun risultato per questa selezione."
+
+
+msgid "No results."
+msgstr "Nessun risultato."
+
+
 msgid "No series selected."
 msgstr "Nessuna serie selezionata."
+
+
+msgid "None"
+msgstr "Nessuna"
 
 
 msgid "Normalisation:"
@@ -1288,6 +1648,10 @@ msgid "Order"
 msgstr "Ordina"
 
 
+msgid "Order of the polynomial fitted over each window."
+msgstr "Grado del polinomio adattato su ogni finestra."
+
+
 msgid "Outlier detection needs a table, and these series read from a saved query:\n\n{series}\n\nHiding an outlier marks a row in the source table, which a query result does not have. Import the query result as a table first."
 msgstr "Il rilevamento degli outlier richiede una tabella, e queste serie leggono da una query salvata:\n\n{series}\n\nNascondere un outlier marca una riga nella tabella di origine, che il risultato di una query non ha. Importa prima il risultato della query come tabella."
 
@@ -1320,6 +1684,10 @@ msgid "Paired-sample tests"
 msgstr "Test a campioni appaiati"
 
 
+msgid "Parameter"
+msgstr "Parametro"
+
+
 msgid "Parameter estimates"
 msgstr "Stime dei parametri"
 
@@ -1340,12 +1708,20 @@ msgid "Peak family:"
 msgstr "Famiglia di picchi:"
 
 
+msgid "Peaks"
+msgstr "Picchi"
+
+
 msgid "Peaks:"
 msgstr "Picchi:"
 
 
 msgid "Pick a built-in model to populate the expression and parameters."
 msgstr "Scegli un modello predefinito per popolare espressione e parametri."
+
+
+msgid "Pick a scanned function model to populate the formula and parameters."
+msgstr "Scegli un modello di funzione rilevato per compilare la formula e i parametri."
 
 
 msgid "Pick radius"
@@ -1364,6 +1740,30 @@ msgid "Plot"
 msgstr "Grafico"
 
 
+msgid "Point"
+msgstr "Punto"
+
+
+msgid "Points"
+msgstr "Punti"
+
+
+msgid "Points at half prominence. Raise it to reject single-sample spikes, which are usually instrument artefacts rather than features."
+msgstr "Punti a metà prominenza. Aumentalo per scartare i picchi di un solo campione, che di solito sono artefatti dello strumento e non caratteristiche del segnale."
+
+
+msgid "Points per polynomial fit. Larger smooths more and rounds sharp features; must exceed the polynomial order."
+msgstr "Punti per ogni adattamento polinomiale. Valori maggiori levigano di più e arrotondano i dettagli marcati; deve essere maggiore del grado del polinomio."
+
+
+msgid "Points plotted"
+msgstr "Punti tracciati"
+
+
+msgid "Points. Of any two peaks closer than this, the more prominent is kept - which is how a single noisy peak stops being reported as several."
+msgstr "Punti. Fra due picchi più vicini di così viene mantenuto il più prominente: è così che un singolo picco rumoroso non viene riportato come più picchi."
+
+
 msgid "Points:"
 msgstr "Punti:"
 
@@ -1374,6 +1774,10 @@ msgstr "Grado del polinomio (per i modelli della famiglia polinomiale)."
 
 msgid "Polynomial degree for NumPy polyfit."
 msgstr "Grado del polinomio per polyfit di NumPy."
+
+
+msgid "Polynomial order:"
+msgstr "Grado del polinomio:"
 
 
 msgid "Preview"
@@ -1400,6 +1804,18 @@ msgid "Projection"
 msgstr "Proiezione"
 
 
+msgid "Prominence"
+msgstr "Prominenza"
+
+
+msgid "Prominence (relative)"
+msgstr "Prominenza (relativa)"
+
+
+msgid "Prominence measures a peak against its own surroundings and survives a sloping baseline. Height compares it to zero, which only means something when the baseline is at zero."
+msgstr "La prominenza misura un picco rispetto a ciò che lo circonda e regge anche con una linea di base inclinata. L'altezza lo confronta con lo zero, il che ha senso solo se la linea di base è a zero."
+
+
 msgid "Query Builder"
 msgstr "Query Builder"
 
@@ -1412,8 +1828,16 @@ msgid "Query:"
 msgstr "Query:"
 
 
+msgid "Range"
+msgstr "Intervallo"
+
+
 msgid "Rank by:"
 msgstr "Ordina per:"
+
+
+msgid "Recomputes the limits without the points they flagged. Use only when the flagged points have an assigned cause you have removed; otherwise it hides the problem."
+msgstr "Ricalcola i limiti senza i punti che hanno segnalato. Usalo solo quando i punti segnalati hanno una causa identificata che hai rimosso; altrimenti nasconde il problema."
 
 
 msgid "Reduce noise and highlight underlying trends through signal smoothing."
@@ -1440,8 +1864,16 @@ msgid "Reload chart"
 msgstr "Ricarica il grafico"
 
 
+msgid "Reload database tables"
+msgstr "Ricarica le tabelle del database"
+
+
 msgid "Reload from the source"
 msgstr "Ricarica dalla sorgente"
+
+
+msgid "Reload tables"
+msgstr "Ricarica tabelle"
 
 
 msgid "Remove"
@@ -1456,8 +1888,16 @@ msgid "Remove the selected property"
 msgstr "Rimuove la proprieta selezionata"
 
 
+msgid "Removed before integrating. Without this, a raised baseline contributes its offset times the width to the area."
+msgstr "Rimossa prima di integrare. Senza questo, una linea di base sollevata contribuisce all'area con il suo scostamento moltiplicato per la larghezza."
+
+
 msgid "Rename"
 msgstr "Rinomina"
+
+
+msgid "Rename current table"
+msgstr "Rinomina la tabella corrente"
 
 
 msgid "Rename table"
@@ -1466,6 +1906,10 @@ msgstr "Rinomina tabella"
 
 msgid "Rename the selection"
 msgstr "Rinomina la selezione"
+
+
+msgid "Rename…"
+msgstr "Rinomina…"
 
 
 msgid "Render as:"
@@ -1484,6 +1928,10 @@ msgid "Replace previous smoothing preview in chart"
 msgstr "Sostituisci nel grafico l'anteprima di smoothing precedente"
 
 
+msgid "Report at most:"
+msgstr "Riporta al massimo:"
+
+
 msgid "Reset"
 msgstr "Reimposta"
 
@@ -1494,6 +1942,10 @@ msgstr "Reimposta i cluster"
 
 msgid "Reset Hide to 0"
 msgstr "Reimposta Hide a 0"
+
+
+msgid "Reset parameters"
+msgstr "Reimposta i parametri"
 
 
 msgid "Reset the parameter table to the selected model's defaults."
@@ -1536,6 +1988,10 @@ msgid "Rows"
 msgstr "Righe"
 
 
+msgid "Rule"
+msgstr "Regola"
+
+
 msgid "Run"
 msgstr "Esegui"
 
@@ -1568,6 +2024,10 @@ msgid "SQL query (SELECT / WITH ...)"
 msgstr "Query SQL (SELECT / WITH ...)"
 
 
+msgid "Same axis as the source"
+msgstr "Stesso asse dell'origine"
+
+
 msgid "Samples per Welch segment. Longer segments resolve finer frequency detail; shorter ones average away more noise."
 msgstr "Campioni per segmento di Welch. Segmenti più lunghi risolvono dettagli in frequenza più fini; segmenti più corti mediano via più rumore."
 
@@ -1592,6 +2052,10 @@ msgid "Save Matplotlib Style"
 msgstr "Salva stile Matplotlib"
 
 
+msgid "Save as CSV"
+msgstr "Salva come CSV"
+
+
 msgid "Save as picture"
 msgstr "Salva come immagine"
 
@@ -1606,6 +2070,10 @@ msgstr "Errore di salvataggio"
 
 msgid "Save failed"
 msgstr "Salvataggio non riuscito"
+
+
+msgid "Save parameters as CSV"
+msgstr "Salva i parametri come CSV"
 
 
 msgid "Save query"
@@ -1660,6 +2128,14 @@ msgid "Select"
 msgstr "Seleziona"
 
 
+msgid "Select Matplotlib Style"
+msgstr "Seleziona uno stile Matplotlib"
+
+
+msgid "Select a function."
+msgstr "Seleziona una funzione."
+
+
 msgid "Select a property first."
 msgstr "Seleziona prima una proprietà."
 
@@ -1678,6 +2154,10 @@ msgstr "Seleziona un asse per modificarne i kwargs."
 
 msgid "Select file"
 msgstr "Seleziona file"
+
+
+msgid "Select one or more source series."
+msgstr "Seleziona una o più serie di origine."
 
 
 msgid "Series"
@@ -1724,6 +2204,10 @@ msgid "Series:"
 msgstr "Serie:"
 
 
+msgid "Set Figure layout to Manual to edit spacing by hand."
+msgstr "Imposta il layout della figura su Manuale per modificare la spaziatura a mano."
+
+
 msgid "Settings"
 msgstr "Impostazioni"
 
@@ -1760,6 +2244,10 @@ msgid "Show details"
 msgstr "Mostra i dettagli"
 
 
+msgid "Show generated tables"
+msgstr "Mostra le tabelle generate"
+
+
 msgid "Show grid"
 msgstr "Mostra la griglia"
 
@@ -1776,8 +2264,20 @@ msgid "Show series operations"
 msgstr "Mostra le operazioni sulle serie"
 
 
+msgid "Show the tables written by fits, smoothing, outlier and spectral operations. Their names start with an underscore."
+msgstr "Mostra le tabelle scritte dalle operazioni di fit, smoothing, outlier e spettrali. I loro nomi iniziano con un trattino basso."
+
+
+msgid "Sigma estimate"
+msgstr "Stima di sigma"
+
+
 msgid "Sign test"
 msgstr "Test dei segni"
+
+
+msgid "Signal"
+msgstr "Segnale"
 
 
 msgid "Skip last rows"
@@ -1804,6 +2304,10 @@ msgid "Smoothing"
 msgstr "Smoothing"
 
 
+msgid "Smoothing window:"
+msgstr "Finestra di lisciamento:"
+
+
 msgid "Snippets"
 msgstr "Frammenti"
 
@@ -1824,8 +2328,16 @@ msgid "Source"
 msgstr "Origine"
 
 
+msgid "Spacing"
+msgstr "Spaziatura"
+
+
 msgid "Spacing:"
 msgstr "Spaziatura:"
+
+
+msgid "Span"
+msgstr "Estensione"
 
 
 msgid "Spectral"
@@ -1852,8 +2364,16 @@ msgid "Spline k:"
 msgstr "k della spline:"
 
 
+msgid "Spline smoothing:"
+msgstr "Lisciamento della spline:"
+
+
 msgid "Spline:"
 msgstr "Spline:"
+
+
+msgid "Start of the range to evaluate over."
+msgstr "Inizio dell'intervallo su cui valutare la funzione."
 
 
 msgid "Start params:"
@@ -1872,12 +2392,28 @@ msgid "Step:"
 msgstr "Passo:"
 
 
+msgid "Straight line between endpoints"
+msgstr "Retta fra gli estremi"
+
+
 msgid "Style"
 msgstr "Stile"
 
 
 msgid "Style stack"
 msgstr "Pila degli stili"
+
+
+msgid "Subgroup size"
+msgstr "Dimensione del sottogruppo"
+
+
+msgid "Subgroup size:"
+msgstr "Dimensione del sottogruppo:"
+
+
+msgid "Subtract minimum"
+msgstr "Sottrai il minimo"
 
 
 msgid "Summary"
@@ -1908,12 +2444,28 @@ msgid "Target"
 msgstr "Destinazione"
 
 
+msgid "Text"
+msgstr "Testo"
+
+
+msgid "The A/B/C zones the run rules are phrased in: \"two of three beyond two sigma\" is a statement about a line worth seeing."
+msgstr "Le zone A/B/C in cui sono formulate le regole di sequenza: \"due su tre oltre due sigma\" parla di una linea che vale la pena vedere."
+
+
 msgid "The apply callback failed:\n{error}"
 msgstr "Il callback di applicazione non è riuscito:\n{error}"
 
 
 msgid "The latest fit has no parameters to copy."
 msgstr "L’ultimo fit non ha parametri da copiare."
+
+
+msgid "The operation runs on the figure it was opened from."
+msgstr "L'operazione viene eseguita sulla figura da cui è stata aperta."
+
+
+msgid "The process mean the limits are built around."
+msgstr "La media del processo attorno alla quale sono costruiti i limiti."
 
 
 msgid "The query is not valid and was not saved:\n\n{error}"
@@ -1928,8 +2480,21 @@ msgid "The style stack is empty."
 msgstr "La pila degli stili è vuota."
 
 
+msgid "The upper and lower limits. Without them the chart is a run chart - the points, but nothing to judge them against."
+msgstr "I limiti superiore e inferiore. Senza di essi la carta è un semplice grafico dei valori: i punti, ma nulla con cui confrontarli."
+
+
+
+msgid "There is no database yet.\n\nBuild the demo project? It writes a small example project - tables, saved queries and ready-made charts - so there is something to take apart. You can create your own database at any time."
+msgstr "Non c'è ancora nessun database.\n\nVuoi creare il progetto dimostrativo? Contiene un piccolo progetto di esempio - tabelle, query salvate e grafici già pronti - da cui partire. Puoi creare il tuo database in qualsiasi momento."
+
+
 msgid "These entries are not valid and were not applied:\n{entries}"
 msgstr "Queste voci non sono valide e non sono state applicate:\n{entries}"
+
+
+msgid "This function takes no parameters."
+msgstr "Questa funzione non ha parametri."
 
 
 msgid "This operation needs both an x and a y role. Map them first."
@@ -1964,8 +2529,16 @@ msgid "Ticks, grid and spines"
 msgstr "Tacche, griglia e bordi degli assi"
 
 
+msgid "Tie eta"
+msgstr "Vincola eta"
+
+
 msgid "Tie eta across pseudo-Voigt peaks"
 msgstr "Vincola eta tra i picchi pseudo-Voigt"
+
+
+msgid "Tie width"
+msgstr "Vincola la larghezza"
 
 
 msgid "Tie width/sigma across peaks"
@@ -1976,8 +2549,16 @@ msgid "Title"
 msgstr "Titolo"
 
 
+msgid "To x:"
+msgstr "A x:"
+
+
 msgid "Top"
 msgstr "Alto"
+
+
+msgid "Total"
+msgstr "Totale"
 
 
 msgid "Trim percentage used for trimmed mean."
@@ -1996,8 +2577,16 @@ msgid "Two-sided"
 msgstr "Bilaterale"
 
 
+msgid "Type"
+msgstr "Tipo"
+
+
 msgid "UNION ALL of two tables with the same columns"
 msgstr "UNION ALL di due tabelle con le stesse colonne"
+
+
+msgid "Undefined points"
+msgstr "Punti non definiti"
 
 
 msgid "Union"
@@ -2012,12 +2601,40 @@ msgid "Up"
 msgstr "Su"
 
 
+msgid "Update current table from its link"
+msgstr "Aggiorna la tabella corrente dal suo collegamento"
+
+
+msgid "Update link"
+msgstr "Aggiorna collegamento"
+
+
+msgid "Upper control limit"
+msgstr "Limite di controllo superiore"
+
+
+msgid "Use Simpson's rule:"
+msgstr "Usa il metodo di Simpson:"
+
+
 msgid "Use current figure"
 msgstr "Usa la figura corrente"
 
 
 msgid "Use existing axis"
 msgstr "Usa un asse esistente"
+
+
+msgid "Use latest fitted parameters"
+msgstr "Usa gli ultimi parametri ottimizzati"
+
+
+msgid "Value"
+msgstr "Valore"
+
+
+msgid "Values used to evaluate the function. Nothing is fitted here."
+msgstr "Valori usati per valutare la funzione. Qui non viene eseguito alcun fit."
 
 
 msgid "View statistical information about the data"
@@ -2044,6 +2661,10 @@ msgid "Weighted RMSE/R²"
 msgstr "RMSE/R² pesati"
 
 
+msgid "Welcome"
+msgstr "Benvenuto"
+
+
 msgid "When enabled, applying this dialog again replaces the previously generated preview series."
 msgstr "Se attivo, applicando di nuovo questa finestra la serie di anteprima generata in precedenza viene sostituita."
 
@@ -2054,6 +2675,10 @@ msgstr "Quale grafico aggiungere. 'Segui il modello' sceglie quello che mostra c
 
 msgid "Which fitted distribution the histogram draws. Best fit follows whichever candidate ranks first for the series."
 msgstr "Quale distribuzione adattata viene disegnata sull'istogramma. Fit migliore segue la candidata che risulta prima in classifica per la serie."
+
+
+msgid "Which turning points to look for."
+msgstr "Quali punti di inversione cercare."
 
 
 msgid "Width"
@@ -2088,6 +2713,10 @@ msgid "Write, validate and save SQL queries"
 msgstr "Scrivi, valida e salva query SQL"
 
 
+msgid "X"
+msgstr "X"
+
+
 msgid "X label"
 msgstr "Etichetta X"
 
@@ -2110,6 +2739,10 @@ msgstr "Spaziatura X:"
 
 msgid "X tick rotation"
 msgstr "Rotazione delle tacche X"
+
+
+msgid "Y"
+msgstr "Y"
 
 
 msgid "Y label"
@@ -2148,6 +2781,10 @@ msgid "auto, or start, stop"
 msgstr "auto, oppure inizio, fine"
 
 
+msgid "bar"
+msgstr "barra"
+
+
 msgid "density: power per unit frequency. spectrum: power per segment."
 msgstr "density: potenza per unità di frequenza. spectrum: potenza per segmento."
 
@@ -2160,8 +2797,24 @@ msgid "macOS native"
 msgstr "macOS nativo"
 
 
+msgid "maximum"
+msgstr "massimo"
+
+
+msgid "minimum"
+msgstr "minimo"
+
+
 msgid "no timeout"
 msgstr "nessun timeout"
+
+
+msgid "series"
+msgstr "serie"
+
+
+msgid "slice"
+msgstr "fetta"
 
 
 msgid "space"
@@ -2170,6 +2823,14 @@ msgstr "spazio"
 
 msgid "unbiased divides by the overlap at each lag; biased divides by N; none returns the raw sum of products."
 msgstr "unbiased divide per la sovrapposizione a ogni ritardo; biased divide per N; none restituisce la somma grezza dei prodotti."
+
+
+msgid "y range"
+msgstr "Intervallo di y"
+
+
+msgid "{count} of {total} points signal. The process is not in statistical control."
+msgstr "{count} punti su {total} segnalano. Il processo non è in controllo statistico."
 
 
 msgid "{count} rows are now hidden."
@@ -2184,316 +2845,16 @@ msgid "{error}"
 msgstr "{error}"
 
 
+msgid "{label}: {value}"
+msgstr "{label}: {value}"
+
+
 msgid "{method} needs two series.\n\nSelect the reference series first, then the one to compare it with."
 msgstr "{method} richiede due serie.\n\nSeleziona prima la serie di riferimento, poi quella da confrontare."
 
 
 msgid "{report}"
 msgstr "{report}"
-
-
-msgid "{series}: {error}"
-msgstr "{series}: {error}"
-
-
-msgid "series"
-msgstr "serie"
-
-
-msgid "{series} — x: {x}, y: {y}"
-msgstr "{series} — x: {x}, y: {y}"
-
-
-msgid "{series} — {count} points, mean x: {x}, mean y: {y}"
-msgstr "{series} — {count} punti, media x: {x}, media y: {y}"
-
-
-msgid "Create a new plot tab for the current table"
-msgstr "Crea una nuova scheda grafico per la tabella corrente"
-
-
-msgid "Rename…"
-msgstr "Rinomina…"
-
-
-msgid "Rename current table"
-msgstr "Rinomina la tabella corrente"
-
-
-msgid "Update link"
-msgstr "Aggiorna collegamento"
-
-
-msgid "Update current table from its link"
-msgstr "Aggiorna la tabella corrente dal suo collegamento"
-
-
-msgid "Export → CSV…"
-msgstr "Esporta → CSV…"
-
-
-msgid "Export current table as comma separated text file"
-msgstr "Esporta la tabella corrente come file di testo separato da virgole"
-
-
-msgid "Export → XLSX…"
-msgstr "Esporta → XLSX…"
-
-
-msgid "Export current table as Excel file"
-msgstr "Esporta la tabella corrente come file Excel"
-
-
-msgid "Delete…"
-msgstr "Elimina…"
-
-
-msgid "Delete selected tables…"
-msgstr "Elimina le tabelle selezionate…"
-
-
-msgid "Delete {count} selected tables"
-msgstr "Elimina {count} tabelle selezionate"
-
-
-msgid "Delete the selected table"
-msgstr "Elimina la tabella selezionata"
-
-
-msgid "Show generated tables"
-msgstr "Mostra le tabelle generate"
-
-
-msgid "Show the tables written by fits, smoothing, outlier and spectral operations. Their names start with an underscore."
-msgstr "Mostra le tabelle scritte dalle operazioni di fit, smoothing, outlier e spettrali. I loro nomi iniziano con un trattino basso."
-
-
-msgid "Reload tables"
-msgstr "Ricarica tabelle"
-
-
-msgid "Reload database tables"
-msgstr "Ricarica le tabelle del database"
-
-
-msgid "Add annotation"
-msgstr "Aggiungi annotazione"
-
-
-msgid "Annotation"
-msgstr "Annotazione"
-
-
-msgid "Annotation added at x: {x}, y: {y}"
-msgstr "Annotazione aggiunta a x: {x}, y: {y}"
-
-
-msgid "Annotations"
-msgstr "Annotazioni"
-
-
-msgid "Annotations are stored in axis options. Kwargs must be JSON, for example: {\"xytext\": [10, 10], \"textcoords\": \"offset points\"}."
-msgstr "Le annotazioni sono salvate nelle opzioni dell'asse. I kwargs devono essere in JSON, per esempio: {\"xytext\": [10, 10], \"textcoords\": \"offset points\"}."
-
-
-msgid "Apply multi-peak"
-msgstr "Applica multi-picco"
-
-
-msgid "Browse…"
-msgstr "Sfoglia…"
-
-
-msgid "Calculus"
-msgstr "Calcolo"
-
-
-msgid "Choose the calculation."
-msgstr "Scegli il calcolo da eseguire."
-
-
-msgid "Copy parameters"
-msgstr "Copia i parametri"
-
-
-msgid "Correlation matrix"
-msgstr "Matrice di correlazione"
-
-
-msgid "Curve"
-msgstr "Curva"
-
-
-msgid "Delete selected"
-msgstr "Elimina selezionati"
-
-
-msgid "Detail"
-msgstr "Dettaglio"
-
-
-msgid "Find:"
-msgstr "Cerca:"
-
-
-msgid "Function expression"
-msgstr "Espressione della funzione"
-
-
-msgid "Function expression with evaluated parameters"
-msgstr "Espressione della funzione con i parametri valutati"
-
-
-msgid "Grid cells this axis spans from its position, so it can take up more room than the other axes in the figure."
-msgstr "Celle della griglia occupate da questo asse a partire dalla sua posizione, così da poter occupare più spazio degli altri assi della figura."
-
-
-msgid "Grid position"
-msgstr "Posizione nella griglia"
-
-
-msgid "Half-prominence bounds"
-msgstr "Limiti a metà prominenza"
-
-
-msgid "Initial value, bounds and fixed flag for each function parameter. Apply runs the fit with these settings."
-msgstr "Valore iniziale, limiti e blocco per ogni parametro della funzione. Applica esegue il fit con queste impostazioni."
-
-
-msgid "Kind"
-msgstr "Tipo"
-
-
-msgid "Kwargs JSON"
-msgstr "Kwargs JSON"
-
-
-msgid "Manual spacing"
-msgstr "Spaziatura manuale"
-
-
-msgid "Matplotlib Style (*.mplstyle);;All Files (*)"
-msgstr "Stile Matplotlib (*.mplstyle);;Tutti i file (*)"
-
-
-msgid "No descriptor axis found for annotation."
-msgstr "Nessun asse del descrittore trovato per l'annotazione."
-
-
-msgid "No peaks passed the filter. Lower the minimum, or switch from height to prominence if the baseline is not at zero."
-msgstr "Nessun picco ha superato il filtro. Abbassa il minimo, oppure passa da altezza a prominenza se la linea di base non è a zero."
-
-
-msgid "No results for this selection."
-msgstr "Nessun risultato per questa selezione."
-
-
-msgid "No results."
-msgstr "Nessun risultato."
-
-
-msgid "Peaks"
-msgstr "Picchi"
-
-
-msgid "Pick a scanned function model to populate the formula and parameters."
-msgstr "Scegli un modello di funzione rilevato per compilare la formula e i parametri."
-
-
-msgid "Points"
-msgstr "Punti"
-
-
-msgid "Prominence"
-msgstr "Prominenza"
-
-
-msgid "Reset parameters"
-msgstr "Reimposta i parametri"
-
-
-msgid "Save as CSV"
-msgstr "Salva come CSV"
-
-
-msgid "Save parameters as CSV"
-msgstr "Salva i parametri come CSV"
-
-
-msgid "Select Matplotlib Style"
-msgstr "Seleziona uno stile Matplotlib"
-
-
-msgid "Select one or more source series."
-msgstr "Seleziona una o più serie di origine."
-
-
-msgid "Set Figure layout to Manual to edit spacing by hand."
-msgstr "Imposta il layout della figura su Manuale per modificare la spaziatura a mano."
-
-
-msgid "Span"
-msgstr "Estensione"
-
-
-msgid "Text"
-msgstr "Testo"
-
-
-msgid "Tie eta"
-msgstr "Vincola eta"
-
-
-msgid "Tie width"
-msgstr "Vincola la larghezza"
-
-
-msgid "Total"
-msgstr "Totale"
-
-
-msgid "Type"
-msgstr "Tipo"
-
-
-msgid "Use latest fitted parameters"
-msgstr "Usa gli ultimi parametri ottimizzati"
-
-
-msgid "Which turning points to look for."
-msgstr "Quali punti di inversione cercare."
-
-
-msgid "X"
-msgstr "X"
-
-
-msgid "Y"
-msgstr "Y"
-
-
-msgid "bar"
-msgstr "barra"
-
-
-msgid "maximum"
-msgstr "massimo"
-
-
-msgid "minimum"
-msgstr "minimo"
-
-
-msgid "slice"
-msgstr "fetta"
-
-
-msgid "{label}: {value}"
-msgstr "{label}: {value}"
-
-
-msgid "{series}\nx: {x}\ny: {y}"
-msgstr "{series}\nx: {x}\ny: {y}"
 
 
 msgid "{series} hidden"
@@ -2504,353 +2865,22 @@ msgid "{series} shown"
 msgstr "{series} mostrata"
 
 
+msgid "{series} — x: {x}, y: {y}"
+msgstr "{series} — x: {x}, y: {y}"
+
+
+msgid "{series} — {count} points, mean x: {x}, mean y: {y}"
+msgstr "{series} — {count} punti, media x: {x}, media y: {y}"
+
+
 msgid "{series} — {percent:.1f}% of the total"
 msgstr "{series} — {percent:.1f}% del totale"
 
 
-msgid "Centre line"
-msgstr "Linea centrale"
+msgid "{series}: {error}"
+msgstr "{series}: {error}"
 
 
-msgid "Chart"
-msgstr "Carta"
+msgid "{series}\nx: {x}\ny: {y}"
+msgstr "{series}\nx: {x}\ny: {y}"
 
-
-msgid "Choose the control chart."
-msgstr "Scegli la carta di controllo."
-
-
-msgid "Control Chart"
-msgstr "Carta di controllo"
-
-
-msgid "Description"
-msgstr "Descrizione"
-
-
-msgid "Estimator"
-msgstr "Stimatore"
-
-
-msgid "Function"
-msgstr "Funzione"
-
-
-msgid "Lower control limit"
-msgstr "Limite di controllo inferiore"
-
-
-msgid "No points signal. The process is in statistical control - which says it is stable, not that it meets any specification."
-msgstr "Nessun punto segnala. Il processo è in controllo statistico: significa che è stabile, non che rispetti una specifica."
-
-
-msgid "Parameter"
-msgstr "Parametro"
-
-
-msgid "Point"
-msgstr "Punto"
-
-
-msgid "Points plotted"
-msgstr "Punti tracciati"
-
-
-msgid "Range"
-msgstr "Intervallo"
-
-
-msgid "Rule"
-msgstr "Regola"
-
-
-msgid "Select a function."
-msgstr "Seleziona una funzione."
-
-
-msgid "Sigma estimate"
-msgstr "Stima di sigma"
-
-
-msgid "Signal"
-msgstr "Segnale"
-
-
-msgid "Spacing"
-msgstr "Spaziatura"
-
-
-msgid "Subgroup size"
-msgstr "Dimensione del sottogruppo"
-
-
-msgid "This function takes no parameters."
-msgstr "Questa funzione non ha parametri."
-
-
-msgid "Undefined points"
-msgstr "Punti non definiti"
-
-
-msgid "Upper control limit"
-msgstr "Limite di controllo superiore"
-
-
-msgid "Value"
-msgstr "Valore"
-
-
-msgid "Values used to evaluate the function. Nothing is fitted here."
-msgstr "Valori usati per valutare la funzione. Qui non viene eseguito alcun fit."
-
-
-msgid "y range"
-msgstr "Intervallo di y"
-
-
-msgid "{count} of {total} points signal. The process is not in statistical control."
-msgstr "{count} punti su {total} segnalano. Il processo non è in controllo statistico."
-
-
-msgid "0 interpolates every point exactly; larger values allow the spline to depart from noisy data."
-msgstr "0 interpola esattamente ogni punto; valori maggiori permettono alla spline di discostarsi da dati rumorosi."
-
-
-msgid "1 for the slope, 2 for the curvature."
-msgstr "1 per la pendenza, 2 per la curvatura."
-
-
-msgid "3 is the Shewhart convention: on a stable normal process it gives about one false alarm per 370 points, which balances missed signals against chasing noise."
-msgstr "3 è la convenzione di Shewhart: su un processo normale e stabile dà circa un falso allarme ogni 370 punti, il che bilancia i segnali mancati e le false segnalazioni."
-
-
-msgid "A derivative or an integral rarely shares a scale with the series it came from - d/dx of a slow drift is near zero beside data in the thousands. On by default for that reason; turn it off to overlay when the ranges happen to be comparable."
-msgstr "Una derivata o un integrale raramente condivide la scala della serie di origine: la d/dx di una deriva lenta è quasi zero accanto a dati dell'ordine delle migliaia. Per questo è attivo per impostazione predefinita; disattivalo per sovrapporre le curve quando gli intervalli sono confrontabili."
-
-
-msgid "Apply Nelson rules:"
-msgstr "Applica le regole di Nelson:"
-
-
-msgid "As a fraction of the signal's full range. 0.1 keeps peaks standing at least a tenth of the range above their surroundings."
-msgstr "Come frazione dell'intervallo completo del segnale. 0,1 mantiene i picchi che si elevano almeno di un decimo dell'intervallo rispetto a ciò che li circonda."
-
-
-msgid "Baseline:"
-msgstr "Linea di base:"
-
-
-msgid "Consecutive points averaged into each plotted subgroup. Rational subgrouping: choose it so variation within a subgroup is only common-cause noise."
-msgstr "Punti consecutivi mediati in ogni sottogruppo tracciato. Sottogruppi razionali: scegli la dimensione in modo che la variazione interna al sottogruppo sia solo rumore di causa comune."
-
-
-msgid "Derivative order:"
-msgstr "Ordine della derivata:"
-
-
-msgid "Draw on a new axis:"
-msgstr "Disegna su un nuovo asse:"
-
-
-msgid "Draw the located peaks as markers rather than writing a table of measurements."
-msgstr "Disegna i picchi individuati come marcatori invece di scrivere una tabella di misure."
-
-
-msgid "End of the range to evaluate over."
-msgstr "Fine dell'intervallo su cui valutare la funzione."
-
-
-msgid "Exclude flagged points from the limits:"
-msgstr "Escludi dai limiti i punti segnalati:"
-
-
-msgid "Filter by:"
-msgstr "Filtra per:"
-
-
-msgid "Flags runs, trends and other patterns that stay inside the limits - the signals a limits-only chart misses."
-msgstr "Segnala sequenze, tendenze e altri andamenti che restano entro i limiti: i segnali che una carta basata solo sui limiti non vede."
-
-
-msgid "From x:"
-msgstr "Da x:"
-
-
-msgid "Height (absolute)"
-msgstr "Altezza (assoluta)"
-
-
-msgid "How densely to sample. A curve with sharp features needs more; a straight line needs two."
-msgstr "Densità di campionamento. Una curva con dettagli marcati ne richiede di più; una retta ne richiede due."
-
-
-msgid "Keeps the most prominent peaks when many are found."
-msgstr "Mantiene i picchi più prominenti quando ne vengono trovati molti."
-
-
-msgid "Limits at sigma:"
-msgstr "Limiti a sigma:"
-
-
-msgid "Linear"
-msgstr "Lineare"
-
-
-msgid "Logarithmic"
-msgstr "Logaritmica"
-
-
-msgid "Logarithmic puts equal numbers of points in each decade, which is what a curve plotted on a log axis needs. It requires a range strictly above zero."
-msgstr "La spaziatura logaritmica mette lo stesso numero di punti in ogni decade, come richiede una curva tracciata su un asse logaritmico. Richiede un intervallo strettamente maggiore di zero."
-
-
-msgid "Mark peaks only:"
-msgstr "Segna solo i picchi:"
-
-
-msgid "Minimum separation:"
-msgstr "Separazione minima:"
-
-
-msgid "Minimum width:"
-msgstr "Larghezza minima:"
-
-
-msgid "Minimum:"
-msgstr "Minimo:"
-
-
-msgid "More accurate on smooth data than the trapezoidal rule. Assumes the curve is well approximated by parabolas."
-msgstr "Più accurata del metodo dei trapezi su dati regolari. Presuppone che la curva sia ben approssimata da parabole."
-
-
-msgid "None"
-msgstr "Nessuna"
-
-
-msgid "Order of the polynomial fitted over each window."
-msgstr "Grado del polinomio adattato su ogni finestra."
-
-
-msgid "Points at half prominence. Raise it to reject single-sample spikes, which are usually instrument artefacts rather than features."
-msgstr "Punti a metà prominenza. Aumentalo per scartare i picchi di un solo campione, che di solito sono artefatti dello strumento e non caratteristiche del segnale."
-
-
-msgid "Points per polynomial fit. Larger smooths more and rounds sharp features; must exceed the polynomial order."
-msgstr "Punti per ogni adattamento polinomiale. Valori maggiori levigano di più e arrotondano i dettagli marcati; deve essere maggiore del grado del polinomio."
-
-
-msgid "Points. Of any two peaks closer than this, the more prominent is kept - which is how a single noisy peak stops being reported as several."
-msgstr "Punti. Fra due picchi più vicini di così viene mantenuto il più prominente: è così che un singolo picco rumoroso non viene riportato come più picchi."
-
-
-msgid "Polynomial order:"
-msgstr "Grado del polinomio:"
-
-
-msgid "Prominence (relative)"
-msgstr "Prominenza (relativa)"
-
-
-msgid "Prominence measures a peak against its own surroundings and survives a sloping baseline. Height compares it to zero, which only means something when the baseline is at zero."
-msgstr "La prominenza misura un picco rispetto a ciò che lo circonda e regge anche con una linea di base inclinata. L'altezza lo confronta con lo zero, il che ha senso solo se la linea di base è a zero."
-
-
-msgid "Recomputes the limits without the points they flagged. Use only when the flagged points have an assigned cause you have removed; otherwise it hides the problem."
-msgstr "Ricalcola i limiti senza i punti che hanno segnalato. Usalo solo quando i punti segnalati hanno una causa identificata che hai rimosso; altrimenti nasconde il problema."
-
-
-msgid "Removed before integrating. Without this, a raised baseline contributes its offset times the width to the area."
-msgstr "Rimossa prima di integrare. Senza questo, una linea di base sollevata contribuisce all'area con il suo scostamento moltiplicato per la larghezza."
-
-
-msgid "Report at most:"
-msgstr "Riporta al massimo:"
-
-
-msgid "Smoothing window:"
-msgstr "Finestra di lisciamento:"
-
-
-msgid "Spline smoothing:"
-msgstr "Lisciamento della spline:"
-
-
-msgid "Start of the range to evaluate over."
-msgstr "Inizio dell'intervallo su cui valutare la funzione."
-
-
-msgid "Straight line between endpoints"
-msgstr "Retta fra gli estremi"
-
-
-msgid "Subgroup size:"
-msgstr "Dimensione del sottogruppo:"
-
-
-msgid "Subtract minimum"
-msgstr "Sottrai il minimo"
-
-
-msgid "To x:"
-msgstr "A x:"
-
-
-msgid "Use Simpson's rule:"
-msgstr "Usa il metodo di Simpson:"
-
-
-msgid "A derivative or an integral rarely shares a scale with the series it came from - d/dx of a slow drift is near zero beside data in the thousands - so a new axis is the default. Same axis overlays them when the ranges are comparable; a new figure keeps the result out of this chart entirely."
-msgstr "Una derivata o un integrale raramente condivide la scala della serie di origine - la d/dx di una deriva lenta è quasi zero accanto a dati dell'ordine delle migliaia - quindi l'impostazione predefinita è un nuovo asse. Stesso asse sovrappone le curve quando gli intervalli sono confrontabili; nuova figura tiene il risultato del tutto fuori da questo grafico."
-
-
-msgid "Draw on:"
-msgstr "Disegna su:"
-
-
-msgid "New axis in this figure"
-msgstr "Nuovo asse in questa figura"
-
-
-msgid "New figure"
-msgstr "Nuova figura"
-
-
-msgid "Same axis as the source"
-msgstr "Stesso asse dell'origine"
-
-
-msgid "The operation runs on the figure it was opened from."
-msgstr "L'operazione viene eseguita sulla figura da cui è stata aperta."
-
-
-msgid "Draw the centre line:"
-msgstr "Traccia la linea centrale:"
-
-
-msgid "Draw the control limits:"
-msgstr "Traccia i limiti di controllo:"
-
-
-msgid "Draw the one and two sigma lines:"
-msgstr "Traccia le linee a uno e due sigma:"
-
-
-msgid "Draws the signalling points again as separate markers."
-msgstr "Ridisegna i punti che segnalano come marcatori separati."
-
-
-msgid "Highlight the flagged points:"
-msgstr "Evidenzia i punti segnalati:"
-
-
-msgid "The A/B/C zones the run rules are phrased in: \"two of three beyond two sigma\" is a statement about a line worth seeing."
-msgstr "Le zone A/B/C in cui sono formulate le regole di sequenza: \"due su tre oltre due sigma\" parla di una linea che vale la pena vedere."
-
-
-msgid "The process mean the limits are built around."
-msgstr "La media del processo attorno alla quale sono costruiti i limiti."
-
-
-msgid "The upper and lower limits. Without them the chart is a run chart - the points, but nothing to judge them against."
-msgstr "I limiti superiore e inferiore. Senza di essi la carta è un semplice grafico dei valori: i punti, ma nulla con cui confrontarli."

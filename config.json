@@ -346,6 +346,11 @@
     }
   },
   "messages": {
+    "axis.confirm_delete": {
+      "level": "question",
+      "title": "Delete axis",
+      "text": "Delete the axis '{axis}'?"
+    },
     "chart.confirm_delete": {
       "level": "question",
       "title": "Delete chart",
@@ -481,6 +486,11 @@
       "title": "Query Builder",
       "text": "Could not save the query:\n{error}"
     },
+    "series.confirm_delete": {
+      "level": "question",
+      "title": "Delete series",
+      "text": "Delete the series '{series}'?"
+    },
     "series.estimate_failed": {
       "level": "warning",
       "title": "Series operation",
@@ -541,6 +551,16 @@
       "title": "Series operation",
       "text": "Some series could not be processed:\n\n{errors}"
     },
+    "startup.demo_failed": {
+      "level": "error",
+      "title": "Welcome",
+      "text": "Could not build the demo project:\n{error}"
+    },
+    "startup.offer_demo": {
+      "level": "question",
+      "title": "Welcome",
+      "text": "There is no database yet.\n\nBuild the demo project? It writes a small example project - tables, saved queries and ready-made charts - so there is something to take apart. You can create your own database at any time."
+    },
     "style.apply_callback_failed": {
       "level": "warning",
       "title": "Apply",
@@ -595,16 +615,6 @@
       "level": "question",
       "title": "Delete tables",
       "text": "Delete {count} selected tables?\n\n{tables}"
-    },
-    "series.confirm_delete": {
-      "level": "question",
-      "title": "Delete series",
-      "text": "Delete the series '{series}'?"
-    },
-    "axis.confirm_delete": {
-      "level": "question",
-      "title": "Delete axis",
-      "text": "Delete the axis '{axis}'?"
     }
   },
   "chart_panel": {

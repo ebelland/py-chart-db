@@ -175,6 +175,27 @@ def read_xml_file(path: str, *, skiprows: int = 0, skipfooter: int = 0) -> pd.Da
     return df
 
 
+#: What the readers above can open, and therefore what the file dialog offers
+#: and what a drop onto the main window is accepted for.  One list: the dialog
+#: filter and the drop test used to be two literals, and a format added to the
+#: reader was a format the window still refused.
+IMPORTABLE_SUFFIXES: tuple[str, ...] = (
+    ".csv", ".tsv", ".txt", ".xlsx", ".xlsm", ".xls", ".json", ".xml",
+)
+
+#: The same list as a QFileDialog filter.
+IMPORT_FILE_FILTER: str = (
+    "Data files ("
+    + " ".join(f"*{suffix}" for suffix in IMPORTABLE_SUFFIXES)
+    + ");;All files (*.*)"
+)
+
+
+def is_importable(path: str | Path) -> bool:
+    """True when this file is one the import dialog can read."""
+    return (Path(path).suffix or "").lower() in IMPORTABLE_SUFFIXES
+
+
 def read_any_file(
     path: str,
     *,
@@ -759,18 +780,29 @@ class ImportDataDialog(QDialog):
             self,
             _("Select file"),
             str(Path.home()),
-            "Data files (*.csv *.tsv *.txt *.xlsx *.xls *.xlsm *.json *.xml);;All files (*.*)",
+            IMPORT_FILE_FILTER,
         )
         if not path:
             return
+        self.load_file(path)
 
+    def load_file(self, path: str | Path) -> None:
+        """Show *path* as the source, exactly as Browse does.
+
+        Public because Browse is no longer the only way a file arrives: the
+        main window accepts a drop and opens this dialog on what was dropped.
+        Sharing the method rather than the four lines means the dropped file
+        gets the sheet list, the default table name and the preview too - the
+        parts that are easy to leave out of a second copy.
+        """
+        name = str(path)
         self._source_mode = "file"
-        self._set_file_name_label(path)
-        self._set_default_table_name(path)
-        self._path = path
-        self._update_sheet_choices(path)
+        self._set_file_name_label(name)
+        self._set_default_table_name(name)
+        self._path = name
+        self._update_sheet_choices(name)
 
-        # Auto preview immediately when browse is selected
+        # Auto preview immediately: the file was chosen, not typed.
         self._refresh_preview()
 
     def _on_load_clipboard(self) -> None:
