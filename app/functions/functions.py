@@ -1,50 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import ClassVar
-
 import numpy as np
 import scipy.special as spsp
-
-
-@dataclass
-class base_function:
-    """Base metadata contract for scanned fit functions.
-
-    ``category`` is the top-level tree grouping in the fit dialog.  There is no
-    separate ``kind`` field on function classes: all subclasses are executable
-    fit functions discovered by FunctionScanner.
-    """
-
-    name: ClassVar[str] = ""
-    category: ClassVar[str] = "Functions"
-    description: ClassVar[str] = ""
-    expression: ClassVar[str] = ""
-    p0: ClassVar[list[float]] = []
-    params: ClassVar[list[str]] = []
-
-    @staticmethod
-    def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        raise NotImplementedError
-
-
-def _eps(value: float | np.ndarray, eps: float = 1e-12) -> np.ndarray:
-    arr = np.asarray(value, dtype=float)
-    return np.where(np.abs(arr) < eps, eps, arr)
-
-
-def _pos(value: float | np.ndarray, eps: float = 1e-12) -> np.ndarray:
-    arr = np.asarray(value, dtype=float)
-    return np.where(np.abs(arr) < eps, eps, np.abs(arr))
-
-
-def _safe_x(x: np.ndarray, eps: float = 1e-12) -> np.ndarray:
-    return np.where(np.abs(x) < eps, np.sign(x + eps) * eps, x)
-
-
-def _positive_x(x: np.ndarray, eps: float = 1e-12) -> np.ndarray:
-    return np.maximum(x, eps)
-
+from app.functions.base import (
+    _baseline,
+    _eps,
+    _exponential,
+    _measured_fwhm,
+    _peak_shape,
+    _polynomial_guess,
+    _pos,
+    _positive_x,
+    _safe_x,
+    base_function,
+)
 
 # ---------------------------------------------------------------------------
 # Basic functions
@@ -62,6 +31,10 @@ class constant(base_function):
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
         return np.full_like(x, p[0], dtype=float)
 
+    @staticmethod
+    def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
+        del x
+        return [float(np.mean(y))] if y.size else None
 
 class linear(base_function):
     name = "Linear"
@@ -75,6 +48,9 @@ class linear(base_function):
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
         return p[0] + p[1] * x
 
+    @staticmethod
+    def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
+        return _polynomial_guess(x, y, 1)
 
 class quadratic(base_function):
     name = "Quadratic"
@@ -88,6 +64,9 @@ class quadratic(base_function):
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
         return p[0] + p[1] * x + p[2] * x * x
 
+    @staticmethod
+    def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
+        return _polynomial_guess(x, y, 2)
 
 class cubic(base_function):
     name = "Cubic"
@@ -101,6 +80,9 @@ class cubic(base_function):
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
         return p[0] + p[1] * x + p[2] * x**2 + p[3] * x**3
 
+    @staticmethod
+    def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
+        return _polynomial_guess(x, y, 3)
 
 class reciprocal(base_function):
     name = "Reciprocal"
@@ -114,7 +96,6 @@ class reciprocal(base_function):
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
         return p[0] / _safe_x(x) + p[1]
 
-
 class logarithmic(base_function):
     name = "Logarithmic"
     category = "Basic functions"
@@ -126,7 +107,6 @@ class logarithmic(base_function):
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
         return p[0] * np.log(_positive_x(x - p[1])) + p[2]
-
 
 class power_law(base_function):
     name = "Power law"
@@ -140,6 +120,42 @@ class power_law(base_function):
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
         return p[0] * np.power(_positive_x(x), p[1]) + p[2]
 
+    @staticmethod
+    def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
+        """``A x^n + C``, via a straight line through log x against log y.
+
+        Both offsets are tried and the better one kept.  A power law rises
+        from its own offset, so the value at the low end of x is very nearly
+        that offset - except when there is no offset at all, where the same
+        reading subtracts a real part of the curve and the log-log line comes
+        out through skewed data.  The two candidates cost one polyfit each and
+        are told apart by the residual they leave, which is not something a
+        rule of thumb can decide in advance.
+        """
+        candidates: list[list[float]] = []
+        for offset in (_baseline(y), 0.0):
+            above = y - offset
+            usable = (x > 0.0) & (above > 0.0)
+            if int(np.count_nonzero(usable)) < 2:
+                continue
+            try:
+                exponent, intercept = np.polyfit(
+                    np.log(x[usable]), np.log(above[usable]), 1
+                )
+            except Exception:
+                continue
+            if np.isfinite(exponent) and np.isfinite(intercept):
+                candidates.append([float(np.exp(intercept)), float(exponent), float(offset)])
+
+        if not candidates:
+            return None
+
+        def misfit(guess: list[float]) -> float:
+            values = power_law.execute(x, np.asarray(guess, dtype=float))
+            residual = y - values
+            return float(np.sum(residual * residual)) if np.all(np.isfinite(residual)) else np.inf
+
+        return min(candidates, key=misfit)
 
 class rational_21(base_function):
     name = "Rational 2/1"
@@ -152,7 +168,6 @@ class rational_21(base_function):
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
         return (p[0] + p[1] * x + p[2] * x**2) / _eps(1.0 + p[3] * x)
-
 
 # ---------------------------------------------------------------------------
 # Growth and saturation
@@ -170,6 +185,9 @@ class exponential_growth(base_function):
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
         return p[0] * np.exp(p[1] * x) + p[2]
 
+    @staticmethod
+    def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
+        return _exponential(x, y, True)
 
 class exponential_decay(base_function):
     name = "Exponential decay"
@@ -183,6 +201,9 @@ class exponential_decay(base_function):
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
         return p[0] * np.exp(-p[1] * x) + p[2]
 
+    @staticmethod
+    def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
+        return _exponential(x, y, False)
 
 class double_exponential_decay(base_function):
     name = "Double exponential decay"
@@ -196,7 +217,6 @@ class double_exponential_decay(base_function):
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
         return p[0] * np.exp(-p[1] * x) + p[2] * np.exp(-p[3] * x) + p[4]
 
-
 class saturation_exponential(base_function):
     name = "Saturating exponential"
     category = "Growth and saturation"
@@ -208,7 +228,6 @@ class saturation_exponential(base_function):
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
         return p[2] + p[0] * (1.0 - np.exp(-p[1] * x))
-
 
 class michaelis_menten(base_function):
     name = "Michaelis-Menten"
@@ -222,6 +241,35 @@ class michaelis_menten(base_function):
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
         return p[2] + p[0] * x / _eps(p[1] + x)
 
+    @staticmethod
+    def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
+        if x.size < 3:
+            return None
+
+        usable = (x > 0.0) & (y > 0.0)
+        if int(np.count_nonzero(usable)) >= 2:
+            try:
+                slope, intercept = np.polyfit(x[usable], x[usable] / y[usable], 1)
+            except Exception:
+                slope = intercept = 0.0
+            if np.isfinite(slope) and np.isfinite(intercept) and slope > 0.0:
+                v_max = float(1.0 / slope)
+                km = float(intercept * v_max)
+                if km > 0.0 and np.isfinite(km):
+                    # Returned here rather than falling through: the
+                    # Lineweaver-Burk reading is the better of the two, and
+                    # the direct one below would overwrite it.
+                    return [v_max, km, 0.0]
+
+        # The direct reading, for data the transform cannot take: every y at or
+        # below zero, or a slope the wrong way.
+        v_max = float(np.max(y))
+        if v_max <= 0.0:
+            return None
+        km = float(x[int(np.argmin(np.abs(y - 0.5 * v_max)))])
+        if km <= 0.0:
+            km = float(np.median(x[x > 0.0])) if np.any(x > 0.0) else 1.0
+        return [v_max, km, 0.0]
 
 class hill(base_function):
     name = "Hill"
@@ -236,7 +284,6 @@ class hill(base_function):
         xp = _positive_x(x)
         n = _pos(p[2])
         return p[3] + p[0] * xp**n / _eps(_positive_x(p[1])**n + xp**n)
-
 
 # ---------------------------------------------------------------------------
 # Sigmoidal curves
@@ -254,6 +301,26 @@ class logistic4(base_function):
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
         return p[0] + p[1] / (1.0 + np.exp(-p[2] * (x - p[3])))
 
+    @staticmethod
+    def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
+        if x.size < 4:
+            return None
+
+        edge = max(1, x.size // 10)
+        bottom = float(np.mean(y[:edge]))
+        top = float(np.mean(y[-edge:]))
+        span = top - bottom
+        if span == 0.0:
+            return None
+
+        half = bottom + 0.5 * span
+        midpoint = float(x[int(np.argmin(np.abs(y - half)))])
+
+        # A transition occupying about a tenth of the plotted range; the sign
+        # follows the direction of travel because k carries it.
+        x_span = float(np.ptp(x)) or 1.0
+        steepness = (10.0 / x_span) * (1.0 if span > 0 else -1.0)
+        return [bottom, span, steepness, midpoint]
 
 class logistic5(base_function):
     name = "Logistic 5P asymmetric"
@@ -266,7 +333,6 @@ class logistic5(base_function):
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
         return p[0] + p[1] / np.power(1.0 + np.exp(-p[2] * (x - p[3])), _pos(p[4]))
-
 
 class richards(base_function):
     name = "Richards generalized logistic"
@@ -281,7 +347,6 @@ class richards(base_function):
         nu = _pos(p[4])
         return p[0] + p[1] / np.power(1.0 + nu * np.exp(-p[2] * (x - p[3])), 1.0 / nu)
 
-
 class gompertz_growth(base_function):
     name = "Gompertz growth"
     category = "Sigmoidal curves"
@@ -293,7 +358,6 @@ class gompertz_growth(base_function):
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
         return p[3] + p[0] * np.exp(-p[1] * np.exp(-p[2] * x))
-
 
 class erf_sigmoid(base_function):
     name = "Error-function sigmoid"
@@ -308,7 +372,6 @@ class erf_sigmoid(base_function):
         sigma = _pos(p[2])
         return p[3] + 0.5 * p[0] * (1.0 + spsp.erf((x - p[1]) / (np.sqrt(2.0) * sigma)))
 
-
 class tanh_sigmoid(base_function):
     name = "Tanh sigmoid"
     category = "Sigmoidal curves"
@@ -321,7 +384,6 @@ class tanh_sigmoid(base_function):
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
         return p[3] + 0.5 * p[0] * (1.0 + np.tanh(p[1] * (x - p[2])))
 
-
 class arctan_sigmoid(base_function):
     name = "Arctan sigmoid"
     category = "Sigmoidal curves"
@@ -333,7 +395,6 @@ class arctan_sigmoid(base_function):
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
         return p[3] + p[0] * (0.5 + np.arctan(p[1] * (x - p[2])) / np.pi)
-
 
 class double_logistic_pulse(base_function):
     name = "Double logistic pulse"
@@ -348,8 +409,6 @@ class double_logistic_pulse(base_function):
         rise = 1.0 / (1.0 + np.exp(-p[1] * (x - p[2])))
         fall = 1.0 / (1.0 + np.exp(p[3] * (x - p[4])))
         return p[5] + p[0] * rise * fall
-
-
 # ---------------------------------------------------------------------------
 # Peak functions
 # ---------------------------------------------------------------------------
@@ -367,6 +426,13 @@ class gaussian_peak(base_function):
         sigma = _pos(p[2])
         return p[0] * np.exp(-((x - p[1]) ** 2) / (2.0 * sigma**2)) + p[3]
 
+    @staticmethod
+    def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
+        shape = _peak_shape(x, y)
+        if shape is None:
+            return None
+        amplitude, centre, width, offset = shape
+        return [amplitude, centre, max(width, 1e-9), offset]
 
 class lorentzian_peak(base_function):
     name = "Lorentzian peak"
@@ -381,6 +447,20 @@ class lorentzian_peak(base_function):
         g2 = (0.5 * _pos(p[2])) ** 2
         return p[0] * g2 / (((x - p[1]) ** 2) + g2) + p[3]
 
+    @staticmethod
+    def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
+        shape = _peak_shape(x, y)
+        if shape is None:
+            return None
+        amplitude, centre, moment_width, offset = shape
+
+        width = _measured_fwhm(x, y, centre, amplitude, offset)
+        if width is None:
+            # Falling back to the moment is wrong by a factor for a Lorentzian,
+            # but a too-wide peak in the right place still converges; no guess at
+            # all does not.
+            width = 2.355 * moment_width
+        return [amplitude, centre, max(width, 1e-9), offset]
 
 class pseudo_voigt_peak(base_function):
     name = "Pseudo-Voigt peak"
@@ -397,6 +477,17 @@ class pseudo_voigt_peak(base_function):
         g = np.exp(-((x - p[1]) ** 2) / (2.0 * width**2))
         l = (0.5 * width) ** 2 / (((x - p[1]) ** 2) + (0.5 * width) ** 2)
         return p[0] * (eta * l + (1.0 - eta) * g) + p[4]
+
+    @staticmethod
+    def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
+        shape = _peak_shape(x, y)
+        if shape is None:
+            return None
+        amplitude, centre, moment_width, offset = shape
+        width = _measured_fwhm(x, y, centre, amplitude, offset) or (2.355 * moment_width)
+        # eta 0.5: an even mix is the honest starting point, since nothing in the
+        # data says how Gaussian or Lorentzian the peak is.
+        return [amplitude, centre, max(width, 1e-9), 0.5, offset]
 
 
 class voigt_peak(base_function):

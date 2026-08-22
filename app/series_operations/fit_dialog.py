@@ -38,7 +38,21 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from scipy.optimize import least_squares
+from app.functions.optimizers import (
+    DEFAULT_OPTIMIZER,
+    LOSSES,
+    OPTIMIZERS,
+    BY_KEY,
+    run_optimizer,
+)
+from app.functions.starting_point import (
+    FROM_DECLARED,
+    FROM_FUNCTION,
+    FROM_SEARCH,
+    ask_the_function,
+    choose_starting_point,
+    clip_into_bounds,
+)
 
 from app.data.data_source import row_value , parse_roles
 from app.data.sqlite_repo import SqliteRepo
@@ -215,6 +229,10 @@ class SeriesFitDialog(SeriesOperationDialogBase):
         self._output_table_edit = QLineEdit(self)
         self._max_nfev_edit = QLineEdit("800", self)
         self._weighted_check = QCheckBox(_("Weighted RMSE/R²"), self)
+        self._combo_optimizer = QComboBox(self)
+        self._combo_loss = QComboBox(self)
+        self._btn_estimate = QPushButton(_("Estimate"), self)
+        self._btn_estimate.clicked.connect(self.on_estimate_initial_values)
         self._btn_use_fit_params = create_action_button(
                                        parent=self,
                                        action_id="copy",
@@ -351,14 +369,45 @@ class SeriesFitDialog(SeriesOperationDialogBase):
         fit_options = QWidget(outer)
         fit_options_layout = QHBoxLayout(fit_options)
         stdSizeAndlayout(fit_options_layout)
+        fit_options_layout.addWidget(QLabel(_("Algorithm:")))
+        for optimizer in OPTIMIZERS:
+            self._combo_optimizer.addItem(_(optimizer.label), optimizer.key)
+        self._combo_optimizer.setCurrentIndex(
+            max(0, self._combo_optimizer.findData(DEFAULT_OPTIMIZER))
+        )
+        self._combo_optimizer.currentIndexChanged.connect(self._refresh_optimizer_help)
+        fit_options_layout.addWidget(self._combo_optimizer)
+
+        fit_options_layout.addWidget(QLabel(_("Loss:")))
+        for key, label in LOSSES:
+            self._combo_loss.addItem(_(label), key)
+        self._combo_loss.setToolTip(
+            _(
+                "How a large residual is weighted. Least squares trusts every "
+                "point; the robust losses cap what one bad point can do to the "
+                "fit. Only the least-squares algorithms use it."
+            )
+        )
+        fit_options_layout.addWidget(self._combo_loss)
+
         fit_options_layout.addWidget(QLabel(_("Max evals:")))
         self._max_nfev_edit.setMaximumWidth(90)
         self._max_nfev_edit.setToolTip(_("Maximum number of function evaluations for the optimizer."))
         fit_options_layout.addWidget(self._max_nfev_edit)
         self._weighted_check.setToolTip(_("Weight residuals by magnitude when computing RMSE/R²."))
         fit_options_layout.addWidget(self._weighted_check)
+
+        self._btn_estimate.setToolTip(
+            _(
+                "Fill the Initial column from the data: the function's own "
+                "estimator when it has one, a Monte Carlo search of the "
+                "parameter space when it does not."
+            )
+        )
+        fit_options_layout.addWidget(self._btn_estimate)
         fit_options_layout.addStretch(1)
         layout.addWidget(fit_options)
+        self._refresh_optimizer_help()
 
         layout.addWidget(QLabel(_("Output table:"), outer))
         self._output_table_edit.setToolTip(_("Name of the SQLite table where fitted values/residuals are saved."))
@@ -469,6 +518,9 @@ class SeriesFitDialog(SeriesOperationDialogBase):
         self._spin_params.setValue(len(p0))
         self._ensure_params_rows(len(p0))
         self._populate_params_defaults()
+        # Then improve on them wherever the function can: see
+        # _fill_initial_from_estimator.
+        self._fill_initial_from_estimator()
 
         expression_html = str(payload.get("expression", "")).strip()
         description = _(str(payload.get("description", "")).strip())
@@ -889,13 +941,28 @@ class SeriesFitDialog(SeriesOperationDialogBase):
                     return np.asarray(r, dtype=float)
 
                 max_nfev = max(1, int(float(self._max_nfev_edit.text().strip() or "800")))
-                res = least_squares(residual_fun, p0[free], bounds=(lb[free], ub[free]), max_nfev=max_nfev)
+                outcome = run_optimizer(
+                    self._optimizer_key(),
+                    residual_fun,
+                    p0[free],
+                    lb[free],
+                    ub[free],
+                    max_nfev=max_nfev,
+                    loss=self._loss_key(),
+                )
                 p_opt = p0.copy()
-                p_opt[free] = res.x
+                p_opt[free] = outcome.params
                 residual = target_data - model(x_data, p_opt)
-                jac_free = np.asarray(res.jac, dtype=float)
-                success = bool(res.success)
-                message = str(res.message)
+                jac_free = (
+                    outcome.jac
+                    if outcome.jac is not None
+                    # A method that reports no Jacobian still owes the user
+                    # error bars; the numerical one is what the evaluate path
+                    # already uses.
+                    else self._numerical_jacobian(model, x_data, p_opt)[:, free]
+                )
+                success = bool(outcome.success)
+                message = f"{BY_KEY[outcome.optimizer].label}: {outcome.message}"
             fit_values = model(x_data, p_opt)
             uncertainty_free = free.copy()
             if not optimise and p0.size:
@@ -944,6 +1011,139 @@ class SeriesFitDialog(SeriesOperationDialogBase):
                               action=self.on_fit,
                               layout=layout,
                           )
+
+    # ------------------------------------------------------------------
+    # Algorithm and starting point
+    # ------------------------------------------------------------------
+    def _optimizer_key(self) -> str:
+        """Return the chosen algorithm's key."""
+        return str(self._combo_optimizer.currentData() or DEFAULT_OPTIMIZER)
+
+    def _loss_key(self) -> str:
+        """Return the chosen robust loss, or plain least squares."""
+        return str(self._combo_loss.currentData() or "linear")
+
+    def _refresh_optimizer_help(self) -> None:
+        """Explain the chosen algorithm, and disable the loss where it does nothing."""
+        optimizer = BY_KEY.get(self._optimizer_key())
+        if optimizer is None:
+            return
+        self._combo_optimizer.setToolTip(_(optimizer.description))
+        # Only the least_squares family takes a loss. Leaving the control
+        # enabled where it is ignored is a setting that silently does nothing.
+        self._combo_loss.setEnabled(optimizer.supports_loss)
+
+    def _selected_function_class(self) -> Any:
+        """Return the class behind the selected model, or None.
+
+        None for the multi-peak builder, which is assembled here rather than
+        discovered and so has no class to ask.
+        """
+        if not self._selected_model or self._selected_model.get("_multi_peak"):
+            return None
+        try:
+            return self._function_scanner.load_class(self._selected_model)
+        except Exception:
+            applogger.exception(
+                "Could not load the class for %s", self._selected_model.get("name", "")
+            )
+            return None
+
+    def _fill_initial_from_estimator(self) -> bool:
+        """Put the function's own estimate in the Initial column, if it has one.
+
+        Run when a model is selected, because it costs one pass over the data
+        and a starting point read off the data beats a declared default every
+        time: a Gaussian's centre is where the mass is, not 0.0.
+
+        Only the function's own estimator, never the search - selecting a model
+        is a click, and a click must not cost a twenty-thousand-sample scan.
+        That is what Estimate is for.
+        """
+        function_class = self._selected_function_class()
+        if function_class is None:
+            return False
+        try:
+            x_data, target_data, _clean = self._load_fit_data()
+        except Exception:
+            # No series selected yet, or a query that does not run. The
+            # declared defaults stay and nothing is reported: the user has not
+            # asked for anything yet.
+            return False
+        if x_data is None or target_data is None:
+            return False
+
+        p0, lb, ub, _fixed = self._collect_params_from_table()
+        estimate = ask_the_function(function_class, x_data, target_data, expected=p0.size)
+        if estimate is None:
+            return False
+
+        self._set_initial_params(clip_into_bounds(estimate, lb, ub))
+        return True
+
+    def on_estimate_initial_values(self) -> None:
+        """Fill the Initial column from the data, searching if it has to.
+
+        The whole policy, unlike the automatic pass above: the function's own
+        estimator when it has one, and a Monte Carlo search of the parameter
+        space when it does not - which is most of the library, and every user
+        function this application has never seen.
+        """
+        try:
+            x_data, target_data, _clean = self._load_fit_data()
+            if x_data is None or target_data is None:
+                return
+            built = self._build_model(x_data, target_data)
+            if built is None:
+                return
+            model, _model_p0 = built
+
+            p0, lb, ub, fixed = self._collect_params_from_table()
+            start = choose_starting_point(
+                model,
+                x_data,
+                target_data,
+                declared=p0,
+                lower=lb,
+                upper=ub,
+                function_class=self._selected_function_class(),
+                fixed=fixed,
+            )
+        except Exception as exc:  # noqa: BLE001
+            applogger.exception("Could not estimate initial values")
+            show_message(
+                self, "series.estimate_failed", series=self._current_table(), error=exc
+            )
+            return
+
+        self._set_initial_params(start.values)
+        applogger.info("Initial values from %s (cost %.6g)", start.source, start.cost)
+        self.set_results_text(self._estimate_report(start.source, start.cost))
+
+    @staticmethod
+    def _estimate_report(source: str, cost: float) -> str:
+        """One line saying where the starting values came from, and how good.
+
+        Reported because "the fit is wrong" and "the starting values were
+        invented" are different problems, and the user should not have to
+        guess which one they have.
+        """
+        wording = {
+            FROM_FUNCTION: _(
+                "Initial values read off the data by the function's own estimator."
+            ),
+            FROM_SEARCH: _(
+                "Initial values found by searching the parameter space at random: "
+                "this function has no estimator of its own."
+            ),
+            FROM_DECLARED: _(
+                "The search found nothing better than the declared values, which "
+                "are unchanged."
+            ),
+        }.get(source, _("Initial values updated."))
+        return wording + "\n" + _("Residual sum of squares: {cost}").format(
+            cost=f"{cost:.6g}"
+        )
 
     def _weights_sigma(self, data: np.ndarray) -> np.ndarray:
         return np.maximum(np.abs(data), np.nanmedian(np.abs(data)) * 1e-6 + 1e-12).astype(float)

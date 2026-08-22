@@ -56,9 +56,16 @@ def test_fit_previews_what_it_found() -> None:
 
 
 def test_both_paths_share_one_evaluation() -> None:
-    """Metrics computed two ways would disagree sooner or later."""
+    """Metrics computed two ways would disagree sooner or later.
+
+    The optimiser call moved to app/functions/optimizers.py when the dialog
+    grew a choice of ten algorithms; the invariant is unchanged, and is what
+    this asserts: Fit and Preview reach the optimiser through one call site,
+    so residuals, metrics and the output frame cannot be computed two ways.
+    """
     assert "def _evaluate(self, *, optimise: bool)" in FIT_SOURCE
-    assert FIT_SOURCE.count("least_squares(") == 1
+    assert FIT_SOURCE.count("run_optimizer(") == 1
+    assert "least_squares(" not in FIT_SOURCE, "the dialog no longer picks the method"
 
 
 def test_the_fit_button_sits_in_the_shared_action_row() -> None:

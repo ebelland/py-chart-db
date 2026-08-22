@@ -191,6 +191,29 @@ def test_the_function_library_is_translated() -> None:
     )
 
 
+def test_the_fit_algorithms_are_translated() -> None:
+    """The optimiser names and their explanations are data too.
+
+    They are declared in ``app/functions/optimizers.py`` and handed to the
+    combo as ``_(optimizer.label)``, so there is no literal at the call site.
+    The description is the more important half: it is the only thing in the
+    interface that says when to reach for a global method rather than the
+    default.
+    """
+    from app.functions.optimizers import LOSSES, OPTIMIZERS
+
+    catalog = i18n._parse_po(PO_PATH)
+    missing = {
+        text
+        for optimizer in OPTIMIZERS
+        for text in (optimizer.label, optimizer.description)
+        if text and text not in catalog
+    }
+    missing |= {label for _key, label in LOSSES if label not in catalog}
+
+    assert sorted(missing) == []
+
+
 def test_the_catalogue_has_no_empty_translations() -> None:
     """An empty msgstr silently falls back, so it reads as untranslated."""
     catalog = i18n._parse_po(PO_PATH)

@@ -98,8 +98,14 @@ class FunctionScanner:
 
         return dict(sorted(grouped.items(), key=lambda item: item[0].lower()))
 
-    def make_model(self, payload: dict[str, Any]) -> Callable[[np.ndarray, np.ndarray], np.ndarray]:
-        """Build a fit callable from a tree payload."""
+    def load_class(self, payload: dict[str, Any]) -> Any:
+        """Return the function class a tree payload describes.
+
+        The callable from :meth:`make_model` is enough to evaluate a function
+        and not enough to ask it anything: the starting-point estimator is a
+        second staticmethod on the class (``initial_guess``), so the caller
+        that wants one needs the class rather than the closure.
+        """
         entry = payload.get("discovery_entry")
         if not isinstance(entry, dict):
             raise ValueError("Function payload has no discovery_entry.")
@@ -107,6 +113,11 @@ class FunctionScanner:
         cls = import_class_from_discovery_entry(entry, module_prefix="_fit_function")
         if cls is None:
             raise ValueError(f"Could not load function class from entry: {entry!r}")
+        return cls
+
+    def make_model(self, payload: dict[str, Any]) -> Callable[[np.ndarray, np.ndarray], np.ndarray]:
+        """Build a fit callable from a tree payload."""
+        cls = self.load_class(payload)
 
         execute = getattr(cls, "execute", None)
         if not callable(execute):

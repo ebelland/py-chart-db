@@ -220,6 +220,10 @@ msgid "Apply the changes"
 msgstr "Applica le modifiche"
 
 
+msgid "Arctan (very robust)"
+msgstr "Arcotangente (molto robusta)"
+
+
 msgid "Arctan sigmoid"
 msgstr "Sigmoide arcotangente"
 
@@ -292,6 +296,10 @@ msgid "Basic functions"
 msgstr "Funzioni di base"
 
 
+msgid "Basin hopping"
+msgstr "Basin hopping"
+
+
 msgid "Batch size for Monte Carlo resampling. Auto lets SciPy choose."
 msgstr "Dimensione del lotto per il ricampionamento Monte Carlo. Auto lascia scegliere a SciPy."
 
@@ -316,6 +324,14 @@ msgid "Boundary:"
 msgstr "Condizione al contorno:"
 
 
+msgid "Bounded least squares, often better when a parameter sits on a bound."
+msgstr "Minimi quadrati con vincoli, spesso migliori quando un parametro si appoggia a un limite."
+
+
+msgid "Bounded least squares. The right answer for most fits."
+msgstr "Minimi quadrati con vincoli. La scelta giusta per la maggior parte dei fit."
+
+
 msgid "Browse…"
 msgstr "Sfoglia…"
 
@@ -330,6 +346,10 @@ msgstr "Costruisce un'espressione multipicco 1D. Modifica i parametri generati p
 
 msgid "Calculus"
 msgstr "Calcolo"
+
+
+msgid "Cauchy (very robust)"
+msgstr "Cauchy (molto robusta)"
 
 
 msgid "Cauchy CDF"
@@ -788,6 +808,14 @@ msgid "Derivative order:"
 msgstr "Ordine della derivata:"
 
 
+msgid "Derivative-free line searches; often reaches a valley a simplex crawls to."
+msgstr "Ricerche lungo direzioni, senza derivate; spesso raggiunge una valle a cui il simplesso arriva strisciando."
+
+
+msgid "Derivative-free. Slow, but unbothered by a rough or noisy surface."
+msgstr "Senza derivate. Lento, ma indifferente a una superficie irregolare o rumorosa."
+
+
 msgid "Derive from the x role"
 msgstr "Ricava dal ruolo x"
 
@@ -824,6 +852,10 @@ msgid "Detrend:"
 msgstr "Detrend:"
 
 
+msgid "Differential evolution"
+msgstr "Evoluzione differenziale"
+
+
 msgid "Differentiate or integrate"
 msgstr "Deriva o integra"
 
@@ -846,6 +878,10 @@ msgstr "Documentazione:"
 
 msgid "Documentation"
 msgstr "Documentazione"
+
+
+msgid "Dogleg box"
+msgstr "Dogleg box"
 
 
 msgid "Dose response power"
@@ -896,6 +932,10 @@ msgid "Draws the signalling points again as separate markers."
 msgstr "Ridisegna i punti che segnalano come marcatori separati."
 
 
+msgid "Dual annealing"
+msgstr "Ricottura duale"
+
+
 msgid "Edit"
 msgstr "Modifica"
 
@@ -926,6 +966,10 @@ msgstr "Garantisci la colonna Hide"
 
 msgid "Error-function sigmoid"
 msgstr "Sigmoide con funzione errore"
+
+
+msgid "Estimate"
+msgstr "Stima"
 
 
 msgid "Estimate missing values and resample data using interpolation techniques."
@@ -1066,6 +1110,10 @@ msgstr "Figura:"
 
 msgid "Fill missing values"
 msgstr "Riempi i valori mancanti"
+
+
+msgid "Fill the Initial column from the data: the function's own estimator when it has one, a Monte Carlo search of the parameter space when it does not."
+msgstr "Riempi la colonna Iniziale a partire dai dati: con lo stimatore della funzione se ne ha uno, con una ricerca Monte Carlo nello spazio dei parametri se non ce l'ha."
 
 
 msgid "Filter"
@@ -1320,6 +1368,10 @@ msgid "Hill"
 msgstr "Hill"
 
 
+msgid "How a large residual is weighted. Least squares trusts every point; the robust losses cap what one bad point can do to the fit. Only the least-squares algorithms use it."
+msgstr "Come viene pesato un residuo grande. I minimi quadrati si fidano di ogni punto; le perdite robuste limitano quanto un punto sbagliato può influenzare il fit. La usano solo gli algoritmi ai minimi quadrati."
+
+
 msgid "How densely to sample. A curve with sharp features needs more; a straight line needs two."
 msgstr "Densità di campionamento. Una curva con dettagli marcati ne richiede di più; una retta ne richiede due."
 
@@ -1334,6 +1386,10 @@ msgstr "Quante scale valutare, con spaziatura logaritmica, tra il periodo più l
 
 msgid "How the candidates are ordered. AIC is the default because the KS statistic alone always favours the distributions with the most free parameters, whatever the data really is."
 msgstr "Come vengono ordinate le candidate. AIC è il valore predefinito perché la sola statistica KS favorisce sempre le distribuzioni con più parametri liberi, qualunque siano davvero i dati."
+
+
+msgid "Huber (robust)"
+msgstr "Huber (robusta)"
 
 
 msgid "Hyperbolic saturation."
@@ -1382,6 +1438,18 @@ msgstr "Valore iniziale, limiti e blocco per ogni parametro della funzione. Appl
 
 msgid "Initial value, bounds and fixed flag for each parameter. Apply runs the fit with these settings."
 msgstr "Valore iniziale, limiti e flag di blocco per ogni parametro. Applica esegue il fit con queste impostazioni."
+
+
+msgid "Initial values found by searching the parameter space at random: this function has no estimator of its own."
+msgstr "Valori iniziali trovati cercando a caso nello spazio dei parametri: questa funzione non ha uno stimatore proprio."
+
+
+msgid "Initial values read off the data by the function's own estimator."
+msgstr "Valori iniziali ricavati dai dati dallo stimatore della funzione."
+
+
+msgid "Initial values updated."
+msgstr "Valori iniziali aggiornati."
 
 
 msgid "Insert"
@@ -1500,6 +1568,10 @@ msgid "Largest lag to keep. 0 keeps every lag."
 msgstr "Ritardo massimo da conservare. 0 li conserva tutti."
 
 
+msgid "Least squares"
+msgstr "Minimi quadrati"
+
+
 msgid "Left"
 msgstr "Sinistra"
 
@@ -1510,6 +1582,10 @@ msgstr "Etichetta di legenda"
 
 msgid "Less"
 msgstr "Minore"
+
+
+msgid "Levenberg-Marquardt"
+msgstr "Levenberg-Marquardt"
 
 
 msgid "Limits at sigma:"
@@ -1586,6 +1662,10 @@ msgstr "Picco lorentziano"
 
 msgid "Lorentzian peak with full width at half maximum."
 msgstr "Picco lorentziano con larghezza totale a metà altezza."
+
+
+msgid "Loss:"
+msgstr "Perdita:"
 
 
 msgid "Lower control limit"
@@ -1692,6 +1772,10 @@ msgid "Monitor process stability"
 msgstr "Monitora la stabilità del processo"
 
 
+msgid "Monte Carlo"
+msgstr "Monte Carlo"
+
+
 msgid "More accurate on smooth data than the trapezoidal rule. Assumes the curve is well approximated by parabolas."
 msgstr "Più accurata del metodo dei trapezi su dati regolari. Presuppone che la curva sia ben approssimata da parabole."
 
@@ -1734,6 +1818,10 @@ msgstr "Nome:"
 
 msgid "Neighborhood radius for DBSCAN. 0 uses the default 0.5."
 msgstr "Raggio di vicinato per DBSCAN. 0 usa il valore predefinito 0.5."
+
+
+msgid "Nelder-Mead simplex"
+msgstr "Simplesso di Nelder-Mead"
 
 
 msgid "New"
@@ -2088,6 +2176,10 @@ msgid "Polynomial order:"
 msgstr "Grado del polinomio:"
 
 
+msgid "Powell"
+msgstr "Powell"
+
+
 msgid "Power law"
 msgstr "Legge di potenza"
 
@@ -2276,6 +2368,10 @@ msgid "Renderers"
 msgstr "Renderer"
 
 
+msgid "Repeated local fits from perturbed starts. Good when minima are many but shallow."
+msgstr "Fit locali ripetuti da punti di partenza perturbati. Utile quando i minimi sono molti ma poco profondi."
+
+
 msgid "Replace previous smoothing preview in chart"
 msgstr "Sostituisci nel grafico l'anteprima di smoothing precedente"
 
@@ -2306,6 +2402,10 @@ msgstr "Riporta la tabella dei parametri ai valori predefiniti del modello selez
 
 msgid "Reset the selected property to the Matplotlib default"
 msgstr "Ripristina la proprieta selezionata al valore predefinito di Matplotlib"
+
+
+msgid "Residual sum of squares: {cost}"
+msgstr "Somma dei quadrati dei residui: {cost}"
 
 
 msgid "Result preview"
@@ -2366,6 +2466,10 @@ msgstr "SELECT sulla tabella scelta"
 
 msgid "SELECT x, y FROM my_table WHERE ..."
 msgstr "SELECT x, y FROM mia_tabella WHERE ..."
+
+
+msgid "SHGO"
+msgstr "SHGO"
 
 
 msgid "SQL"
@@ -2530,6 +2634,10 @@ msgstr "Cerca modelli..."
 
 msgid "Search properties..."
 msgstr "Cerca proprietà..."
+
+
+msgid "Searches the whole box with a population, then fits locally. Use when the starting point is a guess."
+msgstr "Esplora tutto il dominio con una popolazione, poi fa un fit locale. Da usare quando il punto di partenza è solo un'ipotesi."
 
 
 msgid "Second-order numerator over first-order denominator."
@@ -2716,6 +2824,10 @@ msgid "Simple Poisson yield relation versus area or defect opportunity."
 msgstr "Relazione di resa di Poisson rispetto all'area o alle opportunità di difetto."
 
 
+msgid "Simulated annealing over the box, then a local fit. Escapes deep local minima."
+msgstr "Ricottura simulata sul dominio, poi un fit locale. Esce dai minimi locali profondi."
+
+
 msgid "Sine"
 msgstr "Seno"
 
@@ -2766,6 +2878,10 @@ msgstr "Finestra di lisciamento:"
 
 msgid "Snippets"
 msgstr "Frammenti"
+
+
+msgid "Soft L1 (robust)"
+msgstr "Soft L1 (robusta)"
 
 
 msgid "Some series could not be processed:\n\n{errors}"
@@ -2896,6 +3012,10 @@ msgid "Symmetric Gaussian peak with offset."
 msgstr "Picco gaussiano simmetrico con offset."
 
 
+msgid "Systematic sampling of the box; finds every basin rather than sampling at random."
+msgstr "Campionamento sistematico del dominio: trova ogni bacino invece di campionare a caso."
+
+
 msgid "Table"
 msgstr "Tabella"
 
@@ -2936,6 +3056,10 @@ msgid "The apply callback failed:\n{error}"
 msgstr "Il callback di applicazione non è riuscito:\n{error}"
 
 
+msgid "The classic unbounded least squares. Bounds are ignored."
+msgstr "I classici minimi quadrati senza vincoli. I limiti vengono ignorati."
+
+
 msgid "The latest fit has no parameters to copy."
 msgstr "L’ultimo fit non ha parametri da copiare."
 
@@ -2950,6 +3074,10 @@ msgstr "La media del processo attorno alla quale sono costruiti i limiti."
 
 msgid "The query is not valid and was not saved:\n\n{error}"
 msgstr "La query non è valida e non è stata salvata:\n\n{error}"
+
+
+msgid "The search found nothing better than the declared values, which are unchanged."
+msgstr "La ricerca non ha trovato niente di meglio dei valori dichiarati, che restano invariati."
 
 
 msgid "The style and the language are applied the next time the app starts."
@@ -3053,6 +3181,10 @@ msgid "Trimmed mean:"
 msgstr "Media troncata:"
 
 
+msgid "Trust region (default)"
+msgstr "Regione di fiducia (predefinito)"
+
+
 msgid "Try every SciPy distribution"
 msgstr "Prova tutte le distribuzioni di SciPy"
 
@@ -3075,6 +3207,10 @@ msgstr "UNION ALL di due tabelle con le stesse colonne"
 
 msgid "Undefined points"
 msgstr "Punti non definiti"
+
+
+msgid "Uniform random sampling, then a local fit. Assumes nothing about the model."
+msgstr "Campionamento casuale uniforme, poi un fit locale. Non assume nulla sul modello."
 
 
 msgid "Union"
@@ -3407,5 +3543,3 @@ msgstr "{series}: {error}"
 
 msgid "{series}\nx: {x}\ny: {y}"
 msgstr "{series}\nx: {x}\ny: {y}"
-
-
