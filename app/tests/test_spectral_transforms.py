@@ -232,7 +232,12 @@ def test_the_dialog_carries_its_own_presentation() -> None:
     """
     assert SeriesSpectralDialog.Name.strip()
     assert SeriesSpectralDialog.Description.strip()
-    assert SeriesSpectralDialog.Icon.strip().startswith("<svg")
+    # Path data, not a whole document: every operation declares the drawing
+    # and style.icon_from_svg_source supplies the frame - one viewBox and one
+    # stroke width for eleven plugins instead of eleven chances to differ.
+    icon = SeriesSpectralDialog.Icon.strip()
+    assert icon
+    assert any(shape in icon for shape in ("<path", "<circle", "<rect", "<line"))
 
 
 def test_every_discovered_operation_has_one() -> None:

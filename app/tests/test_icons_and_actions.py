@@ -161,7 +161,7 @@ def test_every_action_has_some_presentation() -> None:
 # ----------------------------------------------------------------------
 def test_a_name_resolves_to_a_file(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(style.platform, "system", lambda: "Linux")
-    assert style.get_icon_file_name("clustering") == "common/clustering.svg"
+    assert style.get_icon_file_name("clear") == "common/clear.svg"
 
 
 def test_the_platform_folder_wins(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -176,8 +176,10 @@ def test_common_is_used_when_the_platform_has_no_variant(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(style.platform, "system", lambda: "Darwin")
-    # There is no macOs/clustering.svg; the shared one is correct.
-    assert style.get_icon_file_name("clustering") == "common/clustering.svg"
+    # There is no macOs/clear.svg; the shared one is correct. (It used to be
+    # clustering, which stopped existing when the operations began carrying
+    # their artwork on the class instead of in this folder.)
+    assert style.get_icon_file_name("clear") == "common/clear.svg"
 
 
 def test_an_unknown_name_resolves_to_nothing() -> None:

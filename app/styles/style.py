@@ -691,7 +691,28 @@ def _svg_icon(icon_id: str | None) -> QIcon:
 _SVG_SOURCE_ICON_CACHE: dict[tuple[str, int, float], QIcon] = {}
 
 
-def icon_from_svg_source(svg: str | None, *, size: int = 20) -> QIcon:
+#: The document a bare icon body is wrapped in.  An operation declares its
+#: artwork as path data alone - see ``SeriesOperationDialogBase.Icon`` - which
+#: is the readable half; the frame around it is always the same and repeating
+#: it in eleven plugins would only be eleven places to get the viewBox wrong.
+SVG_ICON_DOCUMENT: str = (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" '
+    'viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="1.8" '
+    'stroke-linecap="round" stroke-linejoin="round">{body}</svg>'
+)
+
+
+def svg_icon_document(body: str, color: str | None = None) -> str:
+    """Return icon path data wrapped in the standard SVG document."""
+    return SVG_ICON_DOCUMENT.format(color=color or _symbol_tint(), body=body)
+
+
+def icon_from_svg_source(
+    svg: str | None,
+    *,
+    size: int = 20,
+    color: str | None = None,
+) -> QIcon:
     """Return a QIcon drawn from an SVG document held in memory.
 
     For icons that travel inside the thing they belong to rather than in
@@ -711,11 +732,18 @@ def icon_from_svg_source(svg: str | None, *, size: int = 20) -> QIcon:
     if not source:
         return QIcon()
 
+    if "<svg" not in source.lower():
+        # Path data on its own: wrap it. This used to be done by the widget
+        # that lists the operations, so every *other* caller got an empty icon
+        # from perfectly good markup - which is why the operation dialogs had
+        # no window icon and nothing said so.
+        source = svg_icon_document(source, color)
+
     ratio = _icon_device_pixel_ratio()
     # Keyed on the document itself.  These come from class attributes, so the
     # same str object arrives every time and Python has already cached its
     # hash; there is nothing to gain from digesting it first.
-    cache_key = (source, int(size), round(ratio, 2))
+    cache_key = (source, int(size), round(ratio, 2))  # colour is inside source
     cached = _SVG_SOURCE_ICON_CACHE.get(cache_key)
     if cached is not None:
         return cached
@@ -764,16 +792,24 @@ def icon_from_action_spec(spec: "ActionSpec") -> QIcon:
     Priority is intentionally simple:
     1. On macOS, use ``SFSymbol`` when configured.
     2. On Windows, use ``SegoeFluent`` when configured.
-    3. Otherwise, load the configured SVG ``icon`` from the platform folder,
-       then from ``common``.
+    3. Otherwise - or when the symbol or glyph could not be drawn - load the
+       configured SVG ``icon`` from the platform folder, then from ``common``.
     4. If no configured source exists or the configured source cannot be loaded,
        return an empty ``QIcon``.
     """
+    # Each step falls through when it produces nothing, which is the whole
+    # reason every action also names an SVG. Returning the empty icon straight
+    # from the symbol path is why a Mac without pyobjc had a toolbar of blank
+    # buttons while the SVGs sat unused beside it.
     if _IS_MACOS and spec.sf_symbol:
-        return _create_sf_symbol_icon(spec.sf_symbol)
+        icon = _create_sf_symbol_icon(spec.sf_symbol)
+        if not icon.isNull():
+            return icon
 
     if _IS_WINDOWS and spec.segoe_fluent and _is_fluent_glyph(spec.segoe_fluent):
-        return _create_fluent_icon(spec.segoe_fluent, color=_symbol_tint())
+        icon = _create_fluent_icon(spec.segoe_fluent, color=_symbol_tint())
+        if not icon.isNull():
+            return icon
 
     return _svg_icon_or_empty(spec.icon)
 

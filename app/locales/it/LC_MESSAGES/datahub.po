@@ -368,6 +368,10 @@ msgid "Calculus"
 msgstr "Calcolo"
 
 
+msgid "Cancel"
+msgstr "Annulla"
+
+
 msgid "Cauchy (very robust)"
 msgstr "Cauchy (molto robusta)"
 
@@ -2012,6 +2016,10 @@ msgid "Number of parameters p[0]..p[n-1] in the expression."
 msgstr "Numero di parametri p[0]..p[n-1] nell'espressione."
 
 
+msgid "OK"
+msgstr "OK"
+
+
 msgid "ORDER BY with an explicit direction"
 msgstr "ORDER BY con direzione esplicita"
 
@@ -3643,5 +3651,3 @@ msgstr "{series}: {error}"
 
 msgid "{series}\nx: {x}\ny: {y}"
 msgstr "{series}\nx: {x}\ny: {y}"
-
-

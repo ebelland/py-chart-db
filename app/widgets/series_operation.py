@@ -22,17 +22,6 @@ from app.utils.i18n import _, tr
 _ACCENT = "#2563EB"
 
 
-def svg_base(body: str, color: str = _ACCENT) -> str:
-    return f"""
-    <svg xmlns="http://www.w3.org/2000/svg"
-         width="24" height="24" viewBox="0 0 24 24"
-         fill="none" stroke="{color}" stroke-width="1.8"
-         stroke-linecap="round" stroke-linejoin="round">
-        {body}
-    </svg>
-    """
-
-
 class OperationRow(QFrame):
     clicked = Signal()
     ICON_SIZE = 20
@@ -166,9 +155,9 @@ class SeriesOperationWidget(QWidget):
         svg_source = unescape(str(svg_source)).strip()
         if not svg_source:
             return QIcon()
-        if "<svg" not in svg_source.lower():
-            svg_source = svg_base(svg_source)
-        return icon_from_svg_source(svg_source)
+        # The wrapping lives in style.icon_from_svg_source now; the accent
+        # colour is this list's own, so it is passed rather than assumed.
+        return icon_from_svg_source(svg_source, color=_ACCENT)
 
     def _add_section_title(self, layout: QVBoxLayout, title: str) -> None:
         label = QLabel(title, self)

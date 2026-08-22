@@ -148,7 +148,14 @@ def fit_one(values: np.ndarray, name: str) -> DistributionFit | None:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             params = tuple(float(value) for value in distribution.fit(sample))
-            result = stats.kstest(sample, name, args=params)
+            # The distribution's own cdf, not its name. Passing the name made
+            # SciPy look the function up itself, and in 1.18 that lookup
+            # started returning the bare special function (ndtr for "norm"),
+            # which takes one argument - so loc and scale arrived as extra
+            # positional arguments and every fit raised TypeError. Caught
+            # below, so the sweep reported "could not be fitted" for all
+            # fifteen candidates and the feature simply stopped working.
+            result = stats.kstest(sample, distribution.cdf, args=params)
             log_likelihood = float(
                 np.sum(distribution.logpdf(sample, *params))
             )

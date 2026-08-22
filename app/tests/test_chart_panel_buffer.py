@@ -14,7 +14,7 @@ keeps whatever was there.
 
 These tests are cheap and they pin the arrangement, because the symptom needs a
 real window server to reproduce and would otherwise be caught only by a user.
-``_testChart.py``, beside main.py, shows it on a Mac.
+``supporting apps/_testChart.py`` shows it on a Mac.
 """
 from __future__ import annotations
 
@@ -135,7 +135,11 @@ def test_the_debug_window_exists_beside_main() -> None:
     leading underscore keeps it out of ``test_*`` discovery while leaving it
     obvious in a directory listing.
     """
-    script = Path(__file__).resolve().parent.parent.parent / "_testChart.py"
+    script = (
+        Path(__file__).resolve().parent.parent.parent
+        / "supporting apps"
+        / "_testChart.py"
+    )
 
     assert script.exists()
     assert not script.name.startswith("test_")

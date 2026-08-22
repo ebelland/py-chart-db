@@ -140,93 +140,60 @@ def test_no_stray_browser_is_written_to() -> None:
 # ----------------------------------------------------------------------
 # What the parameters mean
 # ----------------------------------------------------------------------
-def _catalog() -> dict:
-    """Return the model catalogue by calling the real method.
+def _library() -> list[dict]:
+    """Return every discovered fit function, the way the dialog gets them.
 
-    Not ast.literal_eval: the defaults contain expressions (``2*np.pi``,
-    ``[0.0]*6``) that only mean something when evaluated.  The method touches
-    no widget, so an unbound call is enough.
+    Through the scanner, not through the dialog: ``_catalog_data`` is a
+    one-line forward to it and calling it unbound needed a fake self, which
+    stopped working the moment the method touched an attribute. What these
+    tests are about is the library's own metadata, so they read it at
+    the source.
     """
-    from app.series_operations.fit_dialog import SeriesFitDialog
+    from app.scanners.functions_scanner import FunctionScanner
 
-    return SeriesFitDialog.__dict__["_catalog_data"](object())
-
-
-def _models(kind: str | None = None) -> list[dict]:
     return [
-        model
-        for models in _catalog().values()
-        for model in models
-        if kind is None or model.get("kind") == kind
+        payload
+        for payloads in FunctionScanner().catalog().values()
+        for payload in payloads
     ]
 
 
-def test_the_expression_box_shows_the_formula_not_a_helper_name() -> None:
-    """``helpers.gaussian(x, p)`` said nothing about what p[2] was."""
-    expressions = {model["name"]: model["expr"] for model in _models("expr")}
+def test_every_function_declares_a_formula() -> None:
+    """``helpers.gaussian(x, p)`` said nothing about what p[2] was.
 
-    assert expressions["Gaussian"] == "p[0]*exp(-(x - p[1])**2/(2*p[2]**2)) + p[3]"
+    The expression is the only thing in the dialog that says what the
+    parameters mean before the fit runs, so a function without one is a row of
+    spin boxes labelled p[0]..p[4].
+    """
+    missing = [
+        payload["name"] for payload in _library() if not str(payload.get("expression", "")).strip()
+    ]
+    assert missing == []
 
-    # Only the models needing a function the evaluator does not expose: the
-    # Faddeeva function, and a per-point branch.
+
+def test_no_formula_names_a_helper_instead_of_the_maths() -> None:
     helper_backed = sorted(
-        name for name, expr in expressions.items() if "helpers." in expr
+        payload["name"]
+        for payload in _library()
+        if "helpers." in str(payload.get("expression", ""))
     )
-    assert helper_backed == ["Asymmetric Gaussian", "Pseudo-Voigt", "Voigt"]
+    assert helper_backed == []
 
 
-def test_every_expression_model_names_its_parameters() -> None:
+def test_every_function_names_its_parameters() -> None:
     """A five-parameter peak is unusable if p[3] could be anything."""
-    missing = [model["name"] for model in _models("expr") if not model.get("params")]
+    missing = [payload["name"] for payload in _library() if not payload.get("params")]
     assert missing == []
 
 
 def test_the_names_match_the_parameter_count() -> None:
     """A legend that stops at p[2] of a five-parameter model is worse than none."""
     mismatched = {
-        model["name"]: (len(model["params"]), len(model["p0"]))
-        for model in _models()
-        if model.get("params") and len(model["params"]) != len(model["p0"])
+        payload["name"]: (len(payload["params"]), len(payload["p0"]))
+        for payload in _library()
+        if payload.get("params") and len(payload["params"]) != len(payload["p0"])
     }
     assert mismatched == {}
-
-
-def test_the_inlined_formulas_still_compute_what_the_helpers_did() -> None:
-    """The formulas were transcribed by hand; this is what proves them."""
-    import numpy as np
-
-    from app.series_operations.fit_dialog import (
-        ModelHelpers,
-        make_model_from_expression,
-    )
-
-    cases = {
-        "Linear": (ModelHelpers.linear, [0.3, 1.7]),
-        "Exp decay": (ModelHelpers.exp_decay, [2.0, 0.5, 0.1]),
-        "Double exp decay": (ModelHelpers.double_exp_decay, [2.0, 0.5, 1.0, 0.1, 0.3]),
-        "Saturating exp": (ModelHelpers.saturating_exp, [2.0, 0.4, 0.1]),
-        "Logistic": (ModelHelpers.logistic, [3.0, 1.2, 0.5, 0.2]),
-        "Gompertz": (ModelHelpers.gompertz, [3.0, 1.2, 0.5, 0.2]),
-        "Sinusoid": (ModelHelpers.sine, [1.5, 2.0, 0.3, 0.4]),
-        "Cosine": (ModelHelpers.cosine, [1.5, 2.0, 0.3, 0.4]),
-        "Damped sine": (ModelHelpers.damped_sine, [1.5, 2.0, 0.3, 0.2, 0.4]),
-        "Michaelis-Menten": (ModelHelpers.michaelis_menten, [2.0, 1.0, 0.3]),
-        "Hill": (ModelHelpers.hill, [2.0, 1.0, 2.0, 0.3]),
-        "Power law": (ModelHelpers.power_law, [2.0, -1.0, 0.3]),
-        "Gaussian": (ModelHelpers.gaussian, [2.0, 0.5, 1.2, 0.3]),
-        "Lorentzian": (ModelHelpers.lorentzian, [2.0, 0.5, 1.2, 0.3]),
-        "Double Gaussian": (
-            ModelHelpers.double_gaussian,
-            [2.0, -1.0, 1.0, 0.8, 1.5, 1.2, 0.3],
-        ),
-    }
-    expressions = {model["name"]: model["expr"] for model in _models("expr")}
-    x = np.linspace(0.5, 4.0, 25)
-
-    for name, (helper, values) in cases.items():
-        params = np.asarray(values, dtype=float)
-        model = make_model_from_expression(expressions[name], params)
-        assert model(x, params) == pytest.approx(helper(x, params)), name
 
 
 def test_the_legend_is_shown_under_the_expression() -> None:
@@ -243,5 +210,8 @@ def test_the_parameter_table_is_relabelled_when_the_model_changes() -> None:
 
 
 def test_the_report_carries_the_expression() -> None:
+    """Twice: the formula, and the formula with the fitted numbers in it."""
     body = _body(FIT_SOURCE, "_results_html")
-    assert '"Expression"' in body
+
+    assert '_("Function expression")' in body
+    assert '_("Function expression with evaluated parameters")' in body

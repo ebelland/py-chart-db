@@ -136,6 +136,8 @@ class QueryBuilderDialog(QDialog):
         stdSizeAndlayout(add_layout)
         create_action_button(parent=add_row, action_id="add",
                              action=self._new_query, layout=add_layout)
+        create_action_button(parent=add_row, action_id="delete",
+                             action=self._delete_current_query, layout=add_layout)
         add_layout.addStretch(1)
         layout.addWidget(add_row, 0)
 
@@ -295,6 +297,30 @@ class QueryBuilderDialog(QDialog):
         name = self._query_combo.currentData()
         if name:
             self.load_query(str(name))
+
+    def _delete_current_query(self) -> None:
+        """Delete the saved query the combo is on, after confirmation.
+
+        A saved query is not just a row: charts read through it, so deleting
+        one leaves them with no data - which is why this asks first, and why
+        the question says so.
+        """
+        name = str(self._query_combo.currentData() or "").strip()
+        if not name:
+            self._status.setText(_("Pick a saved query."))
+            return
+
+        if not ask(self, "query.confirm_delete", name=name):
+            return
+
+        self._repo.delete_query(name)
+        applogger.info("Deleted query '%s'.", name)
+
+        if self._current_name == name:
+            self._current_name = None
+            self._editor.clear()
+            self._result_view.setModel(None)
+        self._reload_queries()
 
     def _new_query(self) -> None:
         """Create an unsaved named query descriptor through the repository."""

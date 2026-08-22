@@ -15,11 +15,11 @@
       "SegoeFluent": "E710"
     },
     "apply": {
-      "icon": "",
+      "icon": "select_all",
       "text": "OK",
       "description": "Apply the changes",
-      "SFSymbol": "",
-      "SegoeFluent": ""
+      "SFSymbol": "checkmark.circle",
+      "SegoeFluent": "E73E"
     },
     "clear": {
       "icon": "clear",
@@ -29,15 +29,15 @@
       "SegoeFluent": "E894"
     },
     "close": {
-      "icon": "",
+      "icon": "clear",
       "text": "Cancel",
       "description": "Close the current window",
       "shortcut": "Ctrl+W",
-      "SFSymbol": "",
-      "SegoeFluent": ""
+      "SFSymbol": "xmark.circle",
+      "SegoeFluent": "E711"
     },
     "copy": {
-      "icon": "",
+      "icon": "copy",
       "text": "Copy",
       "description": "Copy to the clipboard",
       "shortcut": "Ctrl+C",
@@ -45,14 +45,14 @@
       "SegoeFluent": "E8C8"
     },
     "delete": {
-      "icon": "",
+      "icon": "delete",
       "text": "Delete",
       "description": "Delete the selection",
       "SFSymbol": "trash",
       "SegoeFluent": "E74D"
     },
     "down": {
-      "icon": "",
+      "icon": "down",
       "text": "Down",
       "description": "Down",
       "SFSymbol": "chevron.down",
@@ -67,7 +67,7 @@
       "SegoeFluent": "E70F"
     },
     "export_csv": {
-      "icon": "",
+      "icon": "csv",
       "text": "Export CSV",
       "description": "Export as a CSV file",
       "SFSymbol": "text.document",
@@ -159,11 +159,11 @@
       "SegoeFluent": "e8a5"
     },
     "new_plot": {
-      "icon": "",
+      "icon": "plot",
       "text": "Plot",
       "description": "Create a new plot tab",
-      "SFSymbol": "",
-      "SegoeFluent": ""
+      "SFSymbol": "chart.xyaxis.line",
+      "SegoeFluent": "E9D2"
     },
     "open": {
       "icon": "open",
@@ -331,7 +331,7 @@
       "SegoeFluent": "E8F1"
     },
     "up": {
-      "icon": "",
+      "icon": "up",
       "text": "Up",
       "description": "Up",
       "SFSymbol": "chevron.up",
@@ -505,11 +505,6 @@
       "level": "info",
       "title": "Series operation",
       "text": "No axis selected."
-    },
-    "series.no_expression_parameters": {
-      "level": "info",
-      "title": "Infer",
-      "text": "No p[i] parameters found in expression."
     },
     "series.no_fit_results": {
       "level": "info",
