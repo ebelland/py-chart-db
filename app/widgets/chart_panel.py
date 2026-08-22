@@ -1778,11 +1778,23 @@ class ChartPanel(QFrame):
                 return
 
             width_cm, height_cm, dpi = metrics
-            rcParams["figure.figsize"] = [
-                width_cm / CM_PER_INCH,
-                height_cm / CM_PER_INCH,
-            ]
+            width_in = width_cm / CM_PER_INCH
+            height_in = height_cm / CM_PER_INCH
+            rcParams["figure.figsize"] = [width_in, height_in]
             rcParams["figure.dpi"] = dpi
+
+            # And the FIXED baseline, which is the same statement: this is the
+            # size the figure is configured to be.
+            #
+            # Without this the baseline was only ever *captured from the last
+            # render* - and in FIXED mode what gets rendered is the baseline
+            # itself, so it fed on its own output. Whatever the first render
+            # produced became permanent, and the width and height typed into
+            # the figure properties were applied to rcParams, applied to the
+            # figure, and then overwritten by the stale baseline before the
+            # descriptor was drawn. Which is exactly how they "were ignored".
+            self._fixed_figure_size_inches = (width_in, height_in)
+            self._fixed_figure_dpi = float(dpi)
         except Exception:
             applogger.exception(
                 "Failed to apply figure metrics (figure_id=%s)", self._figure_id

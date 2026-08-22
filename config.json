@@ -642,11 +642,11 @@
   "last_database": "/Users/ebelland/Desktop/py-chart-db/Demo Project.dhub",
   "window_geometry": {
     "main_window": {
-      "x": 280,
+      "x": 0,
       "y": 62,
-      "width": 1640,
+      "width": 1920,
       "height": 959,
-      "maximized": false
+      "maximized": true
     },
     "SeriesInterpolateDialog": {
       "x": 449,
@@ -691,8 +691,8 @@
       "maximized": false
     },
     "SeriesSpectralDialog": {
-      "x": 651,
-      "y": 256,
+      "x": 89,
+      "y": 134,
       "width": 900,
       "height": 680,
       "maximized": false
@@ -743,7 +743,7 @@
   "main_window_splitters": {
     "main": [
       601,
-      1033
+      1313
     ],
     "data_page": [
       308,
