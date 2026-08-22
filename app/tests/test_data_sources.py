@@ -237,3 +237,73 @@ def test_deleting_a_query_removes_it_from_the_sources(repo: SqliteRepo) -> None:
     assert repo.delete_query("group_a") is True
     assert repo.get_data_source("group_a") is None
     assert "group_a" not in set(repo.list_data_sources()["Table"])
+
+
+# ----------------------------------------------------------------------
+# A new, unsaved query
+# ----------------------------------------------------------------------
+def test_a_new_query_is_a_draft_and_writes_nothing(repo: SqliteRepo) -> None:
+    """The whole point: a query is worth a row once it runs, and this one
+    does not yet - ``save_query`` refuses empty SQL, so a row written here
+    would be one no chart can read."""
+    draft = repo.new_query("daily")
+
+    assert draft.name == "daily"
+    assert draft.id is None
+    assert repo.get_query("daily") is None
+    assert "daily" not in {saved.name for saved in repo.list_queries()}
+
+
+def test_a_new_query_seeds_a_select_over_the_table_it_is_given(repo: SqliteRepo) -> None:
+    draft = repo.new_query("over_measurements", table="measurements")
+
+    assert draft.sql == 'SELECT * FROM "measurements"'
+    ok, _message = repo.validate_query(draft.sql)
+    assert ok, "the seed must be a statement that runs"
+
+
+def test_a_new_query_with_no_table_starts_empty(repo: SqliteRepo) -> None:
+    """Nothing beyond the table is guessed: an invented WHERE or JOIN gives a
+    query that runs and returns the wrong rows, which is worse than none."""
+    assert repo.new_query("blank").sql == ""
+
+
+def test_an_unnamed_new_query_is_given_a_free_name(repo: SqliteRepo) -> None:
+    draft = repo.new_query("")
+
+    assert draft.name == "Query 1"
+    assert repo.get_query(draft.name) is None
+
+
+def test_a_suggested_name_skips_the_ones_already_taken(repo: SqliteRepo) -> None:
+    repo.save_query("Query 1", "SELECT 1 AS a")
+    repo.save_query("Query 2", "SELECT 2 AS a")
+
+    assert repo.next_query_name() == "Query 3"
+
+
+def test_a_suggested_name_avoids_table_names_too(repo: SqliteRepo) -> None:
+    """A query named after a table can never be selected, because the table
+    always wins - so suggesting one offers a name Save is about to refuse."""
+    # IF NOT EXISTS: the test database is a file in the artifacts directory
+    # and survives the run, so a second run would meet its own leftovers.
+    repo.query_df('CREATE TABLE IF NOT EXISTS "Draft 1" (a INTEGER)')
+
+    assert repo.next_query_name("Draft") == "Draft 2"
+
+
+def test_a_suggested_name_ignores_case(repo: SqliteRepo) -> None:
+    """SQLite resolves a table name whatever its case, and two saved queries
+    differing only in case are a trap for whoever reads the list."""
+    repo.save_query("query 1", "SELECT 1 AS a")
+
+    assert repo.next_query_name() == "Query 2"
+
+
+def test_a_draft_may_take_the_name_of_an_existing_query(repo: SqliteRepo) -> None:
+    """Overwriting is the caller's decision - the builder asks first - so the
+    repository reports it and hands the draft back rather than refusing."""
+    draft = repo.new_query("group_a")
+
+    assert draft.name == "group_a"
+    assert repo.get_query("group_a") is not None, "the stored one is untouched"

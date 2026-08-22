@@ -43,6 +43,22 @@ def _select_database() -> Path | None:
         if path.exists():
             return path
 
+        # The remembered database has been moved, renamed or deleted.  Create
+        # an empty one in its place rather than opening a file dialog: the
+        # dialog can only *open* something, so a user whose only project just
+        # disappeared is offered a list they have nothing to pick from, and
+        # cancelling it exits the application.  An empty project starts.
+        applogger.warning(
+            "Last database not found: %s. Creating an empty one in its place.",
+            path,
+        )
+        try:
+            return SqliteRepo.create_empty(path)
+        except Exception as exc:  # noqa: BLE001
+            # Unwritable directory, read-only volume, a name that is now a
+            # folder: fall through to the dialog rather than refusing to start.
+            applogger.exception("Could not create a database at %s: %s", path, exc)
+
     file_path, _ = QFileDialog.getOpenFileName(
         None,
         "Open database",

@@ -44,3 +44,41 @@ def test_list_user_tables_excludes_metadata(tmp_db_path) -> None:
     assert 'data_table' in names
     assert '__import_links__' not in names
     assert '__foo_descriptors__' not in names
+
+def test_create_empty_writes_the_file_and_its_system_tables(tmp_db_path) -> None:
+    """Startup uses this when the remembered database has gone: the point is
+    that the failure surfaces here, not on the first query."""
+    missing = tmp_db_path.parent / "gone_and_recreated.dhub"
+    if missing.exists():
+        missing.unlink()
+
+    created = SqliteRepo.create_empty(missing)
+
+    assert created.exists()
+    with sqlite3.connect(str(created)) as con:
+        names = {
+            str(row[0])
+            for row in con.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+    assert '__figure_descriptors__' in names
+    assert '__import_links__' in names
+
+
+def test_create_empty_adds_the_extension_when_it_is_missing(tmp_db_path) -> None:
+    created = SqliteRepo.create_empty(tmp_db_path.parent / "no_extension")
+
+    assert created.suffix == ".dhub"
+    assert created.exists()
+
+
+def test_create_empty_leaves_no_connection_open(tmp_db_path) -> None:
+    """The caller opens its own; two connections to one file is one too many."""
+    path = tmp_db_path.parent / "closed_again.dhub"
+    if path.exists():
+        path.unlink()
+
+    SqliteRepo.create_empty(path)
+
+    repo = SqliteRepo(db_path=path)
+    assert repo.list_table_names() == []
+    repo.close()
