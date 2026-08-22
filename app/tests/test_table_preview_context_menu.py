@@ -22,7 +22,7 @@ from PySide6.QtCore import QPoint
 from PySide6.QtWidgets import QWidget
 
 from app.data.sqlite_repo import SqliteRepo
-from app.widgets.table_preview_widget import TablePreviewPanel
+from app.widgets.table_preview import TablePreviewPanel
 
 
 def _repo_with_table_and_query(db_path: Path) -> SqliteRepo:

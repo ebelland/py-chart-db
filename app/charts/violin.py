@@ -18,8 +18,8 @@ from typing import Any
 import numpy as np
 from matplotlib.patches import Patch
 
-from app.charts.base_axis import BaseAxisRenderer, SeriesData
-from app.charts.box_plot_axis import BoxAxisRenderer
+from app.charts.base import BaseAxisRenderer, SeriesData
+from app.charts.box import BoxAxisRenderer
 from app.logs.logger import applogger
 
 # The three marker collections violinplot can return, and the option that asks

@@ -13,9 +13,9 @@ import pandas as pd
 import pytest
 from matplotlib.figure import Figure
 
-from app.charts.base_axis import SeriesData
-from app.charts.box_plot_axis import BoxAxisRenderer
-from app.charts.violin_axis import ViolinAxisRenderer
+from app.charts.base import SeriesData
+from app.charts.box import BoxAxisRenderer
+from app.charts.violin import ViolinAxisRenderer
 
 RNG = np.random.default_rng(11)
 

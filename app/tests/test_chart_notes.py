@@ -16,7 +16,7 @@ import re
 from pathlib import Path
 
 
-from app.widgets.html_results_widget import plain_to_html
+from app.widgets.html_results import plain_to_html
 
 APP_DIR = Path(__file__).resolve().parent.parent
 
@@ -41,7 +41,7 @@ def test_line_breaks_survive() -> None:
 # ----------------------------------------------------------------------
 def test_the_report_is_titled_and_dated() -> None:
     """Several appended reports are unreadable without a heading each."""
-    source = (APP_DIR / "series_operations" / "series_operation_dialog_base.py").read_text(
+    source = (APP_DIR / "series_operations" / "dialog_base.py").read_text(
         encoding="utf-8"
     )
     start = source.index("def results_report_html")
@@ -54,7 +54,7 @@ def test_the_report_is_titled_and_dated() -> None:
 
 def test_plain_results_are_escaped_before_they_become_markup() -> None:
     """A dialog whose format_results is plain text must not inject markup."""
-    source = (APP_DIR / "series_operations" / "series_operation_dialog_base.py").read_text(
+    source = (APP_DIR / "series_operations" / "dialog_base.py").read_text(
         encoding="utf-8"
     )
     start = source.index("def results_report_html")
@@ -65,7 +65,7 @@ def test_plain_results_are_escaped_before_they_become_markup() -> None:
 
 def test_only_apply_publishes() -> None:
     """A preview is undone on Close; a note about undone results is a lie."""
-    source = (APP_DIR / "series_operations" / "series_operation_dialog_base.py").read_text(
+    source = (APP_DIR / "series_operations" / "dialog_base.py").read_text(
         encoding="utf-8"
     )
     start = source.index("def _finalize_successful_operation")
@@ -105,7 +105,7 @@ def test_the_report_goes_to_the_panel_it_was_opened_on() -> None:
 # ----------------------------------------------------------------------
 def test_the_notes_pane_is_part_of_the_saved_view_state() -> None:
     """A report about a figure belongs in the .dhub with the figure."""
-    source = (APP_DIR / "widgets" / "chart_panel_widget.py").read_text(encoding="utf-8")
+    source = (APP_DIR / "widgets" / "chart_panel.py").read_text(encoding="utf-8")
     start = source.index("def _persist_view_state")
     body = source[start : source.index("\n    def ", start + 10)]
 
@@ -119,11 +119,11 @@ def test_the_chart_keeps_a_floor_and_the_notes_open_at_a_usable_size() -> None:
     NOTES_MIN_HEIGHT is 0 on purpose - collapsing the pane is a thing the user
     is allowed to do - so the guarantee moved to first open instead.
     """
-    from app.widgets import chart_panel_widget
+    from app.widgets import chart_panel
 
-    assert chart_panel_widget.CHART_AREA_MIN_HEIGHT > 0
-    assert chart_panel_widget.NOTES_FIRST_OPEN_MIN_HEIGHT > 0
-    assert 0.0 < chart_panel_widget.NOTES_INITIAL_FRACTION < 1.0
+    assert chart_panel.CHART_AREA_MIN_HEIGHT > 0
+    assert chart_panel.NOTES_FIRST_OPEN_MIN_HEIGHT > 0
+    assert 0.0 < chart_panel.NOTES_INITIAL_FRACTION < 1.0
 
 
 def test_the_canvas_is_reparented_to_the_chart_area() -> None:
@@ -133,7 +133,7 @@ def test_the_canvas_is_reparented_to_the_chart_area() -> None:
     area.  If it were reparented to the panel again it would escape the
     splitter and cover the notes pane.
     """
-    source = (APP_DIR / "widgets" / "chart_panel_widget.py").read_text(encoding="utf-8")
+    source = (APP_DIR / "widgets" / "chart_panel.py").read_text(encoding="utf-8")
 
     assert "self._canvas.setParent(self._chart_area)" in source
     assert not re.search(r"self\._canvas\.setParent\(self\)", source)
@@ -148,7 +148,7 @@ def test_the_canvas_is_reparented_to_the_chart_area() -> None:
 # viewport stopped being painted by hand: they asserted the presence of the
 # code that turned out to be the bug.
 def test_a_resize_repaints_the_strip_the_canvas_vacates() -> None:
-    source = (APP_DIR / "widgets" / "chart_panel_widget.py").read_text(encoding="utf-8")
+    source = (APP_DIR / "widgets" / "chart_panel.py").read_text(encoding="utf-8")
     start = source.index("def resizeEvent")
     body = source[start : source.index("\n    def ", start + 10)]
 

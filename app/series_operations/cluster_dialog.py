@@ -56,7 +56,7 @@ from app.data.data_source import parse_roles
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
 from app.utils.messages import show_message
-from app.series_operations.series_operation_dialog_base import (
+from app.series_operations.dialog_base import (
     ResultSeriesSpec,
     SeriesOperationDialogBase,
 )
@@ -64,7 +64,7 @@ from app.styles.style import (
     create_card_widget,
     stdSizeAndlayout,
 )
-from app.widgets.axis_series_selector_widget import AxisSeriesSelector
+from app.widgets.axis_series_selector import AxisSeriesSelector
 from app.utils.i18n import _
 
 

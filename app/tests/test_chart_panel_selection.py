@@ -18,7 +18,7 @@ import pytest
 from matplotlib.dates import ConciseDateFormatter, num2date
 from matplotlib.figure import Figure
 
-from app.widgets.chart_panel_widget import PICK_TOLERANCE_POINTS, ChartPanel, axis_text
+from app.widgets.chart_panel import PICK_TOLERANCE_POINTS, ChartPanel, axis_text
 
 
 def _panel():

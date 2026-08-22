@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from app.widgets import report_html
+from app.utils import report_html
 
 APP_DIR = Path(__file__).resolve().parent.parent
 

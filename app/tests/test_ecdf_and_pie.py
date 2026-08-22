@@ -14,9 +14,9 @@ import pandas as pd
 import pytest
 from matplotlib.figure import Figure
 
-from app.charts.base_axis import SeriesData
-from app.charts.ecdf_axis import EcdfAxisRenderer, ecdf_points
-from app.charts.pie_axis import PieAxisRenderer
+from app.charts.base import SeriesData
+from app.charts.ecdf import EcdfAxisRenderer, ecdf_points
+from app.charts.pie import PieAxisRenderer
 
 
 def _axes():

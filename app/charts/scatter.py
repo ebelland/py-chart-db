@@ -13,7 +13,7 @@ import pandas as pd
 from matplotlib.patches import Ellipse
 from matplotlib.transforms import Affine2D
 
-from app.charts.base_axis import ERROR_BAR_KWARGS, BaseAxisRenderer, SeriesData
+from app.charts.base import ERROR_BAR_KWARGS, BaseAxisRenderer, SeriesData
 from app.logs.logger import applogger
 
 

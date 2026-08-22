@@ -111,8 +111,8 @@ APP_DIR = Path(__file__).resolve().parent.parent
 @pytest.mark.parametrize(
     "relative",
     [
-        "series_operations/series_outlier_dialog.py",
-        "series_operations/series_operation_dialog_base.py",
+        "series_operations/outlier_dialog.py",
+        "series_operations/dialog_base.py",
     ],
 )
 def test_the_operations_no_longer_coerce_x_by_hand(relative: str) -> None:
@@ -124,7 +124,7 @@ def test_the_operations_no_longer_coerce_x_by_hand(relative: str) -> None:
 
 
 def test_the_time_series_renderer_uses_the_same_rule() -> None:
-    source = (APP_DIR / "charts" / "time_series_axis.py").read_text(encoding="utf-8")
+    source = (APP_DIR / "charts" / "time_series.py").read_text(encoding="utf-8")
 
     assert "coerce_axis" in source
     assert "def _coerce_x_axis" not in source
@@ -132,7 +132,7 @@ def test_the_time_series_renderer_uses_the_same_rule() -> None:
 
 def test_the_outlier_error_says_what_it_found() -> None:
     """"3 points required" against a full table sends the user astray."""
-    source = (APP_DIR / "series_operations" / "series_outlier_dialog.py").read_text(
+    source = (APP_DIR / "series_operations" / "outlier_dialog.py").read_text(
         encoding="utf-8"
     )
     start = source.index("def _detect_outliers")

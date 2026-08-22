@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 APP_DIR = Path(__file__).resolve().parent.parent
-FIT_SOURCE = (APP_DIR / "series_operations" / "series_fit_dialog.py").read_text(
+FIT_SOURCE = (APP_DIR / "series_operations" / "fit_dialog.py").read_text(
     encoding="utf-8"
 )
 
@@ -70,7 +70,7 @@ def test_the_fit_button_sits_in_the_shared_action_row() -> None:
 
 
 def test_the_hook_exists_on_the_base() -> None:
-    base = (APP_DIR / "series_operations" / "series_operation_dialog_base.py").read_text(
+    base = (APP_DIR / "series_operations" / "dialog_base.py").read_text(
         encoding="utf-8"
     )
     assert "def build_extra_action_buttons" in base
@@ -111,7 +111,7 @@ def test_the_summary_values_are_escaped() -> None:
     The escaping moved into report_html.summary_table, which is the only
     place that turns a value into a cell.
     """
-    from app.widgets import report_html
+    from app.utils import report_html
 
     markup = report_html.summary_table([("Source", "a <b> table")])
     assert "&lt;b&gt;" in markup and "<b>" not in markup
@@ -140,7 +140,7 @@ def _catalog() -> dict:
     ``[0.0]*6``) that only mean something when evaluated.  The method touches
     no widget, so an unbound call is enough.
     """
-    from app.series_operations.series_fit_dialog import SeriesFitDialog
+    from app.series_operations.fit_dialog import SeriesFitDialog
 
     return SeriesFitDialog.__dict__["_catalog_data"](object())
 
@@ -188,7 +188,7 @@ def test_the_inlined_formulas_still_compute_what_the_helpers_did() -> None:
     """The formulas were transcribed by hand; this is what proves them."""
     import numpy as np
 
-    from app.series_operations.series_fit_dialog import (
+    from app.series_operations.fit_dialog import (
         ModelHelpers,
         make_model_from_expression,
     )

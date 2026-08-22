@@ -15,8 +15,8 @@ import pandas as pd
 import pytest
 from matplotlib.figure import Figure
 
-from app.charts.base_axis import SeriesData
-from app.charts.scatter_axis import ScatterAxisRenderer
+from app.charts.base import SeriesData
+from app.charts.scatter import ScatterAxisRenderer
 
 RNG = np.random.default_rng(5)
 

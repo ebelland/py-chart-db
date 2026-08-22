@@ -1,6 +1,6 @@
 """Strict-typed, responsive axis properties editor for Data Hub.
 
-Drop-in replacement for ``app/widgets/axis_properties_widget.py``.
+Drop-in replacement for ``app/widgets/axis_properties.py``.
 
 The implementation keeps the existing public signals and host-facing API while
 reducing signal cascades during reloads and replacing the Pylance-problematic
@@ -50,7 +50,7 @@ from app.styles.style import (
     configure_combo_width,
 )
 from app.utils.messages import ask
-from app.widgets.dictionary_editor_widget import DictEditorPanel
+from app.widgets.dictionary_editor import DictEditorPanel
 
 AxisDescriptorLike: TypeAlias = Any
 RendererConfig: TypeAlias = dict[str, Any]

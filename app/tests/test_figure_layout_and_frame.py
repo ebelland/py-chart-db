@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from matplotlib.figure import Figure
 
-from app.charts.descriptors_multi import AxisDescriptor, FigureDescriptor
+from app.data.descriptors import AxisDescriptor, FigureDescriptor
 from app.charts.render_figure import (
     _apply_figure_options,
     _create_axes_grid,

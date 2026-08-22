@@ -22,7 +22,7 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 
-from app.charts.base_axis import BaseAxisRenderer, SeriesData
+from app.charts.base import BaseAxisRenderer, SeriesData
 from app.logs.logger import applogger
 
 # Where the percentage labels are placed, as a fraction of the radius.

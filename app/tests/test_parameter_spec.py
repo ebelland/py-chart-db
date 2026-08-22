@@ -131,7 +131,7 @@ def test_the_outlier_declaration_reproduces_its_old_visibility(qapp) -> None:
     from PySide6.QtWidgets import QComboBox, QWidget
 
     from app.series_operations.parameter_form import ParameterForm
-    from app.series_operations.series_outlier_dialog import (
+    from app.series_operations.outlier_dialog import (
         OUTLIER_IQR,
         OUTLIER_MAD,
         OUTLIER_ROLLING,
@@ -175,7 +175,7 @@ def test_hidden_parameters_are_still_readable(qapp) -> None:
     from PySide6.QtWidgets import QComboBox, QWidget
 
     from app.series_operations.parameter_form import ParameterForm
-    from app.series_operations.series_outlier_dialog import (
+    from app.series_operations.outlier_dialog import (
         OUTLIER_IQR,
         SeriesOutlierDialog,
     )
@@ -193,7 +193,7 @@ def test_the_form_round_trips_its_values(qapp) -> None:
     from PySide6.QtWidgets import QWidget
 
     from app.series_operations.parameter_form import ParameterForm
-    from app.series_operations.series_outlier_dialog import SeriesOutlierDialog
+    from app.series_operations.outlier_dialog import SeriesOutlierDialog
 
     form = ParameterForm(SeriesOutlierDialog.PARAMS, QWidget())
     form.set_values({"threshold": 7.5, "window": 20})
@@ -207,7 +207,7 @@ def test_setting_an_unknown_name_is_ignored(qapp) -> None:
     from PySide6.QtWidgets import QWidget
 
     from app.series_operations.parameter_form import ParameterForm
-    from app.series_operations.series_outlier_dialog import SeriesOutlierDialog
+    from app.series_operations.outlier_dialog import SeriesOutlierDialog
 
     form = ParameterForm(SeriesOutlierDialog.PARAMS, QWidget())
     form.set_values({"not_a_parameter": 1})

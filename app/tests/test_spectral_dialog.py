@@ -16,7 +16,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from app.series_operations.series_spectral_dialog import (
+from app.series_operations.spectral_dialog import (
     METHOD_ACORR,
     METHOD_ANGLE,
     METHOD_COHERENCE,

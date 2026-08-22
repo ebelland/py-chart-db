@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""app.utils.class_color_combo
+"""app.widgets.color_combo
 
 MatplotlibColorCombo
 
@@ -32,7 +32,7 @@ from matplotlib.colors import (
     to_hex,
 )
 
-from app.utils.combo_base import ComboEntry, IconComboBox
+from app.widgets.icon_combo import ComboEntry, IconComboBox
 from app.styles.style import create_hidpi_pixmap
 
 _NONE_LABEL = "(none)"

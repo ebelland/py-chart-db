@@ -18,7 +18,7 @@ from app.utils.import_runner import refresh_link
 from app.logs.logger import applogger
 from app.utils.messages import ask
 from app.utils.i18n import _
-from app.widgets.series_operation_widget import SeriesOperationWidget
+from app.widgets.series_operation import SeriesOperationWidget
 
 
 

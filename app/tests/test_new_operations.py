@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from app.series_operations.series_calculus_dialog import (
+from app.series_operations.calculus_dialog import (
     BASELINE_ENDPOINTS,
     BASELINE_MINIMUM,
     BASELINE_NONE,
@@ -26,7 +26,7 @@ from app.series_operations.series_calculus_dialog import (
     INTEGRAL_DEFINITE,
     SeriesCalculusDialog,
 )
-from app.series_operations.series_control_chart_dialog import (
+from app.series_operations.control_chart_dialog import (
     CHART_INDIVIDUALS,
     CHART_MOVING_RANGE,
     CHART_XBAR_R,
@@ -34,12 +34,12 @@ from app.series_operations.series_control_chart_dialog import (
     SPC_CONSTANTS,
     SeriesControlChartDialog,
 )
-from app.series_operations.series_function_dialog import (
+from app.series_operations.function_dialog import (
     SPACING_LINEAR,
     SPACING_LOG,
     SeriesFunctionDialog,
 )
-from app.series_operations.series_peaks_dialog import (
+from app.series_operations.peaks_dialog import (
     PEAKS_MAXIMA,
     PEAKS_MINIMA,
     SeriesPeaksDialog,
@@ -570,7 +570,7 @@ def _calculus_with_axis(destination: str) -> tuple[SeriesCalculusDialog, _AxisSp
 
 
 def _derivative_result(order: int = 1, model: str = DERIV_SAVGOL):
-    from app.series_operations.series_calculus_dialog import CalculusResult
+    from app.series_operations.calculus_dialog import CalculusResult
 
     return CalculusResult(
         source_name="s",

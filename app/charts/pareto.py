@@ -20,8 +20,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from app.charts.bar_axis import BarAxisRenderer
-from app.charts.base_axis import BaseAxisRenderer, SeriesData
+from app.charts.bar import BarAxisRenderer
+from app.charts.base import BaseAxisRenderer, SeriesData
 from app.logs.logger import applogger
 
 #: Label used for the bar that absorbs everything past ``max_categories``.

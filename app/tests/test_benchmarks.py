@@ -152,7 +152,7 @@ def test_the_wavelet_transform_on_a_long_record() -> None:
     The naive implementation convolves in the time domain and is minutes, not
     milliseconds - this budget is what keeps it in the Fourier domain.
     """
-    from app.series_operations.series_spectral_dialog import SeriesSpectralDialog
+    from app.series_operations.spectral_dialog import SeriesSpectralDialog
 
     fs = 200.0
     t = np.arange(16_384) / fs
@@ -169,7 +169,7 @@ def test_the_wavelet_transform_on_a_long_record() -> None:
 
 
 def test_the_laplace_transform_is_one_fft() -> None:
-    from app.series_operations.series_spectral_dialog import SeriesSpectralDialog
+    from app.series_operations.spectral_dialog import SeriesSpectralDialog
 
     signal = np.sin(np.arange(1_048_576) / 100.0)
     method = SeriesSpectralDialog.__dict__["_laplace_spectrum"]

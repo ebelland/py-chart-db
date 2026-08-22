@@ -81,7 +81,7 @@ NEW - requested after the review
 ================================================================
 
 N-1   [DONE] series operation: control charts (JMP-style)
-      app/series_operations/series_control_chart_dialog.py. Individuals
+      app/series_operations/control_chart_dialog.py. Individuals
       (I-MR), moving range, X-bar & R, X-bar & S, with the Nelson run rules.
       The one thing not to "simplify" later: sigma is estimated from
       WITHIN-subgroup variation - average moving range over d2, or average
@@ -100,7 +100,7 @@ N-1   [DONE] series operation: control charts (JMP-style)
       role mapping - a separate piece of work, not a model to bolt on.
 
 N-2   [DONE] series operation: plot functions without fitting
-      app/series_operations/series_function_dialog.py. Same FunctionScanner
+      app/series_operations/function_dialog.py. Same FunctionScanner
       the fit dialog uses, so all 56 functions across 10 categories are
       available and a class dropped into user_functions.py appears with no
       registration. Range as from/to/points/spacing (linear or log), function
@@ -265,7 +265,7 @@ P3-11 requirements.txt: declare scikit-learn as an optional dependency
       undeclared, so nobody knows the feature exists.
 
 P3-12 note: statsmodels, scikit-image and PyWavelets are each used by exactly
-      one file (series_smoothing_dialog.py). Three heavy dependencies for one
+      one file (smoothing_dialog.py). Three heavy dependencies for one
       dialog - worth knowing if the install ever needs slimming.
 
 
@@ -292,17 +292,17 @@ claude "Fix P0-8, P0-9 and P0-10 in todo.txt: colorby across all renderers, the 
 
 claude "Convert the remaining seven series operation dialogs to the PARAMS declaration described in section 7.2 of docs/DEVELOPMENT.md. The outlier dialog is the worked example. Do them ONE AT A TIME, committing each separately, and report the line-count change for each - the outlier conversion did not shrink the file and I want to know whether the larger dialogs do."
 
-claude "Implement N-3 in todo.txt: attribute control charts (p, np, c, u). Read app/series_operations/series_control_chart_dialog.py first - the Nelson rules, the violation reporting and the report layout are all reusable; what is new is the per-point limits and the sample-size role."
+claude "Implement N-3 in todo.txt: attribute control charts (p, np, c, u). Read app/series_operations/control_chart_dialog.py first - the Nelson rules, the violation reporting and the report layout are all reusable; what is new is the per-point limits and the sample-size role."
 
 # --- P2, in the order I would do them ---
 
 claude "Implement P2-5 in todo.txt: downsample large series for display. Read the benchmark under P1-2 first - blitting made the repaint flat, so the hover hit test is now the dominant cost at scale and this shrinks both."
 
-claude "Implement P2-1 in todo.txt: add Q-Q and residual renderers. Read app/charts/ecdf_axis.py and app/utils/distribution_fit.py first; both should reuse the existing fitting infrastructure rather than recomputing."
+claude "Implement P2-1 in todo.txt: add Q-Q and residual renderers. Read app/charts/ecdf.py and app/utils/distribution_fit.py first; both should reuse the existing fitting infrastructure rather than recomputing."
 
 claude "Implement P2-2 in todo.txt: a resample-onto-common-x helper, then a series arithmetic operation built on it. The helper is the real deliverable; several other planned features need it. Put it beside app/utils/series_validation.py, which already owns the clean/sort/merge logic it will build on."
 
-claude "Implement P2-3 in todo.txt: baseline correction as a series operation. app/series_operations/series_calculus_dialog.py already has minimum and endpoint-line baselines inline; this should share that code rather than reimplement it."
+claude "Implement P2-3 in todo.txt: baseline correction as a series operation. app/series_operations/calculus_dialog.py already has minimum and endpoint-line baselines inline; this should share that code rather than reimplement it."
 
 claude "Fix P2-6 and P2-7 in todo.txt: the table list and table preview widgets look inconsistent on macOS, and menu popup icons are not aligned with their text. Screenshot the current state first."
 

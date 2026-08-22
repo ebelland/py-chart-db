@@ -28,7 +28,7 @@ class SeriesData:
 # Error bars
 # ----------------------------------------------------------------------
 # Kept at module level, not only on the class: renderers are re-executed from
-# disk by the renderer scanner while ``app.charts.base_axis`` stays cached in
+# disk by the renderer scanner while ``app.charts.base`` stays cached in
 # sys.modules, so a renderer edited while the app runs can be newer than the
 # base module it imports.  Importing a named symbol fails with an ImportError
 # that says which symbol is missing; reading a class attribute fails with an

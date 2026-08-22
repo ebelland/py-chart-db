@@ -39,7 +39,7 @@ from PySide6.QtWidgets import (
 
 from app.data.data_source import parse_roles
 from app.data.sqlite_repo import SqliteRepo
-from app.series_operations.series_operation_dialog_base import (
+from app.series_operations.dialog_base import (
     ResultSeriesSpec,
     SeriesOperationDialogBase,
     generated_table_name,

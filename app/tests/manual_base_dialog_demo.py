@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.data.sqlite_repo import SqliteRepo
-from app.series_operations.series_operation_dialog_base import SeriesOperationDialogBase
+from app.series_operations.dialog_base import SeriesOperationDialogBase
 from app.styles.style import apply_platform_style
 from main import _select_database
 

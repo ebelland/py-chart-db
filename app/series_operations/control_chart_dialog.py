@@ -40,14 +40,14 @@ from app.data.data_source import parse_roles, row_value
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
 from app.series_operations.parameter_spec import BoolParam, FloatParam, IntParam
-from app.series_operations.series_operation_dialog_base import (
+from app.series_operations.dialog_base import (
     ResultSeriesSpec,
     SeriesOperationDialogBase,
     generated_table_name,
 )
 from app.styles.style import create_doc_link, set_doc_link
 from app.utils.i18n import _
-from app.widgets import report_html
+from app.utils import report_html
 
 CHART_INDIVIDUALS = "Individuals (I-MR)"
 CHART_MOVING_RANGE = "Moving range (MR)"

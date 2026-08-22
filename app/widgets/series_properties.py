@@ -30,9 +30,9 @@ from app.styles.style import (
     create_section_title,
     stdSizeAndlayout,
 )
-from app.utils.class_color_combo import MatplotlibColorCombo
-from app.utils.class_line_combo import LineStyleCombo
-from app.utils.class_marker_combo import MarkerStyleCombo
+from app.widgets.color_combo import MatplotlibColorCombo
+from app.widgets.line_combo import LineStyleCombo
+from app.widgets.marker_combo import MarkerStyleCombo
 from app.logs.logger import applogger
 from app.utils.i18n import _
 from app.utils.messages import ask

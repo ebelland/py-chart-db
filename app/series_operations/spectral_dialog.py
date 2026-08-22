@@ -48,8 +48,8 @@ from app.logs.logger import applogger
 import html
 
 from app.utils.messages import show_message
-from app.widgets import report_html
-from app.series_operations.series_operation_dialog_base import (
+from app.utils import report_html
+from app.series_operations.dialog_base import (
     ResultSeriesSpec,
     SeriesOperationDialogBase,
 )

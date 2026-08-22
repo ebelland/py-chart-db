@@ -711,9 +711,9 @@ def test_every_hand_painted_icon_goes_through_the_shared_helper(qapp) -> None:
     stops a fourth from doing the same except this test.
     """
     hand_painted = [
-        APP_DIR / "utils" / "class_color_combo.py",
-        APP_DIR / "utils" / "class_line_combo.py",
-        APP_DIR / "utils" / "class_marker_combo.py",
+        APP_DIR / "widgets" / "color_combo.py",
+        APP_DIR / "widgets" / "line_combo.py",
+        APP_DIR / "widgets" / "marker_combo.py",
     ]
 
     for path in hand_painted:

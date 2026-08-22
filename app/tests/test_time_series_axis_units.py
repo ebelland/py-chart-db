@@ -14,8 +14,8 @@ import pytest
 from matplotlib.dates import AutoDateLocator
 from matplotlib.figure import Figure
 
-from app.charts.base_axis import SeriesData
-from app.charts.time_series_axis import TimeSeriesAxisRenderer
+from app.charts.base import SeriesData
+from app.charts.time_series import TimeSeriesAxisRenderer
 
 
 def _render(df: pd.DataFrame) -> tuple[Figure, object]:

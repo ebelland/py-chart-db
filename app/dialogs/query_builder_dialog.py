@@ -51,7 +51,7 @@ from app.utils.dialog_state import (
     save_window_geometry,
 )
 from app.utils.messages import ask, show_message
-from app.widgets.table_preview_widget import DataFrameTableModel
+from app.widgets.table_preview import DataFrameTableModel
 from app.utils.i18n import _
 
 # Rows fetched by Run.  Enough to see whether the query is right, few enough

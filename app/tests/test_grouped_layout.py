@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.charts.box_plot_axis import BoxAxisRenderer
+from app.charts.box import BoxAxisRenderer
 
 
 def _item(category: str, series: str) -> dict:

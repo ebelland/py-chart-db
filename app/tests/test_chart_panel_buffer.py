@@ -23,7 +23,7 @@ from pathlib import Path
 import pytest
 
 WIDGET_SOURCE = (
-    Path(__file__).resolve().parent.parent / "widgets" / "chart_panel_widget.py"
+    Path(__file__).resolve().parent.parent / "widgets" / "chart_panel.py"
 ).read_text(encoding="utf-8")
 
 
@@ -334,7 +334,7 @@ def test_a_panel_can_be_constructed(qapp, tmp_path) -> None:
     constructor reached the user instead of the suite.
     """
     from app.data.sqlite_repo import SqliteRepo
-    from app.widgets.chart_panel_widget import ChartPanel
+    from app.widgets.chart_panel import ChartPanel
 
     repo = SqliteRepo(db_path=tmp_path / "panel.dhub")
     try:
@@ -358,7 +358,7 @@ def test_a_panel_can_be_constructed(qapp, tmp_path) -> None:
 def test_zooming_a_real_panel_does_not_compound(qapp, tmp_path) -> None:
     """Set the same zoom twice and the canvas must not grow."""
     from app.data.sqlite_repo import SqliteRepo
-    from app.widgets.chart_panel_widget import ChartPanel
+    from app.widgets.chart_panel import ChartPanel
 
     repo = SqliteRepo(db_path=tmp_path / "zoom.dhub")
     try:

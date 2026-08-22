@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.dates import AutoDateLocator, ConciseDateFormatter
 
-from app.charts.base_axis import ERROR_BAR_KWARGS, BaseAxisRenderer, SeriesData
+from app.charts.base import ERROR_BAR_KWARGS, BaseAxisRenderer, SeriesData
 from app.logs.logger import applogger
 from app.utils.coercion import coerce_axis
 

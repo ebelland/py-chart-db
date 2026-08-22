@@ -22,7 +22,7 @@ from app.scanners.axis_renderer_scanner import (
     import_class_from_file,
     renderers,
 )
-from app.charts.base_axis import BaseAxisRenderer
+from app.charts.base import BaseAxisRenderer
 from app.data.sqlite_repo import SqliteRepo
 from app.data.data_source import quote_identifier
 from app.utils.messages import show_message

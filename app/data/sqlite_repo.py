@@ -25,7 +25,7 @@ import numpy as np
 import pandas as pd
 from pandas._typing import DtypeArg
 
-import app.charts.descriptors_multi
+import app.data.descriptors
 from app.data.data_source import DataSource, is_identifier, quote_identifier
 from app.logs.logger import applogger
 from app.utils.config import load_config
@@ -1213,7 +1213,7 @@ class SqliteRepo:
     # Figure/axis/series deletion
     # =====================================================================
     @ensure_connection_wrapper
-    def get_figure_descriptor(self, figure_id: int) -> app.charts.descriptors_multi.FigureDescriptor|None:
+    def get_figure_descriptor(self, figure_id: int) -> app.data.descriptors.FigureDescriptor|None:
         """Get figure descriptor as dict (never None)."""
         assert self._con is not None
         row = self._con.execute(
@@ -1222,7 +1222,7 @@ class SqliteRepo:
         ).fetchone()
         if row is None:
             return None
-        return   app.charts.descriptors_multi.FigureDescriptor(
+        return   app.data.descriptors.FigureDescriptor(
             id=int(row["id"]),
             name=str(row["name"]),
             nrows=int(row["nrows"]),
@@ -2840,7 +2840,7 @@ class SqliteRepo:
 
         return val
     
-    def load_figure_descriptor(self, figure_id: int) -> app.charts.descriptors_multi.FigureDescriptor | None:
+    def load_figure_descriptor(self, figure_id: int) -> app.data.descriptors.FigureDescriptor | None:
         """Load a full figure descriptor tree: figure, axes, and their series.
 
         Returns None only when the figure itself does not exist.  A figure with
@@ -2854,7 +2854,7 @@ class SqliteRepo:
         series_by_axis = self.get_series_for_axes([int(a["id"]) for a in axis_rows])
 
         for a in axis_rows:
-            axis = app.charts.descriptors_multi.AxisDescriptor(
+            axis = app.data.descriptors.AxisDescriptor(
                 id=int(a["id"]),
                 figure_id=int(a["figure_id"]),
                 axis_index=int(a["axis_index"]),
@@ -2865,7 +2865,7 @@ class SqliteRepo:
                 z_label=str(a["z_label"] or "") if "z_label" in a.keys() else "",
                 options=json.loads(str(a["options_json"])) if a["options_json"] is not None else None,
                 series=[
-                    app.charts.descriptors_multi.SeriesDescriptor(
+                    app.data.descriptors.SeriesDescriptor(
                         id=int(s["id"]),
                         axis_id=int(s["axis_id"]),
                         series_index=int(s["series_index"]),

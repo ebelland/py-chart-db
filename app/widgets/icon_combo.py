@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""app.utils.combo_base
+"""app.widgets.icon_combo
 
 IconComboBox
 

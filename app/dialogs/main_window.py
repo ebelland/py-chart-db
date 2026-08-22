@@ -21,14 +21,14 @@ from PySide6.QtGui import (
 )
 from app.dialogs.log_viewer_dialog import LogViewerDialog
 from app.data.sqlite_repo import SqliteRepo
-from app.widgets.chart_panel_widget import ChartPanel
+from app.widgets.chart_panel import ChartPanel
 from app.dialogs.create_chart_dialog import NewPlotTabDialog
 from app.dialogs.import_data_dialog import ImportDataDialog
 from app.dialogs.query_builder_dialog import QueryBuilderDialog
-from app.widgets.axis_properties_widget import AxisPropertiesWidget
-from app.widgets.figure_properties_widget import FigurePropertiesWidget
-from app.widgets.series_properties_widget import SeriesPropertiesWidget
-from app.widgets.series_operation_widget import SeriesOperationWidget
+from app.widgets.axis_properties import AxisPropertiesWidget
+from app.widgets.figure_properties import FigurePropertiesWidget
+from app.widgets.series_properties import SeriesPropertiesWidget
+from app.widgets.series_operation import SeriesOperationWidget
 from app.scanners.series_operation_scanner import import_class_from_file
 from app.styles.style import (
     PANEL_MIN_WIDTH,
@@ -42,8 +42,8 @@ from app.styles.style import (
     relax_minimum_width,
     stdSizeAndlayout,
 )
-from app.widgets.table_list_widget import  TableListPanel
-from app.widgets.table_preview_widget import TablePreviewPanel
+from app.widgets.table_list import  TableListPanel
+from app.widgets.table_preview import TablePreviewPanel
 from app.utils.config import get_section, set_last_database, set_section
 from app.utils.dialog_state import restore_window_geometry, save_window_geometry
 from app.utils.messages import show_message

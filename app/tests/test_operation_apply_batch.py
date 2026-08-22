@@ -115,7 +115,7 @@ def test_the_apply_loop_no_longer_optimizes(repo: SqliteRepo) -> None:
     source = (
         Path(__file__).resolve().parent.parent
         / "series_operations"
-        / "series_operation_dialog_base.py"
+        / "dialog_base.py"
     ).read_text(encoding="utf-8")
 
     start = source.index("def apply_results_to_axis")
@@ -132,7 +132,7 @@ def test_the_preview_loop_no_longer_optimizes(repo: SqliteRepo) -> None:
     source = (
         Path(__file__).resolve().parent.parent
         / "series_operations"
-        / "series_operation_dialog_base.py"
+        / "dialog_base.py"
     ).read_text(encoding="utf-8")
 
     start = source.index("def preview_results_to_axis")
@@ -214,7 +214,7 @@ def test_the_spectral_dialog_targets_its_own_axis() -> None:
     source = (
         Path(__file__).resolve().parent.parent
         / "series_operations"
-        / "series_spectral_dialog.py"
+        / "spectral_dialog.py"
     ).read_text(encoding="utf-8")
 
     assert "def resolve_target_axis_id" in source
@@ -230,7 +230,7 @@ def test_a_result_axis_grows_the_figure_grid(repo: SqliteRepo) -> None:
     source = (
         Path(__file__).resolve().parent.parent
         / "series_operations"
-        / "series_operation_dialog_base.py"
+        / "dialog_base.py"
     ).read_text(encoding="utf-8")
     start = source.index("def create_result_axis")
     body = source[start : source.index("\n    def ", start + 10)]
@@ -248,12 +248,12 @@ def test_the_statistics_dialog_charts_what_it_measured() -> None:
     stay empty because no single picture illustrates every section at once.
     """
     from app.scanners.axis_renderer_scanner import renderers
-    from app.series_operations.series_statistics_dialog import SeriesStatisticsDialog
+    from app.series_operations.statistics_dialog import SeriesStatisticsDialog
 
     source = (
         Path(__file__).resolve().parent.parent
         / "series_operations"
-        / "series_statistics_dialog.py"
+        / "statistics_dialog.py"
     ).read_text(encoding="utf-8")
 
     known = {entry["value"] for entry in renderers}

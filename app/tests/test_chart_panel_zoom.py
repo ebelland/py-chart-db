@@ -11,7 +11,7 @@ from types import SimpleNamespace
 import pytest
 from matplotlib.figure import Figure
 
-from app.widgets.chart_panel_widget import ChartPanel
+from app.widgets.chart_panel import ChartPanel
 
 
 def _panel_and_axes():

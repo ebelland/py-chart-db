@@ -234,7 +234,7 @@ def test_the_settings_action_exists_and_is_in_the_menu() -> None:
 
 def test_the_save_dialog_honours_the_configured_format() -> None:
     """The preference existed for a long time and changed nothing."""
-    source = (APP_DIR / "widgets" / "chart_panel_widget.py").read_text(encoding="utf-8")
+    source = (APP_DIR / "widgets" / "chart_panel.py").read_text(encoding="utf-8")
     body = source[source.index("def save_chart_as") :]
     body = body[: body.index("\n    def ")]
 

@@ -23,7 +23,7 @@ nothing if the signal does not return to zero: a constant offset contributes
 offset x width to the result, which for a broad peak on a raised baseline is
 most of the answer.  So the integral offers to remove a baseline first.
 
-Peak finding lives next door in ``series_peaks_dialog``; find a peak there,
+Peak finding lives next door in ``peaks_dialog``; find a peak there,
 read its bounds, integrate between them here.
 """
 
@@ -44,13 +44,13 @@ from app.data.data_source import parse_roles, row_value
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
 from app.series_operations.parameter_spec import BoolParam, ChoiceParam, IntParam
-from app.series_operations.series_operation_dialog_base import (
+from app.series_operations.dialog_base import (
     ResultSeriesSpec,
     SeriesOperationDialogBase,
     generated_table_name,
 )
 from app.styles.style import create_doc_link, set_doc_link
-from app.widgets import report_html
+from app.utils import report_html
 from app.utils.i18n import _
 
 # --- Models -----------------------------------------------------------

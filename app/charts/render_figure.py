@@ -24,8 +24,8 @@ import pandas as pd
 from matplotlib.figure import Figure
 
 from app.scanners.axis_renderer_scanner import get_renderer, import_class_from_file
-from app.charts.base_axis import SeriesData
-from app.charts.descriptors_multi import AxisDescriptor, FigureDescriptor, SeriesDescriptor
+from app.charts.base import SeriesData
+from app.data.descriptors import AxisDescriptor, FigureDescriptor, SeriesDescriptor
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
 from app.utils.mpl_latex import filter_latex_style_text

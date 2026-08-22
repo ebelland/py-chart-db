@@ -33,7 +33,7 @@ directly from a widget.
 ```
 app/
   charts/            One module per chart type (renderer), plus
-                      render_figure.py (the pipeline) and descriptors_multi.py
+                      render_figure.py (the pipeline) and descriptors.py
                       (the FigureDescriptor/AxisDescriptor/SeriesDescriptor
                       dataclasses).
   data/               SqliteRepo: schema, CRUD, import/export, data sources.
@@ -62,7 +62,7 @@ _make_demo_project.py Builds "Demo Project.dhub" through SqliteRepo - the
 
 ## 3. The descriptor model
 
-Three dataclasses in `app/charts/descriptors_multi.py` mirror the three
+Three dataclasses in `app/charts/descriptors.py` mirror the three
 descriptor tables one-for-one:
 
 ```
@@ -141,7 +141,7 @@ An axis can occupy more than one cell by setting `row_span` and/or
 `col_span` in its `options` (integers ≥ 1, default 1) — e.g. one axis with
 `col_span: 2` in a 2×2 grid spans the whole top row, with two narrower axes
 below it. This is exposed in the UI as **Grid position → Span** on the Axis
-panel (`app/widgets/axis_properties_widget.py`), one spin box per dimension.
+panel (`app/widgets/axis_properties.py`), one spin box per dimension.
 `_make_demo_project.py`'s `_create_layout_showcase_figure` is a worked
 example: a scatter plot spanning both columns of a 2×2 grid over a histogram
 and a box plot, combined with `frameon: False` and explicit margins.
@@ -222,7 +222,7 @@ distinct from any axis's own spines (`hide_spine_*` in axis options).
 ### 7.1 Adding a chart type
 
 Add a module under `app/charts/`, a class implementing
-`BaseAxisRenderer` (`app/charts/base_axis.py` — read the protocol docstring
+`BaseAxisRenderer` (`app/charts/base.py` — read the protocol docstring
 first, it documents the full contract). Nothing else: `axis_renderer_scanner`
 AST-scans `app/charts` at import time and finds it by base class name, so a
 new file is sufficient — there is no registry to edit.
@@ -262,7 +262,7 @@ columns), `apply_annotations`.
 A series operation is a self-contained plugin: one file under
 `app/series_operations/`, dialog and artwork included (`Icon` is inline SVG
 path data on the class, not a file — see `app/series_operations/
-series_operation_dialog_base.py`'s module docstring and any existing
+dialog_base.py`'s module docstring and any existing
 operation for the shape). `app/scanners/series_operation_scanner.py`
 discovers it the same way the renderer scanner discovers chart types.
 Operations write their result back as a new table prefixed with `_`
@@ -433,7 +433,7 @@ new subfolder — no registration needed.
 ### 7.4 ChartPanel interaction
 
 Everything the chart does under the pointer is wired in
-`app/widgets/chart_panel_widget.py`, through Matplotlib's own event system
+`app/widgets/chart_panel.py`, through Matplotlib's own event system
 rather than Qt's — Matplotlib already knows which artist owns each pixel and
 can give a position in data coordinates, and redoing either against Qt
 coordinates would mean reimplementing marker sizes, transforms and axis

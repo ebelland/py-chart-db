@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 from matplotlib.figure import Figure
 
-from app.charts.descriptors_multi import AxisDescriptor
+from app.data.descriptors import AxisDescriptor
 from app.charts.render_figure import _apply_axis_runtime_options
 
 

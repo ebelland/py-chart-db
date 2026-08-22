@@ -14,7 +14,7 @@ import pandas as pd
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from app.charts.base_axis import BaseAxisRenderer, SeriesData
+from app.charts.base import BaseAxisRenderer, SeriesData
 from app.logs.logger import applogger
 
 

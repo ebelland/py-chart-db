@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from app.charts.base_axis import BaseAxisRenderer
+from app.charts.base import BaseAxisRenderer
 from app.scanners.axis_renderer_scanner import renderers
 
 APP_DIR = Path(__file__).resolve().parent.parent
@@ -93,8 +93,8 @@ def test_the_scanner_reads_the_category_statically() -> None:
 
 def test_an_extending_renderer_inherits_the_family_it_declares() -> None:
     """ECDF extends Scatter but is a distribution, and says so itself."""
-    from app.charts.ecdf_axis import EcdfAxisRenderer
-    from app.charts.scatter_axis import ScatterAxisRenderer
+    from app.charts.ecdf import EcdfAxisRenderer
+    from app.charts.scatter import ScatterAxisRenderer
 
     assert ScatterAxisRenderer.Category == "Pairwise data"
     assert EcdfAxisRenderer.Category == "Statistical distributions"

@@ -18,8 +18,8 @@ import numpy as np
 import pandas as pd
 from matplotlib import dates as mdates
 
-from app.charts.base_axis import BaseAxisRenderer, SeriesData
-from app.charts.scatter_axis import ScatterAxisRenderer
+from app.charts.base import BaseAxisRenderer, SeriesData
+from app.charts.scatter import ScatterAxisRenderer
 from app.logs.logger import applogger
 from app.utils.coercion import coerce_axis
 

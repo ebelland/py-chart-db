@@ -24,7 +24,7 @@ from PySide6.QtWidgets import QComboBox, QDialog, QFormLayout, QHBoxLayout, QSiz
 import numpy as np
 
 from app.data.sqlite_repo import SqliteRepo
-from app.widgets.axis_series_selector_widget import AxisSeriesSelector
+from app.widgets.axis_series_selector import AxisSeriesSelector
 from app.styles.style import (
     apply_dialog_shell,
     icon_from_svg_source,
@@ -52,7 +52,7 @@ from app.utils.dialog_state import (
     save_dialog_state,
     save_window_geometry,
 )
-from app.widgets.html_results_widget import HtmlResultsView, looks_like_html, plain_to_html
+from app.widgets.html_results import HtmlResultsView, looks_like_html, plain_to_html
 from app.utils.i18n import _
 
 _TABLE_SAFE_RE = re.compile(r"[^A-Za-z0-9_]+")

@@ -35,14 +35,14 @@ from PySide6.QtWidgets import (
 from app.data.data_source import quote_identifier
 from app.data.data_source import row_value,parse_roles
 from app.data.sqlite_repo import SqliteRepo
-from app.series_operations.series_operation_dialog_base import (
+from app.series_operations.dialog_base import (
     ResultSeriesSpec,
     SeriesOperationDialogBase,
 )
 from app.styles.style import create_card_widget, stdSizeAndlayout
 from app.logs.logger import applogger
 from app.utils.messages import show_message
-from app.widgets import report_html
+from app.utils import report_html
 from app.utils.distribution_fit import (
     CURATED_DISTRIBUTIONS,
     DEFAULT_RANK,

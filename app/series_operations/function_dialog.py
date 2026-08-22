@@ -43,14 +43,14 @@ from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
 from app.scanners.functions_scanner import FunctionScanner
 from app.series_operations.parameter_spec import ChoiceParam, FloatParam, IntParam
-from app.series_operations.series_operation_dialog_base import (
+from app.series_operations.dialog_base import (
     ResultSeriesSpec,
     SeriesOperationDialogBase,
     generated_table_name,
 )
 from app.styles.style import create_doc_link, mark_editor_panel, set_doc_link
 from app.utils.i18n import _
-from app.widgets import report_html
+from app.utils import report_html
 
 SPACING_LINEAR = "linear"
 SPACING_LOG = "log"

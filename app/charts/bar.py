@@ -12,7 +12,7 @@ import math
 import numpy as np
 import pandas as pd
 
-from app.charts.base_axis import BaseAxisRenderer, SeriesData
+from app.charts.base import BaseAxisRenderer, SeriesData
 
 
 Orientation = Literal["vertical", "horizontal"]

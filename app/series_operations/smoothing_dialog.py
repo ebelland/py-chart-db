@@ -36,7 +36,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from app.data.data_source import parse_roles, row_value
-from app.widgets.axis_series_selector_widget import AxisSeriesSelector
+from app.widgets.axis_series_selector import AxisSeriesSelector
 
 from scipy import fft
 from scipy.interpolate import (
@@ -49,7 +49,7 @@ from scipy.ndimage import gaussian_filter, gaussian_filter1d, median_filter
 from scipy.signal import butter, medfilt, savgol_filter, wiener
 
 from app.data.sqlite_repo import SqliteRepo
-from app.series_operations.series_operation_dialog_base import (
+from app.series_operations.dialog_base import (
     ResultSeriesSpec,
     SeriesOperationDialogBase,
     generated_table_name,

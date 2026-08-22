@@ -18,7 +18,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from app.series_operations.series_spectral_dialog import (
+from app.series_operations.spectral_dialog import (
     METHOD_LAPLACE,
     METHOD_WAVELET,
     SPECTRAL_METHODS,
@@ -163,7 +163,7 @@ def test_a_transient_is_found_that_a_long_fft_would_smear() -> None:
 def test_the_wavelet_is_analytic() -> None:
     """Negative frequencies are zeroed; without that the power is doubled."""
     source = (
-        APP_DIR / "series_operations" / "series_spectral_dialog.py"
+        APP_DIR / "series_operations" / "spectral_dialog.py"
     ).read_text(encoding="utf-8")
 
     assert "wavelet[omega <= 0.0] = 0.0" in source
@@ -194,7 +194,7 @@ def test_both_methods_are_offered() -> None:
 def test_neither_transform_touches_a_widget() -> None:
     """Which is what lets them be tested, and read, on their own."""
     source = (
-        APP_DIR / "series_operations" / "series_spectral_dialog.py"
+        APP_DIR / "series_operations" / "spectral_dialog.py"
     ).read_text(encoding="utf-8")
 
     for name in ("_laplace_spectrum", "_wavelet_power"):
@@ -212,7 +212,7 @@ def test_the_transform_works_without_pywavelets() -> None:
     dialog keeps working on an installation where PyWavelets is missing.
     """
     source = (
-        APP_DIR / "series_operations" / "series_spectral_dialog.py"
+        APP_DIR / "series_operations" / "spectral_dialog.py"
     ).read_text(encoding="utf-8")
 
     assert "pywt" not in source

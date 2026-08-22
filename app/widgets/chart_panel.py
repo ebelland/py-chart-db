@@ -38,7 +38,7 @@ from app.utils.hidpi import (
     inches_to_logical,
     logical_to_inches,
 )
-from app.widgets.html_results_widget import HtmlResultsView
+from app.widgets.html_results import HtmlResultsView
 from app.utils.i18n import _
 
 

@@ -11,11 +11,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from app.series_operations.series_operation_dialog_base import (
+from app.series_operations.dialog_base import (
     GENERATED_TABLE_PREFIX,
     generated_table_name,
 )
-from app.widgets.table_list_widget import _is_generated
+from app.widgets.table_list import _is_generated
 
 APP_DIR = Path(__file__).resolve().parent.parent
 
@@ -74,7 +74,7 @@ def test_no_operation_composes_a_table_name_without_the_helper() -> None:
 # The toggle
 # ----------------------------------------------------------------------
 def test_the_toggle_is_remembered() -> None:
-    source = (APP_DIR / "widgets" / "table_list_widget.py").read_text(encoding="utf-8")
+    source = (APP_DIR / "widgets" / "table_list.py").read_text(encoding="utf-8")
     start = source.index("def set_generated_visible")
     body = source[start : source.index("\n    def ", start + 10)]
 
@@ -83,12 +83,12 @@ def test_the_toggle_is_remembered() -> None:
 
 
 def test_generated_tables_are_hidden_by_default() -> None:
-    source = (APP_DIR / "widgets" / "table_list_widget.py").read_text(encoding="utf-8")
+    source = (APP_DIR / "widgets" / "table_list.py").read_text(encoding="utf-8")
     assert "CONFIG_SHOW_GENERATED, False" in source
 
 
 def test_the_filter_is_applied_while_the_list_is_built() -> None:
-    source = (APP_DIR / "widgets" / "table_list_widget.py").read_text(encoding="utf-8")
+    source = (APP_DIR / "widgets" / "table_list.py").read_text(encoding="utf-8")
     start = source.index("def reload")
     body = source[start : source.index("\n    def ", start + 10)]
 

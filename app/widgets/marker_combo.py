@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""app.utils.class_marker_combo
+"""app.widgets.marker_combo
 
 MarkerStyleCombo
 
@@ -28,7 +28,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QWidget
 
-from app.utils.combo_base import ComboEntry, IconComboBox
+from app.widgets.icon_combo import ComboEntry, IconComboBox
 from app.styles.style import create_hidpi_pixmap
 
 

@@ -37,7 +37,7 @@ from PySide6.QtWidgets import (
 )
 from app.utils.config import get_import_data_dialog_config, set_import_data_dialog_config
 from app.data.sqlite_repo import SqliteRepo
-from app.widgets.table_preview_widget import TablePreviewPanel
+from app.widgets.table_preview import TablePreviewPanel
 from app.logs.logger import applogger
 from app.utils.messages import show_message
 from app.styles.style import (

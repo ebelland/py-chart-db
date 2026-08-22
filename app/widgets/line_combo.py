@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""app.utils.class_line_combo
+"""app.widgets.line_combo
 
 LineStyleCombo
 
@@ -24,7 +24,7 @@ from PySide6.QtGui import QColor, QIcon, QPainter, QPen
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
 from app.styles.style import create_hidpi_pixmap
-from app.utils.combo_base import ComboEntry, IconComboBox
+from app.widgets.icon_combo import ComboEntry, IconComboBox
 
 _ICON_W, _ICON_H = 28, 14
 _LINE_COLOR = "#3a3a3a"

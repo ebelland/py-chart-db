@@ -77,7 +77,7 @@ from PySide6.QtWidgets import QWidget, QTreeView, QLabel, QAbstractItemView, QDi
 # Optional external helpers (graceful fallbacks)
 # ---------------------------------------------------------------------------
 
-from app.widgets.dictionary_editor_widget import DictEditorPanel
+from app.widgets.dictionary_editor import DictEditorPanel
 from app.utils.i18n import _
 
 OverrideErrors = list[tuple[str, object, str]]

@@ -24,7 +24,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from app.charts.base_axis import BaseAxisRenderer, SeriesData
+from app.charts.base import BaseAxisRenderer, SeriesData
 from app.logs.logger import applogger
 from app.utils.distribution_fit import (
     CURATED_DISTRIBUTIONS,
