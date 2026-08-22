@@ -2,7 +2,11 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
-logs/
+# The log files, not the logger.  This rule used to be "logs/", which
+# also matched app/logs/ and so kept app/logs/logger.py - the application's
+# own logger - out of the repository entirely: a fresh clone could not even
+# start, because every module imports it.
+*.log
 *.dhub
 *.7z
 *.zip
@@ -21,7 +25,7 @@ sample data/Demo Project.dhub
 app/locales/**/*.mo
 
 # Sync-conflict duplicates ("file 2.py") left by iCloud/OneDrive-style tools.
-# They are not edits: a stray "scatter_axis 2.py" under app/charts would be
+# They are not edits: a stray "scatter 2.py" under app/charts would be
 # read by the renderer scanner as a second, stale renderer.
 * 2.*
 * 2
