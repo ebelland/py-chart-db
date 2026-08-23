@@ -11,35 +11,66 @@ P0-6  style pickers: an "auto" option that defers to rcParams
      sheet says" rather than forcing a concrete value. Default to it, so a
      .mplstyle actually governs the look of a new series.
 
-P0-7  settings: drop the ChartPanel fit mode
-     The context menu it duplicated is gone (moved to Figure Properties as
-     a combo, see below) - so this is now the *default* a newly-created
-     figure starts with, not a duplicate. Worth keeping under that reading;
-     revisit if it still feels redundant once tried.
-
-P0-8  figure: width, height and dpi do not take effect
-
 P0-05  ChartPanel: selecting Axis:Kwargs while switching panels opens a modal
-
-P0-12  properties: mplstyle picker: use a file browser.
+       [DONE: the kwargs editor was detached with setParent(None), which does
+       not merely unparent a widget - it promotes it to a top-level window,
+       and Qt then showed it. Measured: 8 panel switches left 21 orphan
+       top-level DictEditorPanels alive. takeAt() has already removed the
+       widget from the layout, so the parent is now left alone and the
+       widget hidden + deleteLater()'d - 1 panel, 0 orphans after the same 8
+       switches. Same latent bug fixed in collapsible_panel.set_content_widget.
+       Regression test: app/tests/test_axis_kwargs_no_stray_window.py]
 
 P0-10 global: locale must follow the platform locale. Add Auto to settings
 
-P0-13 after series operations all panels are redrawn [DONE: _open_series_operation only calls the full _reload_tabs rebuild when the figure count actually changed; otherwise just the current panel reloads]
-
-P0-15: Fit. Stima etch da riorganizzare. [DONE: "Stima" block rebuilt as a QFormLayout, one control per row; cards use apply_card_layout]
 ================================================================
 NEW - requested after the review
 ================================================================
 
-N-4   3D / contour renderer, gridded and scattered
+N-4   Contour renderer, gridded and scattered
+      [3D SURFACE half is DONE - see N-11. What is left here is the 2D
+      contour/contourf family.]
       Two shapes of input, one renderer: values on a regular grid go straight
       to contour/contourf, and scattered x/y/z has to be interpolated onto one
       first (griddata, or a triangulation with tricontour - the triangulation
       is honest about where there is no data, the grid is not). Deciding which
       case is in front of you is the part worth getting right: a "grid" that
       is only nearly regular must not be treated as one.
+      SurfaceAxisRenderer._pivot_to_grid (app/charts/surface.py) is already
+      exactly that check - share it rather than write a second one.
       Pairs with the heatmap/imshow line under P2-1.
+      Widened scope (per matplotlib.org/stable/plot_types "Gridded data"):
+      also covers pcolormesh, imshow/matshow and streamplot/quiver-family
+      plots on a regular grid - the same "is this actually a grid" decision
+      this item is already about.
+
+N-11  Renderers: 3D surface, gridded and scattered [DONE:
+      app/charts/surface.py. SurfaceAxisRenderer (Axes.plot_surface) pivots
+      x/y/z rows into a regular grid; an incomplete grid is refused with a
+      message pointing at the scattered variant rather than silently
+      inventing the missing cells. TriSurfaceAxisRenderer
+      (Axes.plot_trisurf) skips the pivot and triangulates the raw points.
+      Both ask for a 3D axes via options["projection"]="3d", which
+      render_figure._subplot_kwargs_for_axis already read generically - the
+      only new wiring is create_chart_dialog's CHART_TYPES_NEEDING_3D_AXES.
+      The "round surface for silicon wafers" ask is the circular_mask
+      option on the gridded renderer: cells outside the radius become NaN,
+      which plot_surface simply does not draw - no separate renderer.
+      Demo project "3D surfaces - gridded and scattered" added (wafer
+      thickness map + scattered terrain survey), plus showcase figures.]
+
+N-10  Renderers: broken bar (horizontal and vertical), table, text [DONE:
+      app/charts/broken_bar.py (BrokenBarAxisRenderer +
+      BrokenBarVerticalAxisRenderer - the vertical one draws Rectangle
+      patches, since Matplotlib's broken_barh only ever draws horizontally),
+      app/charts/table.py (Axes.table; the series' own columns become the
+      table's, no x/y roles), app/charts/text.py (adjustText behind a
+      try/except - installed it spreads overlapping labels apart with a
+      leader line, missing it places them exactly and they may overlap,
+      never blank). adjustText declared optional in requirements.txt.
+      Showcase figures added for all four.]
+      Note: Timeline already exists (app/charts/timeline.py) - it is not
+      part of this item.
 
 N-5   sqlite_repo: 3013 lines in one module
       Split by subject rather than by size - connection and pragmas, tables
@@ -77,19 +108,9 @@ P2 - VALUABLE
 ================================================================
 
 P2-1  renderers that pair with infrastructure already built
-        Q-Q plot      - distribution_fit.py and an ECDF renderer already
-                        exist; Q-Q is the third of that set and is what
-                        people actually use to judge a distribution fit
-        residual plot - a full fitting dialog exists with no way to plot
-                        residuals, the standard way to see if a fit is good
         heatmap/imshow- no 2D renderer at all, despite scikit-image being a
                         declared dependency
         contour
-
-P2-2  series operations: arithmetic (A-B, A/B, normalize, offset)
-      Needs a resample-onto-common-x helper first, since two series rarely
-      share an x grid. That helper does not exist and several other things
-      want it.
 
 P2-3  series operation: baseline correction (ALS or rubber-band)
       Pure numpy/scipy. Prerequisite for meaningful peak areas.
@@ -106,15 +127,9 @@ P2-5  ChartPanel: downsample large series for display (LTTB) above ~50k points
       shrinks the hit test and the draw together. This is the next
       interactivity item worth doing.
 
-P2-7  menu popup: icons not aligned with their text
-
 P2-8  table view: colour data by value
-      [was: "table view: data coloring by value"]
 
 P2-9  global: split config.json into user settings and application config
-      [was: "split config.json in user and config"]
-      The file currently mixes the action catalogue with per-session window
-      geometry, so every run dirties the working tree
 
 P2-11 undo for descriptor edits
       Operations write generated tables and deletes are final. Even a simple
@@ -125,8 +140,6 @@ P2-12 series operations: inline preview plot beside the numeric results
       legible with a small plot next to it.
 
 P2-13 style.py: read presentation straight from config.json
-
-
 
 
 ================================================================
@@ -170,47 +183,3 @@ P3-11 requirements.txt: declare scikit-learn as an optional dependency
 P3-12 note: statsmodels, scikit-image and PyWavelets are each used by exactly
       one file (smoothing_dialog.py). Three heavy dependencies for one
       dialog - worth knowing if the install ever needs slimming.
-
-
-================================================================
-CLAUDE COMMANDS
-Paste into the terminal from the project root.
-Requires ~/.local/bin on PATH:
-  echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
-================================================================
-
-# --- P0, all still open ---
-
-claude "Fix P0-7 in todo.txt: five actions in config.json name SVG files that were deleted. Either clear their icon fields for consistency with the rest of the SFSymbol/Fluent migration, or restore the SVGs as a fallback for platforms that are neither macOS nor Windows. Recommend which and explain the tradeoff before changing anything."
-
-claude "Fix P0-3 in todo.txt: the marker and line style pickers are never enabled. Find the root cause before changing anything, and tell me what it was."
-
-claude "Fix P0-4 and P0-5 in todo.txt: picker errors in ChartPanel, and a modal window appearing when panels are switched while Axis:Kwargs is selected. Reproduce each first and show me the traceback. Note that ChartPanel picking changed recently - see section 7.4 of docs/DEVELOPMENT.md."
-
-claude "Fix P0-8, P0-9 and P0-10 in todo.txt: colorby across all renderers, the mplstyle picker not showing folders, and the locale not following the platform."
-
-# --- Finishing what is started ---
-
-claude "Convert the remaining seven series operation dialogs to the PARAMS declaration described in section 7.2 of docs/DEVELOPMENT.md. The outlier dialog is the worked example. Do them ONE AT A TIME, committing each separately, and report the line-count change for each - the outlier conversion did not shrink the file and I want to know whether the larger dialogs do."
-
-claude "Implement N-3 in todo.txt: attribute control charts (p, np, c, u). Read app/series_operations/control_chart_dialog.py first - the Nelson rules, the violation reporting and the report layout are all reusable; what is new is the per-point limits and the sample-size role."
-
-# --- P2, in the order I would do them ---
-
-claude "Implement P2-5 in todo.txt: downsample large series for display. Read the benchmark under P1-2 first - blitting made the repaint flat, so the hover hit test is now the dominant cost at scale and this shrinks both."
-
-claude "Implement P2-1 in todo.txt: add Q-Q and residual renderers. Read app/charts/ecdf.py and app/utils/distribution_fit.py first; both should reuse the existing fitting infrastructure rather than recomputing."
-
-claude "Implement P2-2 in todo.txt: a resample-onto-common-x helper, then a series arithmetic operation built on it. The helper is the real deliverable; several other planned features need it. Put it beside app/utils/series_validation.py, which already owns the clean/sort/merge logic it will build on."
-
-claude "Implement P2-3 in todo.txt: baseline correction as a series operation. app/series_operations/calculus_dialog.py already has minimum and endpoint-line baselines inline; this should share that code rather than reimplement it."
-
-claude "Fix P2-6 and P2-7 in todo.txt: the table list and table preview widgets look inconsistent on macOS, and menu popup icons are not aligned with their text. Screenshot the current state first."
-
-claude "Implement P2-9 in todo.txt: split config.json into user settings and application config. Per-session window geometry currently dirties the working tree on every run; that half should not be tracked in git."
-
-claude "Implement N-4 in todo.txt: a contour renderer for gridded and scattered data. Read app/charts/base.py for the renderer contract and app/charts/histogram.py for a renderer that reads one role; the new part is deciding whether the input is on a grid."
-
-claude "Implement N-7 and N-8 in todo.txt: an annotation dialog and horizontal/vertical reference lines from the ChartPanel context menu, both persisted in the axis options. app/charts/base.py already draws options[\"annotations\"]; the lines want the same treatment."
-
-claude "Implement N-5 in todo.txt: split app/data/sqlite_repo.py by subject, keeping SqliteRepo as the single class every call site already uses."

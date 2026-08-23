@@ -239,6 +239,64 @@ def _peak_scan(rng: np.random.Generator, points: int = 240) -> pd.DataFrame:
     )
 
 
+def _wafer_map(rng: np.random.Generator, side: int = 41) -> pd.DataFrame:
+    """Film thickness measured on a regular grid across a 300mm wafer.
+
+    A complete x/y grid, which is what the gridded Surface Plot needs, and
+    the case its circular_mask option exists for: the measurements cover the
+    square grid, but a wafer is round, so the corners are outside the wafer
+    rather than zero-thickness parts of it.
+
+    The shape is a shallow dome (thicker at the centre, as a spin-coated
+    film tends to be) plus a radial ripple, so the surface has something to
+    show at both scales.
+    """
+    axis = np.linspace(-150.0, 150.0, side)
+    x_grid, y_grid = np.meshgrid(axis, axis)
+    radius = np.hypot(x_grid, y_grid)
+
+    dome = 850.0 - 0.0035 * radius**2
+    ripple = 6.0 * np.cos(radius / 18.0)
+    thickness = dome + ripple + rng.normal(0.0, 1.2, x_grid.shape)
+
+    return pd.DataFrame(
+        {
+            "x_mm": x_grid.ravel(),
+            "y_mm": y_grid.ravel(),
+            "thickness_nm": thickness.ravel(),
+        }
+    )
+
+
+def _terrain_survey(rng: np.random.Generator, points: int = 600) -> pd.DataFrame:
+    """Elevation at scattered survey points - deliberately not on a grid.
+
+    The counterpart to _wafer_map: the same kind of quantity sampled where
+    the surveyor could stand rather than at every grid intersection, which
+    is what the triangulated Surface Plot (Scattered) is for. Pivoting this
+    into a grid would invent values for the gaps; the triangulation does
+    not.
+    """
+    angle = rng.uniform(0.0, 2.0 * np.pi, points)
+    # sqrt keeps the points evenly spread over the area rather than piling
+    # up at the centre, which is what uniform radius would do.
+    distance = 1200.0 * np.sqrt(rng.uniform(0.0, 1.0, points))
+    x = distance * np.cos(angle)
+    y = distance * np.sin(angle)
+
+    ridge = 180.0 * np.exp(-((x - 250.0) ** 2 + (y + 150.0) ** 2) / 2.6e5)
+    valley = -120.0 * np.exp(-((x + 400.0) ** 2 + (y - 300.0) ** 2) / 3.4e5)
+    slope = 0.05 * x + 0.02 * y
+
+    return pd.DataFrame(
+        {
+            "easting_m": x,
+            "northing_m": y,
+            "elevation_m": 420.0 + ridge + valley + slope + rng.normal(0.0, 4.0, points),
+        }
+    )
+
+
 def _figure_specs() -> list[FigureSpec]:
     """Return every demo figure, in the order they appear as tabs."""
     line = {"linestyle": "-", "marker": "", "show_in_legend": True}
@@ -470,6 +528,59 @@ def _figure_specs() -> list[FigureSpec]:
                 ),
             ],
         ),
+        FigureSpec(
+            name="11 · Wafer map",
+            key="wafer_map",
+            tables=("wafer_map",),
+            queries=(),
+            chart_type="Surface Plot",
+            title="Film thickness across a 300mm wafer",
+            x_label="x (mm)",
+            y_label="y (mm)",
+            axis_options={
+                # 3D axes are requested through this option, which
+                # render_figure._subplot_kwargs_for_axis reads for any axis.
+                "projection": "3d",
+                # The measurements are on a square grid but the wafer is
+                # round: without this the corners are drawn as if they were
+                # part of it.
+                "circular_mask": True,
+                "cmap": "viridis",
+            },
+            series=[
+                SeriesSpec(
+                    name="Thickness",
+                    sql=(
+                        "SELECT x_mm AS x, y_mm AS y, thickness_nm AS z "
+                        "FROM wafer_map"
+                    ),
+                    roles={"x": "x", "y": "y", "z": "z"},
+                    style={},
+                ),
+            ],
+        ),
+        FigureSpec(
+            name="12 · Terrain survey",
+            key="terrain_survey",
+            tables=("terrain_survey",),
+            queries=(),
+            chart_type="Surface Plot (Scattered)",
+            title="Elevation from scattered survey points",
+            x_label="easting (m)",
+            y_label="northing (m)",
+            axis_options={"projection": "3d", "cmap": "terrain"},
+            series=[
+                SeriesSpec(
+                    name="Elevation",
+                    sql=(
+                        "SELECT easting_m AS x, northing_m AS y, elevation_m AS z "
+                        "FROM terrain_survey"
+                    ),
+                    roles={"x": "x", "y": "y", "z": "z"},
+                    style={},
+                ),
+            ],
+        ),
     ]
 
 
@@ -488,6 +599,8 @@ TABLE_BUILDERS: dict[str, Any] = {
     "operating_points": _scatter_cloud,
     "process_run": _process_run,
     "peak_scan": _peak_scan,
+    "wafer_map": _wafer_map,
+    "terrain_survey": _terrain_survey,
 }
 
 #: Saved query name -> its SQL, and the table it reads.
@@ -583,6 +696,14 @@ DEMO_PROJECTS: tuple[DemoProject, ...] = (
         "One Gaussian peak on a sloping baseline. Run Series operations, "
         "Fit and pick Gaussian peak: the starting values come from the data.",
         ("peak_scan",),
+    ),
+    DemoProject(
+        "3D surfaces - gridded and scattered",
+        "The same kind of measurement in the two layouts the surface "
+        "renderers each need: film thickness on a regular wafer grid, "
+        "masked to the round wafer, and elevation at scattered survey "
+        "points, triangulated rather than interpolated onto a grid.",
+        ("wafer_map", "terrain_survey"),
     ),
 )
 

@@ -249,6 +249,31 @@ class SeriesFitDialog(SeriesOperationDialogBase):
         self._lbl_spacing = QLabel(_("Spacing:"), self)
         self._combo_knot_spacing = QComboBox(self)
 
+        # Optional accessory charts: judging a fit needs more than the curve
+        # overlaid on the data, and neither picture is one this dialog draws
+        # by default - they cost a new axis each, so only appear when asked.
+        self._residual_chart_check = QCheckBox(_("Residuals vs. x"), self)
+        self._residual_chart_check.setToolTip(
+            _(
+                "Add a chart of the fit residuals (measured minus fit) on a "
+                "new axis in this figure. The classic way to see a fit that "
+                "looks good but has structure in what it left behind."
+            )
+        )
+        self._fit_vs_measured_chart_check = QCheckBox(_("Measured vs. fit"), self)
+        self._fit_vs_measured_chart_check.setToolTip(
+            _(
+                "Add a chart of the measured values against the fitted "
+                "values on a new axis in this figure. A perfect fit falls "
+                "on the diagonal; how far points stray from it is the fit "
+                "quality, independent of what x means."
+            )
+        )
+        self._residual_axis_id: int | None = None
+        self._fit_vs_measured_axis_id: int | None = None
+        self._accessory_table_name: str | None = None
+        self._applied = False
+
     def build_model_selector(self) -> QWidget:
         panel = create_card_widget(self, "fitModelCard")
         layout = QVBoxLayout(panel)
@@ -424,6 +449,10 @@ class SeriesFitDialog(SeriesOperationDialogBase):
         layout.addWidget(QLabel(_("Output table:"), outer))
         self._output_table_edit.setToolTip(_("Name of the SQLite table where fitted values/residuals are saved."))
         layout.addWidget(self._output_table_edit)
+
+        layout.addWidget(QLabel(_("Extra charts:"), outer))
+        layout.addWidget(self._residual_chart_check)
+        layout.addWidget(self._fit_vs_measured_chart_check)
 
         return outer
 
@@ -1465,6 +1494,179 @@ class SeriesFitDialog(SeriesOperationDialogBase):
         if not results:
             return "<p>Run Fit, or press Preview to draw the current parameters.</p>"
         return self._results_html(results[0])
+
+    # ------------------------------------------------------------------
+    # Optional accessory charts: residuals, and measured vs. fit
+    # ------------------------------------------------------------------
+    #
+    # Both read straight off the output table _build_output_frame already
+    # writes - x/residual always, plus y/y_fit (1D) or z/z_fit (2D) - so no
+    # extra computation happens here, only a second axis and a query onto the
+    # same table the overlay series already reads from.
+    #
+    # Each checkbox owns one axis, created on the first Preview or Apply that
+    # has it checked and reused afterwards, the same way the spectral and
+    # statistics dialogs reuse their own single result axis: an axis outside
+    # the preview savepoint (creating one commits) would otherwise stack up
+    # one per Preview click. Unchecking removes it immediately rather than
+    # waiting for Close, since a chart nobody asked for any more should not
+    # linger just because the dialog is still open.
+
+    def _residual_axis_query(
+        self, result: SeriesFitResult, table_name: str
+    ) -> tuple[str, dict[str, str], str, str]:
+        return (
+            f'SELECT x, residual AS y FROM "{table_name}" ORDER BY x',
+            {"x": "x", "y": "y"},
+            result.x_col or "x",
+            _("residual"),
+        )
+
+    def _fit_vs_measured_axis_query(
+        self, result: SeriesFitResult, table_name: str
+    ) -> tuple[str, dict[str, str], str, str]:
+        fit_col, measured_col = ("z_fit", "z") if self._is_2d_fit() else ("y_fit", "y")
+        return (
+            f'SELECT {fit_col} AS x, {measured_col} AS y FROM "{table_name}"',
+            {"x": "x", "y": "y"},
+            _("fit"),
+            result.target_col or _("measured"),
+        )
+
+    def _sync_accessory_axis(
+        self,
+        *,
+        checkbox: QCheckBox,
+        axis_id_attr: str,
+        title: str,
+        query_builder: Callable[[SeriesFitResult, str], tuple[str, dict[str, str], str, str]],
+        result: SeriesFitResult,
+        table_name: str,
+    ) -> None:
+        if not checkbox.isChecked():
+            self._remove_accessory_axis(axis_id_attr)
+            return
+
+        sql_query, roles, x_label, y_label = query_builder(result, table_name)
+        axis_id = getattr(self, axis_id_attr)
+        if axis_id is None:
+            axis_id = self.create_result_axis(
+                chart_type="Scatter Plot",
+                title=title,
+                x_label=x_label,
+                y_label=y_label,
+                options={"grid": True},
+            )
+            setattr(self, axis_id_attr, axis_id)
+
+        # This axis exists for exactly one series; replacing rather than
+        # appending is what keeps repeated Previews from stacking copies.
+        for row in self._repo.get_series(axis_id) or []:
+            self._repo.delete_series(int(row["id"]))
+        self._repo.create_series_descriptor(
+            axis_id=axis_id,
+            series_index=self._repo.next_series_index(axis_id),
+            name=title,
+            sql_query=sql_query,
+            roles=roles,
+            style={"marker": "o", "linestyle": ""},
+        )
+
+    def _remove_accessory_axis(self, axis_id_attr: str) -> None:
+        axis_id = getattr(self, axis_id_attr, None)
+        if axis_id is None:
+            return
+        setattr(self, axis_id_attr, None)
+        try:
+            self._repo.delete_axis(int(axis_id))
+        except Exception:
+            applogger.exception("Failed to remove accessory axis (%s)", axis_id_attr)
+
+    def _sync_accessory_charts(self, result: SeriesFitResult, table_name: str) -> None:
+        if not (
+            self._residual_chart_check.isChecked()
+            or self._fit_vs_measured_chart_check.isChecked()
+        ):
+            self._remove_accessory_axis("_residual_axis_id")
+            self._remove_accessory_axis("_fit_vs_measured_axis_id")
+            return
+
+        # The accessory axes read the *final* output table rather than the
+        # preview one, so it has to exist by now - on Preview it otherwise
+        # would not, and both charts would be empty until Apply. Written
+        # here, outside the preview savepoint, for the same reason the axes
+        # are (see resolve_target_axis_id); Apply overwrites it with the same
+        # content, and Close without Apply drops it again.
+        self.write_result_table(table_name, result)
+        self._accessory_table_name = table_name
+
+        self._sync_accessory_axis(
+            checkbox=self._residual_chart_check,
+            axis_id_attr="_residual_axis_id",
+            title=_("Residuals"),
+            query_builder=self._residual_axis_query,
+            result=result,
+            table_name=table_name,
+        )
+        self._sync_accessory_axis(
+            checkbox=self._fit_vs_measured_chart_check,
+            axis_id_attr="_fit_vs_measured_axis_id",
+            title=_("Measured vs. fit"),
+            query_builder=self._fit_vs_measured_axis_query,
+            result=result,
+            table_name=table_name,
+        )
+
+    def resolve_target_axis_id(
+        self, selected_axis_id: int, results: Sequence[SeriesFitResult]
+    ) -> int:
+        """Keep the fit on its source axis, and sync the accessory axes here.
+
+        The fit overlay itself belongs on the axis its data came from, so the
+        selected axis is returned unchanged. The accessory axes are built in
+        this hook - and *only* here - because ``_run_operation`` calls it
+        before ``begin_preview_transaction()``, which is the one point where
+        an axis can be created safely.
+
+        Creating them inside the savepoint instead destroyed data: writing a
+        result table goes through pandas' to_sql, which commits and so
+        invalidates the savepoint, after which every later repository write
+        has its own commit suppressed (see SqliteRepo._commit) and sits in an
+        implicit transaction that the Close/Cancel cleanup then discards -
+        taking the user's own series on the other axes with it. The spectral
+        and statistics dialogs create their result axis in this same hook for
+        exactly this reason.
+        """
+        if results:
+            self._sync_accessory_charts(
+                results[0], self.result_table_name(selected_axis_id, results[0])
+            )
+        return selected_axis_id
+
+    def apply_results_to_axis(self, axis_id: int, results: Sequence[SeriesFitResult]) -> None:
+        super().apply_results_to_axis(axis_id, results)
+        self._applied = True
+
+    def discard_operation_artifacts(self) -> None:
+        """Remove any accessory axis this dialog added, when Apply never ran.
+
+        Creating an axis commits, so it is not covered by the preview
+        savepoint and has to be undone by hand - see resolve_target_axis_id.
+        """
+        if self._applied:
+            return
+        self._remove_accessory_axis("_residual_axis_id")
+        self._remove_accessory_axis("_fit_vs_measured_axis_id")
+
+        table_name = self._accessory_table_name
+        self._accessory_table_name = None
+        if table_name:
+            try:
+                self._repo.delete_table(table_name)
+            except Exception:
+                applogger.exception(
+                    "Failed to remove the accessory result table %s", table_name
+                )
 
     def on_use_fit_results_as_initial(self) -> None:
         """Copy latest optimized fit parameters back to the Initial column."""

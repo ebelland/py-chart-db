@@ -1445,12 +1445,28 @@ class AxisPropertiesWidget(QWidget):
         return super().eventFilter(watched, event)
 
     def _replace_layout_widget(self, layout: QVBoxLayout, widget: QWidget) -> None:
-        """Replace kwargs content with a plain panel widget."""
+        """Replace kwargs content with a plain panel widget.
+
+        The outgoing widget is hidden and scheduled for deletion, and
+        deliberately *not* unparented on the way out.  ``setParent(None)``
+        does not simply detach a widget - it promotes it to a *top-level
+        window*, and the kwargs editor rebuilt here on every panel switch
+        was left as exactly that: a stray, fully-populated window Qt could
+        show on its own afterwards, floating over the application with its
+        own title bar.
+
+        ``takeAt`` has already removed it from the layout, so keeping the
+        parent costs nothing and means the widget can never become a window
+        in the first place - not even for the one event-loop pass between
+        ``deleteLater`` and the deletion actually happening, which is a real
+        window on screen if Qt shows it in the meantime.
+        """
         while layout.count():
             item = layout.takeAt(0)
             child = item.widget() if item is not None else None
             if child is not None:
-                child.setParent(None)
+                child.hide()
+                child.deleteLater()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         widget.setContentsMargins(0, 0, 0, 0)

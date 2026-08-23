@@ -8,6 +8,7 @@ from app.functions.base import (
     _exponential,
     _measured_fwhm,
     _peak_shape,
+    _periodic_guess,
     _polynomial_guess,
     _pos,
     _positive_x,
@@ -552,6 +553,14 @@ class sine(base_function):
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
         return p[0] * np.sin(p[1] * x + p[2]) + p[3]
 
+    @staticmethod
+    def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
+        guess = _periodic_guess(x, y)
+        if guess is None:
+            return None
+        amplitude, omega, offset = guess
+        return [amplitude, omega, 0.0, offset]
+
 
 class cosine(base_function):
     name = "Cosine"
@@ -564,6 +573,14 @@ class cosine(base_function):
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
         return p[0] * np.cos(p[1] * x + p[2]) + p[3]
+
+    @staticmethod
+    def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
+        guess = _periodic_guess(x, y)
+        if guess is None:
+            return None
+        amplitude, omega, offset = guess
+        return [amplitude, omega, 0.0, offset]
 
 
 class damped_sine(base_function):

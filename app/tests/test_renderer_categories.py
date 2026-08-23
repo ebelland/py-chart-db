@@ -118,7 +118,11 @@ def test_the_picker_is_an_accordion_of_categories(dialog) -> None:
     toolbox = dialog._types_toolbox
     headings = [toolbox.itemText(i) for i in range(toolbox.count())]
 
-    assert headings == ["Pairwise data", "Statistical distributions"]
+    assert headings == [
+        "Pairwise data",
+        "Statistical distributions",
+        "3D and volumetric data",
+    ]
 
 
 def test_matplotlibs_order_is_kept_not_alphabetical(dialog) -> None:
@@ -215,6 +219,7 @@ def test_clearing_the_search_restores_the_headings(dialog) -> None:
     assert [toolbox.itemText(i) for i in range(toolbox.count())] == [
         "Pairwise data",
         "Statistical distributions",
+        "3D and volumetric data",
     ]
 
 

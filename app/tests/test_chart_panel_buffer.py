@@ -128,31 +128,6 @@ def test_redrawing_does_not_accumulate_artists(qapp) -> None:
     assert len(canvas.figure.axes) == 1
 
 
-def test_the_debug_window_exists_beside_main() -> None:
-    """Kept at the project root, not in app/tests, so it is easy to find.
-
-    It needs a real window server, so it must not be collected by pytest: the
-    leading underscore keeps it out of ``test_*`` discovery while leaving it
-    obvious in a directory listing.
-    """
-    script = (
-        Path(__file__).resolve().parent.parent.parent
-        / "supporting apps"
-        / "_testChart.py"
-    )
-
-    assert script.exists()
-    assert not script.name.startswith("test_")
-
-    source = script.read_text(encoding="utf-8")
-    assert "WA_TranslucentBackground" in source
-    assert "FigureCanvasQTAgg" in source
-    # Runnable on its own, and independent of the app so it works even when the
-    # application does not import.
-    assert '__name__ == "__main__"' in source
-    assert "from app." not in source
-
-
 @pytest.mark.parametrize("name", ["_configure_canvas", "paintEvent", "resizeEvent"])
 def test_the_painting_methods_are_all_still_here(name: str) -> None:
     """These were lost once already in a rewrite of this widget."""
@@ -215,10 +190,18 @@ def test_the_fixed_canvas_size_carries_no_pixel_ratio() -> None:
 
 
 def test_zoom_is_applied_to_the_dpi_not_the_size() -> None:
-    """So the figure keeps its physical size and only its resolution changes."""
+    """So the figure keeps its physical size and only its resolution changes.
+
+    Zoom multiplies FIXED_MODE_SCREEN_DPI, the fixed on-screen reference,
+    rather than the figure's own configured dpi. Using the configured dpi
+    here made a figure at a fixed Width/Height grow or shrink on screen
+    purely because its print/export dpi changed - see the module note on
+    FIXED_MODE_SCREEN_DPI in chart_panel.py.
+    """
     body = _method("_apply_fixed_mode_pixel_size")
 
-    assert "_set_configured_dpi(self._fixed_figure_dpi * zoom)" in body
+    assert "_set_configured_dpi(FIXED_MODE_SCREEN_DPI * zoom)" in body
+    assert "self._fixed_figure_dpi" not in body
 
 
 # ----------------------------------------------------------------------

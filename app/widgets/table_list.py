@@ -182,9 +182,11 @@ class TableListPanel(QWidget):
     def _build_view(self) -> QTableView:
         """Build the source list as a Finder sidebar rather than a data grid.
 
-        No frame and no alternating rows: a sidebar is a plain list on the
-        sidebar surface, and the stripes that help a wide table be read across
-        only add noise to a single column of names.
+        No frame: a sidebar is a plain list on the sidebar surface.
+        Alternating rows are on though, to match TablePreviewPanel - this grew
+        a Table/Link/File/Notes header since the "single column of names"
+        this was originally built for, and reads the same way a real table
+        does now, striped or not.
         """
         view = QTableView(self)
         view.setShowGrid(False)
@@ -196,7 +198,7 @@ class TableListPanel(QWidget):
         # subcontrol hands Qt the whole item-painting path, so the cell drew a
         # default blue while the view drew its own selection colour behind it.
         # The row's appearance belongs in the .qss with everything else.
-        view.setAlternatingRowColors(False)
+        view.setAlternatingRowColors(True)
         view.setSortingEnabled(False)
         view.setContextMenuPolicy(PySide6.QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         view.verticalHeader().setVisible(False)

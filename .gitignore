@@ -6,7 +6,10 @@ __pycache__/
 # also matched app/logs/ and so kept app/logs/logger.py - the application's
 # own logger - out of the repository entirely: a fresh clone could not even
 # start, because every module imports it.
+# The .* variant catches the rotated files (datahub.log.1, .2, ...), which
+# "*.log" alone does not match and which were showing up as untracked.
 *.log
+*.log.*
 *.dhub
 *.7z
 *.zip

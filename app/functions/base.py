@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from typing import Any, ClassVar, List
 
 import numpy as np
+from scipy.signal import find_peaks
 
 def _safe_x(x: np.ndarray, eps: float = 1e-12) -> np.ndarray:
     return np.where(np.abs(x) < eps, np.sign(x + eps) * eps, x)
@@ -131,6 +132,47 @@ def _measured_fwhm(
 
     width = float(right.min() - left.max())
     return width if width > 0.0 else None
+
+def _periodic_guess(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float] | None:
+    """Return (amplitude, angular frequency, offset) for an oscillating series.
+
+    Amplitude is half the 5th-95th percentile spread rather than half of
+    max-min: one noise spike should not get to set the whole fit's scale.
+    Offset is the mean, the natural centre of an oscillation around a
+    baseline.
+
+    Frequency comes from the spacing between peaks, not from the shape of
+    any single crest - a least-squares fit is bad at recovering the number
+    of cycles per unit x on its own from a wrong starting guess (it is a
+    steep, many-times-repeating minimum), which is exactly what this is for.
+    Needs at least two peaks - one peak has no spacing to measure - so a
+    series covering less than one full period falls back to None like any
+    other guess this module cannot make.
+    """
+    if x.size < 4:
+        return None
+
+    order = np.argsort(x)
+    x_sorted = x[order]
+    y_sorted = y[order]
+
+    offset = float(np.mean(y_sorted))
+    amplitude = float((np.percentile(y_sorted, 95) - np.percentile(y_sorted, 5)) / 2.0)
+    if not np.isfinite(amplitude) or amplitude <= 0.0:
+        return None
+
+    # A minimum prominence keeps peak-finding from tripping on point-to-point
+    # noise instead of real crests.
+    peaks, _props = find_peaks(y_sorted, prominence=amplitude * 0.2)
+    if peaks.size < 2:
+        return None
+
+    period = float(np.mean(np.diff(x_sorted[peaks])))
+    if not np.isfinite(period) or period <= 0.0:
+        return None
+
+    return amplitude, 2.0 * np.pi / period, offset
+
 
 def _exponential(x: np.ndarray, y: np.ndarray, growth:bool) ->  list[float]|None:
     # Just under the minimum, not the average of an end. An exponential

@@ -94,7 +94,9 @@ def test_the_menu_bar_carries_one_top_level_menu(window: MainWindow) -> None:
     top_actions = menu_bar.actions()
 
     assert len(top_actions) == 1
-    assert top_actions[0].text() == "Menu"
+    # "File", not "Menu": a Mac user looks for New/Open/Import under File,
+    # and the rail button this replaced is not on screen to be echoed.
+    assert top_actions[0].text() == "File"
 
 
 def test_the_menu_holds_every_item_the_popup_has(window: MainWindow) -> None:

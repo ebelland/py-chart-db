@@ -76,6 +76,16 @@ AXIS_COLLECTION_KEYS: Final[tuple[str, ...]] = ("axes", "subplots", "plots", "ch
 #: to be deliberate, wide enough that it does not have to be exact.
 PICK_TOLERANCE_POINTS: Final[float] = 5.0
 
+#: FIXED mode's on-screen reference: the dpi used to turn a figure's physical
+#: size in inches into logical widget pixels, at 100% zoom.  Deliberately not
+#: the figure's own configured dpi - dpi is a print/export resolution, and
+#: using it for on-screen sizing too meant a figure at a fixed 20x15cm looked
+#: three times as big on nothing more than its dpi going from 100 to 300,
+#: although Width and Height never changed.  100 matches Matplotlib's own
+#: default figure.dpi, so a figure saved before per-figure dpi existed keeps
+#: the on-screen size it always had.
+FIXED_MODE_SCREEN_DPI: Final[float] = 100.0
+
 
 def axis_text(axis: Any, value: float) -> str:
     """Format *value* the way *axis* would label it.
@@ -1877,23 +1887,23 @@ class ChartPanel(QFrame):
         """Return the FIXED-mode canvas size in *logical* pixels.
 
         The result goes to ``QWidget.setFixedSize``, which speaks logical
-        pixels, and ``_fixed_figure_dpi`` is the dpi the user configured - so
-        no pixel ratio appears here at all.  A 16 inch figure at 100 dpi and
-        200% zoom occupies 3200 logical pixels on every display; only the
-        number of device pixels behind them differs, and that is the backend's
-        business rather than this method's.
+        pixels.  Sized from ``FIXED_MODE_SCREEN_DPI``, a fixed on-screen
+        reference, rather than from the figure's own configured dpi - dpi is
+        a print/export resolution and must not also change how big the
+        figure looks on screen.  A 16 inch figure occupies 1600 logical
+        pixels at 100% zoom on every display and at every configured dpi;
+        only the number of device pixels behind them differs, and that is
+        the backend's business rather than this method's.
         """
         try:
             width_in, height_in = self._fixed_figure_size_inches
-            dpi = float(self._fixed_figure_dpi or 100.0)
         except Exception:
             width_in, height_in = 16.0, 9.0
-            dpi = 100.0
 
         zoom = self._zoom_percent / 100.0 if apply_zoom else 1.0
         return QSize(
-            int(round(inches_to_logical(width_in, dpi, zoom))),
-            int(round(inches_to_logical(height_in, dpi, zoom))),
+            int(round(inches_to_logical(width_in, FIXED_MODE_SCREEN_DPI, zoom))),
+            int(round(inches_to_logical(height_in, FIXED_MODE_SCREEN_DPI, zoom))),
         )
 
     def _restore_unzoomed_figure_metrics(self) -> None:
@@ -1912,13 +1922,19 @@ class ChartPanel(QFrame):
     def _apply_fixed_mode_pixel_size(self) -> None:
         """Size the canvas for FIXED mode at the current zoom.
 
-        Zoom is applied to the dpi, so the figure keeps its physical size in
-        inches and is simply rendered at more or fewer pixels - which is what
-        makes the printed size independent of how large it looks on screen.
+        Zoom is applied to ``FIXED_MODE_SCREEN_DPI``, the same on-screen
+        reference ``_current_figure_pixel_size`` sizes the widget from - not
+        to the figure's own configured dpi, which must stay a pure
+        print/export setting.  The figure is rendered at exactly the dpi the
+        widget's logical size needs (times the display's own pixel ratio, via
+        ``_set_configured_dpi``); using the configured dpi here instead was
+        what made the on-screen figure grow or shrink with it.  Width, height
+        and the physical print/export size stay in inches throughout - only
+        the number of on-screen pixels changes with zoom.
 
-        Both factors are applied here and neither is stored: ``zoom`` from the
-        slider, the display's ratio by ``_set_configured_dpi``.  Storing either
-        one is what made zoom compound.
+        Neither factor is stored: ``zoom`` from the slider, the display's
+        ratio by ``_set_configured_dpi``.  Storing either one is what made
+        zoom compound.
         """
         if self._resize_mode != "FIXED":
             return
@@ -1926,7 +1942,7 @@ class ChartPanel(QFrame):
         try:
             zoom = self._zoom_percent / 100.0
             width_in, height_in = self._fixed_figure_size_inches
-            self._set_configured_dpi(self._fixed_figure_dpi * zoom)
+            self._set_configured_dpi(FIXED_MODE_SCREEN_DPI * zoom)
             self._figure.set_size_inches(width_in, height_in, forward=False)
             self._canvas.setFixedSize(self._current_figure_pixel_size(apply_zoom=True))
             self._figure.set_size_inches(width_in, height_in, forward=False)
@@ -2005,7 +2021,13 @@ class ChartPanel(QFrame):
             return
 
         try:
-            self._figure.savefig(file_path, bbox_inches="tight")
+            # Not self._figure.dpi: in FIXED mode that now holds the on-screen
+            # rendering dpi (FIXED_MODE_SCREEN_DPI times zoom), which has
+            # nothing to do with export quality.  _fixed_figure_dpi is always
+            # the dpi actually configured for this figure, screen state aside.
+            self._figure.savefig(
+                file_path, dpi=self._fixed_figure_dpi, bbox_inches="tight"
+            )
             applogger.info(
                 "Chart saved (figure_id=%s, path=%s, filter=%s)",
                 self._figure_id,

@@ -12,7 +12,7 @@ scatter plot next to the words "Scatter Plot" is decoration, not information.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import cast
+from typing import Any, cast
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDialog, QListWidget, QListWidgetItem, QSizePolicy, QWidget, QHBoxLayout, QLabel, QVBoxLayout, QRadioButton, QFormLayout, QLineEdit, QComboBox, QPlainTextEdit, QScrollArea, QSplitter, QToolBox
@@ -27,6 +27,7 @@ from app.data.sqlite_repo import SqliteRepo
 from app.data.data_source import quote_identifier
 from app.utils.messages import show_message
 from app.styles.style import (
+    apply_card_layout,
     apply_dialog_shell,
     apply_toolbox_header_metrics,
     create_doc_link,
@@ -144,7 +145,7 @@ class NewPlotTabDialog(QDialog):
 
         renderer_details = create_card_widget(self, "rendererDetailsCard")
         renderer_details_layout = QVBoxLayout(renderer_details)
-        stdSizeAndlayout(renderer_details_layout)
+        apply_card_layout(renderer_details_layout)
         renderer_details_layout.addWidget(self._renderer_name)
 
         renderer_details_layout.addWidget(self._renderer_link)
@@ -166,7 +167,7 @@ class NewPlotTabDialog(QDialog):
 
         fig_group = create_card_widget(self, "plotTargetCard")
         fig_main = QVBoxLayout(fig_group)
-        stdSizeAndlayout(fig_main)
+        apply_card_layout(fig_main)
 
         target_title = create_section_title(_("Target"), fig_group)
         target_title.setStyleSheet("font-weight: 700;")
@@ -227,7 +228,7 @@ class NewPlotTabDialog(QDialog):
             QSizePolicy.Policy.Expanding,
         )
         series_list_layout = QVBoxLayout(series_list_group)
-        stdSizeAndlayout(series_list_layout)
+        apply_card_layout(series_list_layout)
 
         series_header = QWidget(series_list_group)
         series_header_layout = QHBoxLayout(series_header)
@@ -282,7 +283,7 @@ class NewPlotTabDialog(QDialog):
 
         editor_group = create_card_widget(self, "plotSeriesEditorCard")
         editor_layout = QVBoxLayout(editor_group)
-        stdSizeAndlayout(editor_layout)
+        apply_card_layout(editor_layout)
 
         series_editor_title = create_section_title(_("Series"), editor_group)
         series_editor_title.setStyleSheet("font-weight: 700;")
@@ -298,14 +299,21 @@ class NewPlotTabDialog(QDialog):
         editor_layout.addWidget(editor_form, 1)
 
         # Dialog buttons and layout.
-        renderer_panel = QWidget()
+        #
+        # A card like the other two columns, not a plain QWidget: it used to
+        # be the one column with no white "card" surface of its own, so it
+        # showed the dialog's own grey background straight through - the
+        # "grigio e bianco" (grey and white) the panels looked inconsistent
+        # for was this column against the other two, not a shade mismatch
+        # within any one of them.
+        renderer_panel = create_card_widget(self, "plotRendererCard")
         renderer_panel.setMinimumWidth(220)
         renderer_panel.setSizePolicy(
             QSizePolicy.Policy.Preferred,
             QSizePolicy.Policy.Expanding,
         )
         renderer_layout = QVBoxLayout(renderer_panel)
-        stdSizeAndlayout(renderer_layout)
+        apply_card_layout(renderer_layout)
 
         renderer_title = create_section_title(_("Renderers"), renderer_panel)
         renderer_title.setStyleSheet("font-weight: 700;")
@@ -449,16 +457,24 @@ class NewPlotTabDialog(QDialog):
     # Selection across several lists
     # ------------------------------------------------------------------
     def _current_item(self) -> QListWidgetItem | None:
-        """Return the selected renderer item, whichever section holds it.
+        """Return the selected renderer item, from the active toolbox page.
 
-        The selection lives in one of several QListWidgets, so "the current
-        item" is not a property of any single one of them; every reader goes
-        through here.
+        Only one category is ever visible at a time - the toolbox shows one
+        page - so the current item is unambiguously that page's own list's
+        ``currentItem()``. This used to scan every list for the first whose
+        ``currentItem()`` also had ``isSelected()`` true, which broke two
+        ways: on a real mouse click - as opposed to a programmatic
+        ``setCurrentRow()`` - Qt does not guarantee ``isSelected()`` is
+        already true at the exact moment ``currentItemChanged`` fires, so a
+        freshly clicked item briefly read back as unselected and the details
+        panel fell back to a hardcoded "Axis"; and a list that is not even
+        visible can still be carrying a *stale* current item from before the
+        user switched categories, which - iterated first, dict order being
+        what it is - won the read over the section actually on screen.
         """
-        for renderer_list in self._lists_by_category.values():
-            item = renderer_list.currentItem()
-            if item is not None and item.isSelected():
-                return item
+        current_widget = self._types_toolbox.currentWidget()
+        if isinstance(current_widget, QListWidget):
+            return current_widget.currentItem()
         return None
 
     def _clear_other_selections(self, keep: QListWidget) -> None:
@@ -475,17 +491,58 @@ class NewPlotTabDialog(QDialog):
                 # clear the current item, but only this one is typed for it.
                 renderer_list.setCurrentRow(-1)
 
+    #: Selected on open when present, ahead of whatever sits first in
+    #: Matplotlib's own category order. Scatter is the chart almost every new
+    #: figure turns out to be, and the general "just plot the data" case
+    #: users reach for.
+    DEFAULT_RENDERER: str = "Scatter Plot"
+
     def _select_first_renderer(self) -> None:
-        """Select the first renderer of the first section that has one."""
+        """Select the default renderer, or the first one otherwise."""
+        if self._select_renderer_by_name(self.DEFAULT_RENDERER):
+            return
+
         for index, (category, renderer_list) in enumerate(self._lists_by_category.items()):
             if renderer_list.count() == 0 or renderer_list.isHidden():
                 continue
             for row in range(renderer_list.count()):
                 if not renderer_list.item(row).isHidden():
-                    renderer_list.setCurrentRow(row)
+                    # Toolbox page first: _current_item() reads the active
+                    # page's own currentItem(), so setting the row before the
+                    # page is switched would have it looking at the wrong
+                    # list for as long as that order was reversed.
                     self._types_toolbox.setCurrentIndex(index)
+                    renderer_list.setCurrentRow(row)
                     self._clear_other_selections(renderer_list)
                     return
+
+    def _select_renderer_by_name(self, name: str) -> bool:
+        """Select the renderer *name* if it exists in any section.
+
+        Returns whether it was found, so a caller can fall back when it is
+        not - a renderer this dialog no longer ships must not be a reason to
+        select nothing at all.
+        """
+        for index, (category, renderer_list) in enumerate(self._lists_by_category.items()):
+            if renderer_list.isHidden():
+                continue
+            for row in range(renderer_list.count()):
+                item = renderer_list.item(row)
+                # Not a match while an active search has hidden it: forcing
+                # it into view would silently override what the user typed,
+                # and calling this again after every keystroke - it runs
+                # whenever the current selection drops out of the filter -
+                # would make the default win the search outright.
+                if item.isHidden():
+                    continue
+                if str(item.data(Qt.ItemDataRole.UserRole)) == name:
+                    # Toolbox page first - see the matching comment in
+                    # _select_first_renderer.
+                    self._types_toolbox.setCurrentIndex(index)
+                    renderer_list.setCurrentRow(row)
+                    self._clear_other_selections(renderer_list)
+                    return True
+        return False
 
     # ------------------------------------------------------------------
     # Search
@@ -552,7 +609,7 @@ class NewPlotTabDialog(QDialog):
         if renderer_class is None:
             self._renderer_name.clear()
             self._renderer_description.clear()
-            self._renderer_link.clear()
+            set_doc_link(self._renderer_link, "", "")
             self._renderer_link.hide()
             return
 
@@ -562,12 +619,13 @@ class NewPlotTabDialog(QDialog):
         self._renderer_name.setText(renderer_name or renderer_class.__name__)
         self._renderer_description.clear()
 
-        if link:
-            set_doc_link(self._renderer_link, _("Documentation"), link)
-            self._renderer_link.show()
-        else:
-            self._renderer_link.clear()
-            self._renderer_link.hide()
+        # set_doc_link() clears the tooltip along with the text when link is
+        # empty - going through it unconditionally is what keeps a renderer
+        # with no documentation from showing the previous renderer's URL as
+        # its tooltip, which set_doc_link()-only-when-truthy used to leave
+        # behind: the label's own text emptied, but setToolTip("") never ran.
+        set_doc_link(self._renderer_link, _("Documentation"), link)
+        self._renderer_link.setVisible(bool(link))
 
     # ------------------------------------------------------------------
     # Load UI data.
@@ -1129,6 +1187,30 @@ class NewPlotTabDialog(QDialog):
             if isinstance(value, str) and value
         }
 
+    #: Chart types with no meaningful x/y scale of their own - a table has
+    #: nothing to tick or draw a frame around. The renderer's own
+    #: ax.axis("off") call is undone again by _apply_axis_runtime_options's
+    #: unconditional set_axis_on() afterwards, so the descriptor has to ask
+    #: for it explicitly through the one option that survives that: without
+    #: this, a newly created Table axis showed a bare 0-1 frame around it.
+    CHART_TYPES_WITHOUT_AXIS_CHROME: frozenset[str] = frozenset({"Table"})
+
+    #: Chart types that need a 3D Matplotlib axes rather than the ordinary
+    #: 2D one every other renderer draws on. render_figure.py's
+    #: _subplot_kwargs_for_axis already reads a generic "projection" option
+    #: for every axis, so this is the only place that had to name which
+    #: renderers want it.
+    CHART_TYPES_NEEDING_3D_AXES: frozenset[str] = frozenset(
+        {"Surface Plot", "Surface Plot (Scattered)"}
+    )
+
+    def _default_axis_options(self, chart_type: str) -> dict[str, Any] | None:
+        if chart_type in self.CHART_TYPES_WITHOUT_AXIS_CHROME:
+            return {"hide_axis": True}
+        if chart_type in self.CHART_TYPES_NEEDING_3D_AXES:
+            return {"projection": "3d"}
+        return None
+
     def _axis_title_from_series(self, drafts: list[SeriesDraft]) -> str:
         """Infer a readable axis title from selected series names."""
         names = [draft.name.strip() for draft in drafts if draft.name.strip()]
@@ -1198,7 +1280,7 @@ class NewPlotTabDialog(QDialog):
                 x_label=self._axis_label_for_role(drafts, "x"),
                 y_label=self._axis_label_for_role(drafts, "y"),
                 z_label=self._axis_label_for_role(drafts, "z"),
-                options=None,
+                options=self._default_axis_options(chart_type),
             )
 
         created = 0

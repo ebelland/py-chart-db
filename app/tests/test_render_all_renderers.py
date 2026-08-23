@@ -77,6 +77,10 @@ def test_renderer_draws_and_saves(
         + len(axis.collections)
         + len(axis.patches)
         + len(axis.containers)
+        # Axes.table() tracks its own artist in ax.tables - none of the four
+        # collections above, so the Table renderer needs this one counted
+        # too or it always reads as an empty axis.
+        + len(axis.tables)
     )
     assert drawn > 0, f"{chart_type}: renderer produced an empty axis"
 

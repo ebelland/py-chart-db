@@ -249,8 +249,8 @@ class TablePreviewPanel(QWidget):
         if column:
             items.append(
                 MenuItem(
-                    text=f"Delete column '{column}'...",
-                    tooltip="Delete the selected column",
+                    text=_("Delete column '{column}'...").format(column=column),
+                    tooltip=_("Delete the selected column"),
                     callback=lambda _=False, col=column: self._delete_column(col),
                     icon="delete",
                 )
@@ -259,14 +259,17 @@ class TablePreviewPanel(QWidget):
         menu = create_menu(self, items)
 
         if column:
-            hide_menu = menu.addMenu("Hide rows by selected column")
+            hide_menu = menu.addMenu(_("Hide rows by selected column"))
+            # The operator is the payload and stays as it is; only the label
+            # is translated. Wrapping the operator too would hide rows by
+            # comparing against a translated string instead of SQL.
             for label, operator in (
-                ("Equal to...", "="),
-                ("Different from...", "!="),
-                ("Lower than...", "<"),
-                ("Lower or equal...", "<="),
-                ("Higher than...", ">"),
-                ("Higher or equal...", ">="),
+                (_("Equal to..."), "="),
+                (_("Different from..."), "!="),
+                (_("Lower than..."), "<"),
+                (_("Lower or equal..."), "<="),
+                (_("Higher than..."), ">"),
+                (_("Higher or equal..."), ">="),
             ):
                 create_menu_item(
                     parent=self,
@@ -274,7 +277,9 @@ class TablePreviewPanel(QWidget):
                     icon=None,
                     checkable=False,
                     text=label,
-                    tooltip=f"Hide rows where {column} {operator} value",
+                    tooltip=_("Hide rows where {column} {operator} value").format(
+                        column=column, operator=operator
+                    ),
                     key=None,
                     action=(
                         lambda _=False, col=column, op=operator:
@@ -287,8 +292,8 @@ class TablePreviewPanel(QWidget):
                 menu=hide_menu,
                 icon=None,
                 checkable=False,
-                text="Hide NULL / empty values",
-                tooltip="Hide rows where the selected column is empty",
+                text=_("Hide NULL / empty values"),
+                tooltip=_("Hide rows where the selected column is empty"),
                 key=None,
                 action=(
                     lambda _=False, col=column:
@@ -300,8 +305,8 @@ class TablePreviewPanel(QWidget):
                 menu=hide_menu,
                 icon=None,
                 checkable=False,
-                text="Hide rows equal to selected cell",
-                tooltip="Hide rows matching the selected cell value",
+                text=_("Hide rows equal to selected cell"),
+                tooltip=_("Hide rows matching the selected cell value"),
                 key=None,
                 action=self._hide_selected_cell_value,
             )

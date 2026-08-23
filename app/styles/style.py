@@ -24,6 +24,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from PySide6 import QtWidgets
 from PySide6.QtCore import QByteArray, QRect, QRectF, QSize, Qt
 from PySide6.QtSvg import QSvgRenderer
@@ -624,6 +626,43 @@ def _symbol_tint() -> str:
     return SYMBOL_INK_LIGHT if _ACTIVE_THEME_IS_DARK else SYMBOL_INK_DARK
 
 
+def _opaque_bounding_rect(pixmap: QPixmap) -> QRect:
+    """Return the bounding rectangle of a pixmap's non-transparent pixels.
+
+    Some SF Symbols pad their own canvas off-centre - ``square.and.arrow.down``
+    (the Save glyph) measured 10px of empty space above its ink against 4px
+    below, out of an 82px-tall source canvas, while most symbols split that
+    evenly. Centring the pixmap's *rectangle* still carries that imbalance
+    straight into the icon, which is what made Save sit visibly lower than
+    Reload or Copy in the same menu although every icon was the same
+    dimensions.  Falls back to the full pixmap rect when there is no ink to
+    measure or the scan fails - a blank or unreadable glyph is nothing to
+    special-case.
+    """
+    try:
+        image = pixmap.toImage().convertToFormat(QImage.Format.Format_ARGB32)
+        width, height = image.width(), image.height()
+        if width <= 0 or height <= 0:
+            return pixmap.rect()
+
+        stride = image.bytesPerLine()
+        buffer = bytes(image.constBits())[: stride * height]
+        rows = np.frombuffer(buffer, dtype=np.uint8).reshape((height, stride))
+        alpha = rows[:, 3 : width * 4 : 4]
+
+        ys, xs = np.nonzero(alpha > 10)
+        if ys.size == 0:
+            return pixmap.rect()
+        return QRect(
+            int(xs.min()),
+            int(ys.min()),
+            int(xs.max() - xs.min()) + 1,
+            int(ys.max() - ys.min()) + 1,
+        )
+    except Exception:
+        return pixmap.rect()
+
+
 def _tinted_pixmap(
     pixmap: QPixmap,
     size: int,
@@ -650,6 +689,11 @@ def _tinted_pixmap(
     glyph painted with ``Qt.AlignCenter`` into a fixed-size rect is centred by
     construction.  Centring here, after scaling, is what makes the two paths
     agree.
+
+    Centred on the scaled pixmap's *ink*, not its rectangle - see
+    ``_opaque_bounding_rect``. A glyph whose own canvas already sits its ink
+    off-centre would otherwise carry that offset straight through, evenly
+    padded rectangle and all.
     """
     physical = max(1, int(round(size * ratio)))
     scaled = (
@@ -675,16 +719,18 @@ def _tinted_pixmap(
         finally:
             painter.end()
 
-    if scaled.width() != physical or scaled.height() != physical:
+    ink = _opaque_bounding_rect(scaled)
+    ink_center_x = ink.x() + ink.width() / 2.0
+    ink_center_y = ink.y() + ink.height() / 2.0
+    offset_x = round(physical / 2.0 - ink_center_x)
+    offset_y = round(physical / 2.0 - ink_center_y)
+
+    if scaled.width() != physical or scaled.height() != physical or offset_x or offset_y:
         canvas = QPixmap(physical, physical)
         canvas.fill(Qt.GlobalColor.transparent)
         painter = QPainter(canvas)
         try:
-            painter.drawPixmap(
-                (physical - scaled.width()) // 2,
-                (physical - scaled.height()) // 2,
-                scaled,
-            )
+            painter.drawPixmap(offset_x, offset_y, scaled)
         finally:
             painter.end()
         scaled = canvas

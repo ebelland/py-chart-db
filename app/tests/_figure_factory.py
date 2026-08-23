@@ -36,6 +36,12 @@ SHOWCASE_CHART_TYPES: tuple[str, ...] = (
     "Fill Between",
     "Wind Barbs",
     "Timeline",
+    "Broken Bar",
+    "Broken Bar (Vertical)",
+    "Table",
+    "Text",
+    "Surface Plot",
+    "Surface Plot (Scattered)",
 )
 
 
@@ -60,6 +66,16 @@ def _create_source_tables(cur: sqlite3.Cursor, rng: np.random.Generator, n: int)
         -- Dated events, for the timeline: an ISO date and the text to write
         -- at the top of each stem.
         CREATE TABLE src_events   (happened TEXT, title TEXT);
+        -- Interval rows for the broken-bar renderers: one row per interval,
+        -- several rows may share a category (the "broken" part).
+        CREATE TABLE src_intervals (task TEXT, start REAL, duration REAL);
+        -- Labelled points for the text renderer.
+        CREATE TABLE src_labels  (x REAL, y REAL, label TEXT);
+        -- A regular x/y grid, for the gridded surface renderer.
+        CREATE TABLE src_grid    (x REAL, y REAL, z REAL);
+        -- The same surface, sampled at scattered (non-gridded) points, for
+        -- the triangulated surface renderer.
+        CREATE TABLE src_scatter3d (x REAL, y REAL, z REAL);
         """
     )
 
@@ -111,6 +127,53 @@ def _create_source_tables(cur: sqlite3.Cursor, rng: np.random.Generator, n: int)
             ("2026-01-14", "v1.0"), ("2026-02-02", "v1.1"), ("2026-03-19", "v1.2"),
             ("2026-04-07", "v2.0 beta"), ("2026-05-30", "v2.0"), ("2026-06-11", "v2.1"),
             ("2026-08-01", "v2.2"), ("2026-09-22", "v3.0 rc"), ("2026-11-05", "v3.0"),
+        ],
+    )
+
+    # Broken bar: three tasks, one of them ("Design") busy in two separate
+    # stretches - the case broken_barh exists for.
+    cur.executemany(
+        "INSERT INTO src_intervals (task, start, duration) VALUES (?, ?, ?)",
+        [
+            ("Design", 0.0, 3.0), ("Design", 5.0, 2.0),
+            ("Build", 2.0, 4.0),
+            ("Test", 6.0, 3.0),
+        ],
+    )
+
+    # Text: a handful of labelled points, two deliberately close together so
+    # the showcase is meaningful with adjustText installed and still correct
+    # (just overlapping) without it.
+    cur.executemany(
+        "INSERT INTO src_labels (x, y, label) VALUES (?, ?, ?)",
+        [
+            (0.0, 0.0, "origin"), (3.0, 4.0, "north-east"),
+            (3.1, 4.1, "north-east 2"), (-2.0, 1.0, "west"),
+        ],
+    )
+
+    # Surface: a ripple, sampled on a regular grid and again at scattered
+    # points - the same shape, the two input layouts the surface renderers
+    # each need.
+    grid_axis = np.linspace(-3.0, 3.0, 20)
+    grid_x, grid_y = np.meshgrid(grid_axis, grid_axis)
+    grid_z = np.sin(np.hypot(grid_x, grid_y))
+    cur.executemany(
+        "INSERT INTO src_grid (x, y, z) VALUES (?, ?, ?)",
+        [
+            (float(px), float(py), float(pz))
+            for px, py, pz in zip(grid_x.ravel(), grid_y.ravel(), grid_z.ravel())
+        ],
+    )
+
+    scatter_x = rng.uniform(-3.0, 3.0, 400)
+    scatter_y = rng.uniform(-3.0, 3.0, 400)
+    scatter_z = np.sin(np.hypot(scatter_x, scatter_y))
+    cur.executemany(
+        "INSERT INTO src_scatter3d (x, y, z) VALUES (?, ?, ?)",
+        [
+            (float(px), float(py), float(pz))
+            for px, py, pz in zip(scatter_x, scatter_y, scatter_z)
         ],
     )
 
@@ -331,6 +394,81 @@ def _showcase_definitions() -> list[dict[str, Any]]:
                     "SELECT grp AS dataset, measurement AS value FROM src_samples",
                     {},
                 ),
+            ],
+        },
+        {
+            "chart_type": "Broken Bar",
+            "name": "Broken bar showcase",
+            "labels": ("", ""),
+            "axis_options": {"title": "Broken Bar"},
+            "series": [
+                (
+                    "tasks",
+                    "SELECT task AS category, start, duration FROM src_intervals",
+                    {},
+                ),
+            ],
+        },
+        {
+            "chart_type": "Broken Bar (Vertical)",
+            "name": "Broken bar vertical showcase",
+            "labels": ("", ""),
+            "axis_options": {"title": "Broken Bar (Vertical)"},
+            "series": [
+                (
+                    "tasks",
+                    "SELECT task AS category, start, duration FROM src_intervals",
+                    {},
+                ),
+            ],
+        },
+        {
+            "chart_type": "Table",
+            "name": "Table showcase",
+            "labels": ("", ""),
+            # A table has no x/y scale to show a frame or ticks for; the
+            # renderer's own ax.axis("off") is undone again by
+            # _apply_axis_runtime_options's unconditional set_axis_on(),
+            # which runs after every renderer - hide_axis is the one thing
+            # that survives it.
+            "axis_options": {"title": "Table", "hide_axis": True},
+            "series": [
+                (
+                    "amounts",
+                    "SELECT label AS \"label\", amount, err FROM src_categories",
+                    {},
+                ),
+            ],
+        },
+        {
+            "chart_type": "Text",
+            "name": "Text showcase",
+            "labels": ("", ""),
+            "axis_options": {"title": "Text"},
+            "series": [
+                (
+                    "labels",
+                    "SELECT x, y, label AS text FROM src_labels",
+                    {},
+                ),
+            ],
+        },
+        {
+            "chart_type": "Surface Plot",
+            "name": "Surface showcase",
+            "labels": ("", ""),
+            "axis_options": {"title": "Surface Plot", "projection": "3d"},
+            "series": [
+                ("ripple", "SELECT x, y, z FROM src_grid", {}),
+            ],
+        },
+        {
+            "chart_type": "Surface Plot (Scattered)",
+            "name": "Scattered surface showcase",
+            "labels": ("", ""),
+            "axis_options": {"title": "Surface Plot (Scattered)", "projection": "3d"},
+            "series": [
+                ("ripple", "SELECT x, y, z FROM src_scatter3d", {}),
             ],
         },
     ]

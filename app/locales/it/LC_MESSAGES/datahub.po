@@ -3425,6 +3425,15 @@ msgstr "I limiti superiore e inferiore. Senza di essi la carta è un semplice gr
 
 
 
+msgid "About"
+msgstr "Informazioni"
+
+msgid "File"
+msgstr "File"
+
+msgid "Hide"
+msgstr "Nascondi"
+
 msgid "There is no database yet.\n\nBuild the demo project? It writes a small example project - tables, saved queries and ready-made charts - so there is something to take apart. You can create your own database at any time."
 msgstr "Non c'è ancora nessun database.\n\nVuoi creare il progetto dimostrativo? Contiene un piccolo progetto di esempio - tabelle, query salvate e grafici già pronti - da cui partire. Puoi creare il tuo database in qualsiasi momento."
 
@@ -3919,3 +3928,78 @@ msgstr "{series}: {error}"
 
 msgid "{series}\nx: {x}\ny: {y}"
 msgstr "{series}\nx: {x}\ny: {y}"
+
+msgid "Extra charts:"
+msgstr "Grafici accessori:"
+
+msgid "Residuals vs. x"
+msgstr "Residui vs x"
+
+msgid "Measured vs. fit"
+msgstr "Misura vs stima"
+
+msgid "Residuals"
+msgstr "Residui"
+
+msgid "residual"
+msgstr "residuo"
+
+msgid "fit"
+msgstr "stima"
+
+msgid "measured"
+msgstr "misura"
+
+msgid "Add a chart of the fit residuals (measured minus fit) on a new axis in this figure. The classic way to see a fit that looks good but has structure in what it left behind."
+msgstr "Aggiunge un grafico dei residui dell'adattamento (misura meno stima) su un nuovo asse in questa figura. Il modo classico per vedere un adattamento che sembra buono ma ha una struttura in ciò che ha lasciato indietro."
+
+msgid "Add a chart of the measured values against the fitted values on a new axis in this figure. A perfect fit falls on the diagonal; how far points stray from it is the fit quality, independent of what x means."
+msgstr "Aggiunge un grafico dei valori misurati rispetto ai valori stimati su un nuovo asse in questa figura. Un adattamento perfetto cade sulla diagonale; quanto i punti se ne discostano è la qualità dell'adattamento, indipendentemente dal significato di x."
+
+msgid "Delete column '{column}'..."
+msgstr "Elimina la colonna '{column}'..."
+
+msgid "Delete the selected column"
+msgstr "Elimina la colonna selezionata"
+
+msgid "Hide rows by selected column"
+msgstr "Nascondi righe per la colonna selezionata"
+
+msgid "Equal to..."
+msgstr "Uguale a..."
+
+msgid "Different from..."
+msgstr "Diverso da..."
+
+msgid "Lower than..."
+msgstr "Minore di..."
+
+msgid "Lower or equal..."
+msgstr "Minore o uguale..."
+
+msgid "Higher than..."
+msgstr "Maggiore di..."
+
+msgid "Higher or equal..."
+msgstr "Maggiore o uguale..."
+
+msgid "Hide rows where {column} {operator} value"
+msgstr "Nascondi le righe dove {column} {operator} valore"
+
+msgid "Hide NULL / empty values"
+msgstr "Nascondi valori NULL / vuoti"
+
+msgid "Hide rows where the selected column is empty"
+msgstr "Nascondi le righe dove la colonna selezionata è vuota"
+
+msgid "Hide rows equal to selected cell"
+msgstr "Nascondi le righe uguali alla cella selezionata"
+
+msgid "Hide rows matching the selected cell value"
+msgstr "Nascondi le righe che corrispondono al valore della cella selezionata"
+
+msgid "3D surfaces - gridded and scattered"
+msgstr "Superfici 3D - a griglia e sparse"
+
+msgid "The same kind of measurement in the two layouts the surface renderers each need: film thickness on a regular wafer grid, masked to the round wafer, and elevation at scattered survey points, triangulated rather than interpolated onto a grid."
+msgstr "Lo stesso tipo di misura nei due formati richiesti dai renderer di superficie: lo spessore del film su una griglia regolare del wafer, mascherata sul wafer rotondo, e l'altimetria in punti di rilievo sparsi, triangolata anziché interpolata su una griglia."

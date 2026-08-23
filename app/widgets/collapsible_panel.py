@@ -73,7 +73,15 @@ class CollapsiblePanel(QFrame):
         return self._content
 
     def set_content_widget(self, widget: QWidget) -> None:
-        """Replace the body content widget."""
+        """Replace the body content widget.
+
+        The outgoing widget is hidden and scheduled for deletion rather than
+        unparented: ``setParent(None)`` promotes a widget to a *top-level
+        window*, which Qt is then free to show on its own - see the matching
+        note in AxisPropertiesWidget._replace_layout_widget, where exactly
+        that put a stray floating panel on screen.  The incoming widget is
+        never deleted, only ones being replaced.
+        """
         old_widget = self._content
         self._content = widget
 
@@ -81,11 +89,13 @@ class CollapsiblePanel(QFrame):
         while body_layout.count():
             item = body_layout.takeAt(0)
             child = item.widget() if item is not None else None
-            if child is not None:
-                child.setParent(None)
+            if child is not None and child is not widget:
+                child.hide()
+                child.deleteLater()
 
-        if old_widget is not widget:
-            old_widget.setParent(None)
+        if old_widget is not widget and old_widget is not None:
+            old_widget.hide()
+            old_widget.deleteLater()
 
         body_layout.addWidget(widget)
         self._apply_geometry(animated=False)

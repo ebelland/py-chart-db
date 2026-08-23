@@ -15,3 +15,9 @@ pytest==9.1.1
 # and importing it on a released 3.14 kills the interpreter outright.
 pyobjc-framework-Cocoa>=12.2; sys_platform == "darwin"
 
+# Optional: app/charts/text.py guards the import in a try/except and falls
+# back to plain, non-adjusted labels when this is absent, so the Text
+# renderer works either way - installed, it spreads overlapping labels apart
+# instead of leaving them stacked at their points.
+adjustText==1.3.0
+

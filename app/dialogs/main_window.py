@@ -47,6 +47,7 @@ from app.styles.style import (
     load_icon,
     relax_minimum_width,
     stdSizeAndlayout,
+    _pyobjc_core_is_safe_to_import,
 )
 from app.widgets.table_list import  TableListPanel
 from app.widgets.table_preview import TablePreviewPanel
@@ -441,6 +442,15 @@ class MainWindow(QMainWindow):
 
         if IS_MACOS:
             self._build_macos_menu_bar(items)
+            # Cocoa rebuilds its own native menu items - overwriting any
+            # rename - at least once more after this call returns, somewhere
+            # between menu construction and the window's first activation.
+            # Measured, not documented anywhere: a rename applied immediately
+            # is gone again within 500ms, while one applied at 2s already
+            # survives. Rather than guess the exact moment, this reapplies a
+            # few times over the first two seconds and then stops.
+            for delay_ms in (0, 150, 400, 800, 1500, 2500):
+                QTimer.singleShot(delay_ms, self._rename_macos_native_app_menu_items)
 
     def _build_macos_menu_bar(self, items: list) -> None:
         """Populate the real menu bar from the same items as the popup.
@@ -450,12 +460,12 @@ class MainWindow(QMainWindow):
         native application menu - the one already showing next to the apple -
         wherever in the menu bar it was declared. Nothing else has a role a
         Mac user would expect, so the rest stay together in one ordinary
-        top-level menu, named "Menu" like the rail button it replaces.
+        top-level menu, named "File".
         """
         menu_bar = self.menuBar()
         menu_bar.clear()
 
-        menu = menu_bar.addMenu(_("Menu"))
+        menu = menu_bar.addMenu(_("File"))
         for item in items:
             if item is None:
                 menu.addSeparator()
@@ -478,6 +488,71 @@ class MainWindow(QMainWindow):
             role = self._MACOS_MENU_ROLES.get(str(action.data() or ""))
             if role is not None:
                 action.setMenuRole(role)
+
+    #: Cocoa's own selectors for Hide and Quit - reliable regardless of
+    #: title, since neither is backed by a QAction of ours and both keep
+    #: these selectors on every Mac, in every language.  About is *not* in
+    #: here: it is backed by our own "credits" QAction, so Qt dispatches it
+    #: through the same generic "qt_itemFired:" selector as Preferences,
+    #: indistinguishable from it by selector alone.  It is matched by
+    #: position instead - see _rename_macos_native_app_menu_items.
+    _MACOS_APP_MENU_SELECTORS: dict[str, str] = {
+        "hide:": "Hide",
+        "terminate:": "Close",
+    }
+
+    def _rename_macos_native_app_menu_items(self) -> None:
+        """Strip the app name Cocoa insists on adding to About/Hide/Quit.
+
+        `QAction.MenuRole` moves an action into the native application menu,
+        but Cocoa then *replaces* its text with its own "About {name}" /
+        "Hide {name}" / "Quit {name}" template - not read from the QAction at
+        all, so nothing on the Qt side can change it.  The assumption in
+        main.py that QApplication.setApplicationName() controls "{name}" does
+        not hold here: measured directly, Cocoa's template uses
+        NSProcessInfo.processName (the running interpreter, "Python" for an
+        unsigned script) instead, which no public Qt or Cocoa API renames
+        without an actual .app bundle - only reaching past Qt into the
+        NSMenuItem itself can.
+
+        So this does not try to make the name correct - it removes it,
+        landing on the bare "About" / "Hide" / "Close" the request asked for.
+        Hide and Quit are matched by their native Cocoa action selector,
+        stable regardless of title or language.  About cannot be: it is
+        backed by our own "credits" QAction, so Qt dispatches it through the
+        same generic selector as Preferences.  Apple's own Human Interface
+        Guidelines fix the application menu's layout on every Mac - About
+        first, when present - which is the stable signal used here instead.
+
+        Deferred one event-loop turn past menu construction: Cocoa builds the
+        native menu from Qt's QMenuBar lazily, so nothing is there to rename
+        yet in the same call that builds it.
+        """
+        if not _pyobjc_core_is_safe_to_import():
+            return
+
+        try:
+            import AppKit  # type: ignore[import-not-found]
+        except Exception:
+            return
+
+        try:
+            app_menu = AppKit.NSApp.mainMenu().itemAtIndex_(0).submenu()
+            if app_menu is None or app_menu.numberOfItems() == 0:
+                return
+
+            about_item = app_menu.itemAtIndex_(0)
+            if str(about_item.action() or "") == "qt_itemFired:":
+                about_item.setTitle_(_("About"))
+
+            for index in range(app_menu.numberOfItems()):
+                item = app_menu.itemAtIndex_(index)
+                selector = str(item.action()) if item.action() is not None else ""
+                bare_text = self._MACOS_APP_MENU_SELECTORS.get(selector)
+                if bare_text is not None:
+                    item.setTitle_(_(bare_text))
+        except Exception:
+            applogger.exception("Failed to rename the native macOS app menu items.")
 
 
     def _create_activity_rail(self) -> QFrame:

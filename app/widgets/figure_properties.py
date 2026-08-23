@@ -606,19 +606,20 @@ class FigurePropertiesWidget(QWidget):
         self._set_enabled_state(True)
 
     def _list_mplstyle_files(self) -> list[Path]:
-        """Return every ``.mplstyle`` file under MPLSTYLES_DIR, subfolders included.
+        """Return the ``.mplstyle`` files directly under MPLSTYLES_DIR.
 
-        The style library ships styles grouped into subfolders (``color/``,
-        ``journals/``, ``color/discrete-rainbow/``, ...). A plain top-level
-        ``glob("*.mplstyle")`` never saw any of those, so most of the library
-        was invisible in this dropdown even though the files were right there
-        on disk. ``rglob`` walks the whole tree instead.
+        Subfolders (``color/``, ``journals/``, ``color/discrete-rainbow/``,
+        ...) hold most of the shipped library, and used to be walked in here
+        too - which put dozens of rarely-used styles ahead of the handful
+        someone actually reaches for, in one long, hard-to-scan dropdown.
+        Only the main folder's own files are quick-picks now; anything in a
+        subfolder is still reachable, just through "Browse..." instead.
         """
         if not MPLSTYLES_DIR.exists():
             return []
         return sorted(
-            MPLSTYLES_DIR.rglob("*.mplstyle"),
-            key=lambda path: str(path.relative_to(MPLSTYLES_DIR)).lower(),
+            MPLSTYLES_DIR.glob("*.mplstyle"),
+            key=lambda path: path.name.lower(),
         )
 
     @staticmethod
