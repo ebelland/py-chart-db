@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFileDialog,
+    QFormLayout,
     QHBoxLayout,
     QLabel,
     QMenu,
@@ -66,6 +67,7 @@ from app.utils.messages import show_message
 from app.utils import report_html
 
 from app.styles.style import (
+    apply_card_layout,
     create_action_button,
     create_card_widget,
     mark_editor_panel,
@@ -250,7 +252,7 @@ class SeriesFitDialog(SeriesOperationDialogBase):
     def build_model_selector(self) -> QWidget:
         panel = create_card_widget(self, "fitModelCard")
         layout = QVBoxLayout(panel)
-        stdSizeAndlayout(layout)
+        apply_card_layout(layout)
         self._model_search.setPlaceholderText(_("Search models..."))
         self._model_search.setToolTip(_("Filter the model catalog by name."))
         layout.addWidget(self._model_search)
@@ -320,7 +322,7 @@ class SeriesFitDialog(SeriesOperationDialogBase):
         """
         outer = create_card_widget(self, "fitParamsCard")
         layout = QVBoxLayout(outer)
-        stdSizeAndlayout(layout)
+        apply_card_layout(layout)
 
         # Expression / model options.
         option_row = QWidget(outer)
@@ -365,20 +367,26 @@ class SeriesFitDialog(SeriesOperationDialogBase):
         )
         layout.addWidget(self._params_table, 1)
 
-        # Output / fit options.
+        # Output / fit options, one control per row: a translated algorithm
+        # label ("Regione di fiducia (predefinito)") and a translated loss
+        # label ("Arcotangente (molto robusta)") side by side do not fit this
+        # panel's width at all, let alone alongside their own labels - the
+        # single row this used to be overflowed it horizontally, and two
+        # combos paired per row still did. A QFormLayout gives each combo the
+        # whole row to grow into, which is what a translated label this long
+        # actually needs.
         fit_options = QWidget(outer)
-        fit_options_layout = QHBoxLayout(fit_options)
+        fit_options_layout = QFormLayout(fit_options)
         stdSizeAndlayout(fit_options_layout)
-        fit_options_layout.addWidget(QLabel(_("Algorithm:")))
+
         for optimizer in OPTIMIZERS:
             self._combo_optimizer.addItem(_(optimizer.label), optimizer.key)
         self._combo_optimizer.setCurrentIndex(
             max(0, self._combo_optimizer.findData(DEFAULT_OPTIMIZER))
         )
         self._combo_optimizer.currentIndexChanged.connect(self._refresh_optimizer_help)
-        fit_options_layout.addWidget(self._combo_optimizer)
+        fit_options_layout.addRow(_("Algorithm:"), self._combo_optimizer)
 
-        fit_options_layout.addWidget(QLabel(_("Loss:")))
         for key, label in LOSSES:
             self._combo_loss.addItem(_(label), key)
         self._combo_loss.setToolTip(
@@ -388,14 +396,18 @@ class SeriesFitDialog(SeriesOperationDialogBase):
                 "fit. Only the least-squares algorithms use it."
             )
         )
-        fit_options_layout.addWidget(self._combo_loss)
+        fit_options_layout.addRow(_("Loss:"), self._combo_loss)
 
-        fit_options_layout.addWidget(QLabel(_("Max evals:")))
+        run_row = QWidget(fit_options)
+        run_row_layout = QHBoxLayout(run_row)
+        stdSizeAndlayout(run_row_layout)
         self._max_nfev_edit.setMaximumWidth(90)
         self._max_nfev_edit.setToolTip(_("Maximum number of function evaluations for the optimizer."))
-        fit_options_layout.addWidget(self._max_nfev_edit)
+        run_row_layout.addWidget(self._max_nfev_edit)
         self._weighted_check.setToolTip(_("Weight residuals by magnitude when computing RMSE/R²."))
-        fit_options_layout.addWidget(self._weighted_check)
+        run_row_layout.addWidget(self._weighted_check)
+        run_row_layout.addStretch(1)
+        fit_options_layout.addRow(_("Max evals:"), run_row)
 
         self._btn_estimate.setToolTip(
             _(
@@ -404,8 +416,8 @@ class SeriesFitDialog(SeriesOperationDialogBase):
                 "parameter space when it does not."
             )
         )
-        fit_options_layout.addWidget(self._btn_estimate)
-        fit_options_layout.addStretch(1)
+        fit_options_layout.addRow("", self._btn_estimate)
+
         layout.addWidget(fit_options)
         self._refresh_optimizer_help()
 

@@ -19,6 +19,7 @@ AppLogger.configure()
 applogger.debug("Application starting...")
 from PySide6.QtWidgets import QApplication, QMessageBox
 
+from app import APP_NAME, APP_VERSION
 from app.data.sqlite_repo import SqliteRepo
 from app.dialogs.main_window import MainWindow
 
@@ -34,6 +35,19 @@ from app.utils.startup import select_database
 
 
 def run_app() -> int:
+    # Before the QApplication is built: on macOS this is what Cocoa's native
+    # Application menu reads for the two entries it labels itself rather than
+    # from any QAction's own text - "About {name}" for the one carrying
+    # AboutRole, "Quit {name}" for the one every Qt app gets whether it adds
+    # one or not. Unset, both read the running executable's name instead -
+    # "About Python", "Quit Python" - because this is not a signed .app
+    # bundle with its own Info.plist to name it. Nothing about the two
+    # entries themselves can be renamed independently of the app's own name;
+    # that pairing is Cocoa's, not this application's.
+    QApplication.setApplicationName(APP_NAME)
+    QApplication.setApplicationVersion(APP_VERSION)
+    QApplication.setOrganizationName(APP_NAME)
+
     app = QApplication(sys.argv)
 
     # Language before any widget is built: menus read their labels through the

@@ -215,3 +215,52 @@ def test_the_report_carries_the_expression() -> None:
 
     assert '_("Function expression")' in body
     assert '_("Function expression with evaluated parameters")' in body
+
+
+# ----------------------------------------------------------------------
+# Layout: the fit-options row does not overflow, and the cards have padding
+# ----------------------------------------------------------------------
+def test_the_fit_options_are_one_control_per_row() -> None:
+    """The bug: two combo boxes side by side, plus their own labels, do not
+    fit this panel's width once the labels are translated - "Regione di
+    fiducia (predefinito)" and "Arcotangente (molto robusta)" side by side
+    overflowed it well before evals/weighted/Estimate were even reached.
+    A QFormLayout gives each one the whole row."""
+    body = _body(FIT_SOURCE, "_build_parameters_panel")
+
+    assert "fit_options_layout = QFormLayout(fit_options)" in body
+    assert 'fit_options_layout.addRow(_("Algorithm:"), self._combo_optimizer)' in body
+    assert 'fit_options_layout.addRow(_("Loss:"), self._combo_loss)' in body
+
+
+def test_the_two_cards_have_real_padding() -> None:
+    """Both used stdSizeAndlayout - zero margins - directly on a
+    create_card_widget()'s own layout, which is documented as wrong: that
+    helper is for a *nested* layout, where the card around it already
+    supplies the padding. Content sat flush against the card border."""
+    assert FIT_SOURCE.count("stdSizeAndlayout(layout)") == 0
+    assert "apply_card_layout(layout)" in FIT_SOURCE
+
+
+def test_every_optimizer_and_loss_label_fits_a_narrow_panel() -> None:
+    """Guards the actual number, not just the layout shape: a future
+    algorithm with a still longer name should be caught here rather than
+    rediscovered by opening the dialog."""
+    from app.functions.optimizers import LOSSES, OPTIMIZERS
+    from app.utils import i18n
+
+    previous = i18n.language()
+    i18n.set_language("it")
+    try:
+        widest = max(
+            (len(i18n.tr(optimizer.label)) for optimizer in OPTIMIZERS),
+            default=0,
+        )
+        widest_loss = max((len(i18n.tr(label)) for _key, label in LOSSES), default=0)
+    finally:
+        i18n.set_language(previous)
+
+    # Generous: not a pixel measurement, just a sanity ceiling so a label
+    # that grows dramatically longer gets noticed here.
+    assert widest < 45
+    assert widest_loss < 45
