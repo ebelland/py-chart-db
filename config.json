@@ -44,6 +44,13 @@
       "SFSymbol": "doc.on.doc",
       "SegoeFluent": "E8C8"
     },
+    "create_demo": {
+      "icon": "plot",
+      "text": "Create demo",
+      "description": "Build one of the shipped demo projects and open it",
+      "SFSymbol": "wand.and.stars",
+      "SegoeFluent": ""
+    },
     "credits": {
       "icon": "info",
       "text": "Credits",
@@ -410,6 +417,11 @@
       "title": "Open database",
       "text": "Could not open the database:\n{error}"
     },
+    "demo.build_failed": {
+      "level": "error",
+      "title": "Create demo",
+      "text": "Could not build the demo project:\n{error}"
+    },
     "import.clipboard_empty": {
       "level": "info",
       "title": "Clipboard",
@@ -639,18 +651,18 @@
     "figure_height_cm": 120.19,
     "figure_dpi": 122.0
   },
-  "last_database": "/Users/ebelland/Desktop/py-chart-db/Demo Project.dhub",
+  "last_database": "/private/var/folders/fr/9hqwrv154hv1bvl4chqm36c00000gn/T/pytest-of-ebelland/pytest-2/test_choosing_a_demo_builds_it0/peak scan demo.dhub",
   "window_geometry": {
     "main_window": {
-      "x": 0,
-      "y": 94,
+      "x": 360,
+      "y": 862,
       "width": 1920,
       "height": 959,
       "maximized": true
     },
     "SeriesInterpolateDialog": {
-      "x": 449,
-      "y": 383,
+      "x": 310,
+      "y": 167,
       "width": 731,
       "height": 640,
       "maximized": false
@@ -663,22 +675,22 @@
       "maximized": false
     },
     "SeriesSmoothingDialog": {
-      "x": 928,
-      "y": 281,
+      "x": 629,
+      "y": 199,
       "width": 731,
       "height": 640,
       "maximized": false
     },
     "SeriesStatisticsDialog": {
       "x": 412,
-      "y": 194,
+      "y": 290,
       "width": 1060,
       "height": 720,
       "maximized": false
     },
     "SeriesFitDialog": {
-      "x": 519,
-      "y": 160,
+      "x": 90,
+      "y": 62,
       "width": 957,
       "height": 851,
       "maximized": false
@@ -706,14 +718,14 @@
     },
     "query_builder_dialog": {
       "x": 459,
-      "y": 240,
+      "y": 336,
       "width": 766,
       "height": 492,
       "maximized": false
     },
     "SeriesCalculusDialog": {
-      "x": 886,
-      "y": 254,
+      "x": 571,
+      "y": 219,
       "width": 760,
       "height": 640,
       "maximized": false
@@ -746,8 +758,8 @@
       1313
     ],
     "data_page": [
-      308,
-      617
+      309,
+      621
     ]
   },
   "dialog_state": {
@@ -759,7 +771,7 @@
       "range_edit": "",
       "integer_step_spin": 1.0,
       "custom_x_edit": "",
-      "extend_spin": 0.0,
+      "extend_spin": 9.0,
       "extrap_check": true,
       "spline_type_combo": "UnivariateSpline",
       "spline_degree_spin": 3,
@@ -842,23 +854,23 @@
       "rbf_neighbors_spin": 0,
       "preview_check": true,
       "dimension_combo": "1D series",
-      "method_combo": "Smoothing Spline (SciPy)",
+      "method_combo": "Moving Average",
       "preview_button": false,
       "copy_html_button": false,
       "apply_button": false,
       "close_button": false
     },
     "SeriesStatisticsDialog": {
-      "model_combo": "Tutte le statistiche",
+      "model_combo": "All statistics",
       "create_chart_check": true,
       "chart_type_combo": "",
       "distribution_combo": "",
-      "rank_combo": "AIC (penalizza i parametri liberi)",
+      "rank_combo": "AIC (penalises free parameters)",
       "exhaustive_check": false,
       "popmean_spin": 0.0,
-      "alternative_combo": "Bilaterale",
+      "alternative_combo": "Two-sided",
       "trim_percent_spin": 10,
-      "anderson_method_combo": "p-value di Anderson: interpolato",
+      "anderson_method_combo": "Anderson p-value: interpolated",
       "monte_carlo_resamples_spin": 9999,
       "monte_carlo_batch_spin": 0,
       "preview_button": false,
@@ -875,11 +887,11 @@
       "multi_tie_eta": false,
       "multi_apply_btn": false,
       "spin_params": 4,
-      "output_table_edit": "_Fit_Series_y_Cubica",
-      "max_nfev_edit": "8000",
+      "output_table_edit": "_Fit_Series_y_Razionale_2_1",
+      "max_nfev_edit": "88888",
       "weighted_check": false,
       "combo_optimizer": "Simplesso di Nelder-Mead",
-      "combo_loss": "Minimi quadrati",
+      "combo_loss": "Arcotangente (molto robusta)",
       "btn_estimate": false,
       "btn_use_fit_params": false,
       "spin_degree": 4,
@@ -924,9 +936,9 @@
         300,
         435
       ],
-      "query_combo": "lampascione",
-      "table_combo": "_Fit_Series_y_Saturating_exp",
-      "field_combo": "ppm",
+      "query_combo": "",
+      "table_combo": "batch_yields",
+      "field_combo": "batch",
       "editor": "SELECT *\nFROM \"_Fit_Series_y_Saturating_exp\""
     },
     "SeriesCalculusDialog": {
@@ -968,7 +980,7 @@
     "sheet": "Sheet1"
   },
   "app_style": "automatic",
-  "language": "en",
+  "language": "it",
   "save_format": "SVG",
   "table_list": {
     "show_generated": false

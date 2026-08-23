@@ -1,10 +1,16 @@
 """Tests for the application preferences dialog.
 
-Two of the four preferences it exposes were already in config.json and read by
-nothing at all - ``save_format`` and a top-level ``resize_mode``.  A settings
-dialog is exactly where that goes unnoticed: the control looks saved, the
-behaviour never changes, and the disagreement is invisible until someone reads
-both files.  So the tests here are mostly about *where* a value lands.
+``save_format`` was already in config.json and read by nothing at all - a
+settings dialog is exactly where that goes unnoticed, since the control looks
+saved and the behaviour never changes. So part of what these tests are about
+is *where* a value lands.
+
+Chart sizing used to be here too, as a single global default, but it was
+never anything more than the value ChartPanel started a *new* figure on - it
+could not be changed per figure from this dialog, only from the chart's own
+context menu, and now from Figure Properties (see FigurePropertiesWidget.
+set_resize_mode_control). Kept in only one of those places rather than two
+that could disagree about the same figure.
 """
 from __future__ import annotations
 
@@ -14,12 +20,9 @@ from pathlib import Path
 import pytest
 
 from app.dialogs.settings_dialog import (
-    CONFIG_CHART_SECTION,
-    CONFIG_RESIZE_MODE,
     CONFIG_SAVE_FORMAT,
     SAVE_FORMAT_FILTERS,
     SettingsDialog,
-    normalized_resize_mode,
     normalized_save_format,
 )
 from app.styles import style
@@ -60,19 +63,6 @@ def test_an_unusable_export_format_falls_back(stored, expected: str) -> None:
     assert normalized_save_format(stored) == expected
 
 
-@pytest.mark.parametrize(
-    ("stored", "expected"),
-    [
-        ("FIT", "FIT"),
-        ("fixed", "FIXED"),
-        ("", "FIT_PROPORTIONAL"),
-        ("nonsense", "FIT_PROPORTIONAL"),
-    ],
-)
-def test_an_unusable_resize_mode_falls_back(stored, expected: str) -> None:
-    assert normalized_resize_mode(stored) == expected
-
-
 def test_every_offered_format_has_a_filter() -> None:
     """The combo and the save dialog read the same table, so they cannot drift."""
     for name, (extension, file_filter) in SAVE_FORMAT_FILTERS.items():
@@ -89,7 +79,6 @@ def test_the_dialog_opens_on_what_is_stored(temp_config: Path, qapp) -> None:
                 "app_style": "fluent_win11",
                 "language": "it",
                 "save_format": "PDF",
-                "chart_panel": {"resize_mode": "FIXED"},
             }
         ),
         encoding="utf-8",
@@ -99,23 +88,13 @@ def test_the_dialog_opens_on_what_is_stored(temp_config: Path, qapp) -> None:
 
     assert dialog._style_combo.currentData() == "fluent_win11"
     assert dialog._format_combo.currentData() == "PDF"
-    assert dialog._resize_combo.currentData() == "FIXED"
 
 
-def test_the_resize_mode_is_read_from_the_section_the_chart_panel_uses(
+def test_the_dialog_no_longer_offers_a_chart_sizing_default(
     temp_config: Path, qapp
 ) -> None:
-    """ChartPanel reads chart_panel.resize_mode; the top-level key is a ghost.
-
-    Reading the wrong one would show the user a value that has not applied to
-    anything since it was written.
-    """
-    temp_config.write_text(
-        json.dumps({"resize_mode": "FIT", "chart_panel": {"resize_mode": "FIXED"}}),
-        encoding="utf-8",
-    )
-
-    assert SettingsDialog()._resize_combo.currentData() == "FIXED"
+    """It moved to Figure Properties, per figure - see the module docstring."""
+    assert not hasattr(SettingsDialog(), "_resize_combo")
 
 
 # ----------------------------------------------------------------------
@@ -124,20 +103,31 @@ def test_the_resize_mode_is_read_from_the_section_the_chart_panel_uses(
 def test_saving_writes_every_preference_where_it_is_read(
     temp_config: Path, qapp
 ) -> None:
-    temp_config.write_text(json.dumps({"chart_panel": {"copy_dpi": 200}}), encoding="utf-8")
+    temp_config.write_text(json.dumps({}), encoding="utf-8")
 
     dialog = SettingsDialog()
     dialog._style_combo.setCurrentIndex(dialog._style_combo.findData("macos_native"))
     dialog._format_combo.setCurrentIndex(dialog._format_combo.findData("SVG"))
-    dialog._resize_combo.setCurrentIndex(dialog._resize_combo.findData("FIT"))
     dialog._save()
 
     written = _written(temp_config)
     assert written["app_style"] == "macos_native"
     assert written[CONFIG_SAVE_FORMAT] == "SVG"
-    assert written[CONFIG_CHART_SECTION][CONFIG_RESIZE_MODE] == "FIT"
-    # Merged into the section rather than replacing it.
-    assert written[CONFIG_CHART_SECTION]["copy_dpi"] == 200
+
+
+def test_saving_does_not_touch_the_chart_panel_section(
+    temp_config: Path, qapp
+) -> None:
+    """That section is ChartPanel's own, written per figure - see
+    FigurePropertiesWidget.set_resize_mode_control. This dialog has nothing
+    left to write there and must not go near copy_dpi, background_color and
+    the rest of what already lives in it."""
+    temp_config.write_text(json.dumps({"chart_panel": {"copy_dpi": 200}}), encoding="utf-8")
+
+    dialog = SettingsDialog()
+    dialog._save()
+
+    assert _written(temp_config)["chart_panel"] == {"copy_dpi": 200}
 
 
 def test_cancel_writes_nothing(temp_config: Path, qapp) -> None:

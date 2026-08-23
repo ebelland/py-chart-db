@@ -16,6 +16,7 @@ from typing import Any, cast
 
 from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import (
+    QAction,
     QCloseEvent,
     QIcon,
 )
@@ -24,6 +25,8 @@ from app.data.sqlite_repo import SqliteRepo
 from app.widgets.chart_panel import ChartPanel
 from app.dialogs.create_chart_dialog import NewPlotTabDialog
 from app.dialogs.import_data_dialog import ImportDataDialog, is_importable
+from app.data.demo_project import build_demo_project
+from app.dialogs.create_demo_dialog import CreateDemoDialog
 from app.dialogs.credits_dialog import CreditsDialog
 from app.dialogs.query_builder_dialog import QueryBuilderDialog
 from app.widgets.axis_properties import AxisPropertiesWidget
@@ -32,6 +35,7 @@ from app.widgets.series_properties import SeriesPropertiesWidget
 from app.widgets.series_operation import SeriesOperationWidget
 from app.scanners.series_operation_scanner import import_class_from_file
 from app.styles.style import (
+    IS_MACOS,
     PANEL_MIN_WIDTH,
     action_menu_item,
     action_presentation,
@@ -39,6 +43,7 @@ from app.styles.style import (
     apply_toolbox_header_metrics,
     create_card_widget,
     create_menu,
+    create_menu_item,
     load_icon,
     relax_minimum_width,
     stdSizeAndlayout,
@@ -385,29 +390,94 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     # Activity rail
     # ------------------------------------------------------------------
-    def _build_app_menu(self) -> None:
-        """Create the compact menus shown from the activity rail.
+    #: Actions moved into the real macOS menu bar via QAction.MenuRole -
+    #: Preferences and About are relocated by Cocoa itself into the
+    #: application menu next to the apple, wherever they were declared, so
+    #: they read here exactly the way they read in the rail's popup menu.
+    _MACOS_MENU_ROLES: dict[str, QAction.MenuRole] = {
+        "settings": QAction.MenuRole.PreferencesRole,
+        "credits": QAction.MenuRole.AboutRole,
+    }
 
-        Items come from the action catalogue, so each one's icon, label and
-        tooltip are defined together in a single place and are translated for
-        the active language.  Rebuilding these menus is all that switching
-        language requires.
+    def _app_menu_items(self) -> list:
+        """Return the app menu's contents, shared by both places it appears.
+
+        The activity rail's popup on every platform, and - on macOS - the
+        real menu bar as well.  One list means the two cannot drift apart the
+        way a hand-kept second copy would.
         """
-        self._app_menu = create_menu(
-            self,
-            [
-                action_menu_item("new", self._on_new_file),
-                action_menu_item("open", self._on_open_database),
-                action_menu_item("import", self._on_import_data),
-                action_menu_item("query_builder", self._on_query_builder),
-                None,
-                action_menu_item("optimize_db", self._on_optimize_db),
-                None,
-                action_menu_item("settings", self._on_settings),
-                action_menu_item("log_viewer", self._show_log_viewer),
-                action_menu_item("credits", self._on_credits),
-            ],
-        )
+        return [
+            action_menu_item("new", self._on_new_file),
+            action_menu_item("open", self._on_open_database),
+            action_menu_item("import", self._on_import_data),
+            action_menu_item("query_builder", self._on_query_builder),
+            action_menu_item("create_demo", self._on_create_demo),
+            None,
+            action_menu_item("optimize_db", self._on_optimize_db),
+            None,
+            action_menu_item("settings", self._on_settings),
+            action_menu_item("log_viewer", self._show_log_viewer),
+            action_menu_item("credits", self._on_credits),
+        ]
+
+    def _build_app_menu(self) -> None:
+        """Create the app menu, and place it where each platform expects it.
+
+        Everywhere else this is the popup the activity rail's "Menu" button
+        opens - there is no equivalent slot to move it into. On macOS it is
+        a real QMenuBar instead, which is what turns the menu bar next to the
+        apple from the bare running-process name into an actual menu: with no
+        QMenuBar at all, Cocoa still draws that bar, showing only the
+        process's own name (here, "Python", since this is not a signed .app
+        bundle) and a default Quit.
+
+        Rebuilt wholesale on every call - after Settings, since language and
+        theme are what changes underneath these - rather than patched in
+        place, which is simpler and is exactly what already happened when
+        this was only ever the popup.
+        """
+        items = self._app_menu_items()
+        self._app_menu = create_menu(self, items)
+
+        if IS_MACOS:
+            self._build_macos_menu_bar(items)
+
+    def _build_macos_menu_bar(self, items: list) -> None:
+        """Populate the real menu bar from the same items as the popup.
+
+        Settings and Credits do not stay in the menu this builds: Cocoa pulls
+        any action carrying MenuRole.PreferencesRole/AboutRole out into the
+        native application menu - the one already showing next to the apple -
+        wherever in the menu bar it was declared. Nothing else has a role a
+        Mac user would expect, so the rest stay together in one ordinary
+        top-level menu, named "Menu" like the rail button it replaces.
+        """
+        menu_bar = self.menuBar()
+        menu_bar.clear()
+
+        menu = menu_bar.addMenu(_("Menu"))
+        for item in items:
+            if item is None:
+                menu.addSeparator()
+                continue
+            create_menu_item(
+                parent=self,
+                menu=menu,
+                icon=item.icon,
+                checkable=item.checkable,
+                text=item.text,
+                tooltip=item.tooltip,
+                key=item.shortcut,
+                action=item.callback,
+                action_id=item.action_id,
+                checked=item.checked,
+                enabled=item.enabled,
+            )
+
+        for action in menu.actions():
+            role = self._MACOS_MENU_ROLES.get(str(action.data() or ""))
+            if role is not None:
+                action.setMenuRole(role)
 
 
     def _create_activity_rail(self) -> QFrame:
@@ -425,13 +495,24 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(rail)
         stdSizeAndlayout(layout)
 
+        # The "Menu" button - New, Open, Import, Settings, Credits... - is not
+        # a page to switch to, so it was never really one of this group's
+        # choices: it sat at id 0 only because it had to occupy *some* slot,
+        # and _set_nav_index compensated with an "index - 1" that existed for
+        # no other reason. On macOS it is not drawn here at all any more - see
+        # _build_macos_menu_bar - which is what made dropping that offset
+        # worth doing now rather than leaving it as one more thing a removed
+        # button had to keep working around.
+        if not IS_MACOS:
+            menu_button = self._create_activity_button(action_id="nav_menu")
+            layout.addWidget(menu_button, 0, Qt.AlignmentFlag.AlignHCenter)
+
         # Navigation buttons.
         self._nav_group = QButtonGroup(self)
         self._nav_group.setExclusive(True)
         self._nav_group.idClicked.connect(self._set_nav_index)
         self._nav_buttons: list[QToolButton] = []
         nav_actions = (
-            "nav_menu",
             "nav_data",
             "nav_chart_options",
             "nav_series_operations",
@@ -492,11 +573,15 @@ class MainWindow(QMainWindow):
         return panel
 
     def _set_nav_index(self, index: int) -> None:
-        """Switch the active left-side page from the activity rail."""
-        if index>0:
-            self._left_stack.setCurrentIndex(index-1)
-            self._nav_buttons[index].setChecked(True)
-            applogger.debug("Left navigation page changed to index %s", index)
+        """Switch the active left-side page from the activity rail.
+
+        No "Menu" entry to skip past any more - the button group holds only
+        the three real pages now, on every platform - so the group's id is
+        the stack's page index directly.
+        """
+        self._left_stack.setCurrentIndex(index)
+        self._nav_buttons[index].setChecked(True)
+        applogger.debug("Left navigation page changed to index %s", index)
 
 
     # ------------------------------------------------------------------
@@ -1056,6 +1141,40 @@ class MainWindow(QMainWindow):
         except Exception as exc:  # noqa: BLE001
             applogger.exception("Failed to create database: %s", exc)
             show_message(self, "database.create_failed", error=exc)
+
+    def _on_create_demo(self) -> None:
+        """Build one of the shipped demo projects, and open it.
+
+        Where to save it is asked exactly like "New" asks - the demo is a
+        real project, no different from one built by hand, and the sample
+        data it is worth showing to someone is not something this app should
+        assume they want left in some fixed folder.
+        """
+        picker = CreateDemoDialog(self)
+        if not picker.exec() or picker.chosen is None:
+            return
+        demo = picker.chosen
+
+        base_dir = str(self._db_path.parent) if self._db_path else str(Path.home())
+        file_path, _unused = QFileDialog.getSaveFileName(
+            self,
+            _("Save demo project"),
+            str(Path(base_dir) / demo.path_name),
+            "Data Hub DB (*.dhub)",
+        )
+        if not file_path:
+            return
+
+        target = SqliteRepo.ensure_dhub_extension(Path(file_path))
+        applogger.info("Building demo project %r at %s", demo.file_name, target)
+        try:
+            build_demo_project(target, demo.figures)
+        except Exception as exc:  # noqa: BLE001
+            applogger.exception("Failed to build demo project: %s", exc)
+            show_message(self, "demo.build_failed", error=exc)
+            return
+
+        self._switch_database(target)
 
     def _on_open_database(self) -> None:
         """Open an existing database and switch the current UI."""

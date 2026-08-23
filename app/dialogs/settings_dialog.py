@@ -50,7 +50,7 @@ from app.styles.style import (
     resolve_app_style,
     stdSizeAndlayout,
 )
-from app.utils.config import get_section, get_value, set_value, update_section
+from app.utils.config import get_value, set_value
 from app.utils.i18n import available_languages, language, tr
 
 #: Config key and choices for the default chart export format.  The chart
@@ -70,22 +70,6 @@ SAVE_FORMAT_FILTERS: dict[str, tuple[str, str]] = {
 SAVE_FORMATS: tuple[str, ...] = tuple(SAVE_FORMAT_FILTERS)
 DEFAULT_SAVE_FORMAT: str = "PNG"
 
-#: How a chart fills its panel: the same three the chart panel's own context
-#: menu offers, named the same way.
-#:
-#: Inside the ``chart_panel`` section, which is where ChartPanel reads and
-#: writes it.  config.json also carries a top-level ``resize_mode`` that
-#: nothing has ever read - writing there would have produced a setting that
-#: looked saved and did nothing, which is how that key came to exist.
-CONFIG_CHART_SECTION: str = "chart_panel"
-CONFIG_RESIZE_MODE: str = "resize_mode"
-RESIZE_MODES: tuple[tuple[str, str], ...] = (
-    ("FIT_PROPORTIONAL", "Fit, keeping proportions"),
-    ("FIT", "Fit, ignoring proportions"),
-    ("FIXED", "Fixed size, with zoom and scrollbars"),
-)
-DEFAULT_RESIZE_MODE: str = "FIT_PROPORTIONAL"
-
 #: Language codes have no display names in the catalogue, so they are named
 #: here.  A code with no entry shows as itself rather than being hidden: a new
 #: locale folder should appear in this list the moment it is added, named or
@@ -101,12 +85,6 @@ def normalized_save_format(value: object) -> str:
     if clean in ("JPG", "JPEG"):
         return "JPEG"
     return clean if clean in SAVE_FORMATS else DEFAULT_SAVE_FORMAT
-
-
-def normalized_resize_mode(value: object) -> str:
-    """Return a supported resize mode, defaulting rather than raising."""
-    clean = str(value or "").strip().upper()
-    return clean if clean in dict(RESIZE_MODES) else DEFAULT_RESIZE_MODE
 
 
 class SettingsDialog(QDialog):
@@ -171,15 +149,6 @@ class SettingsDialog(QDialog):
             normalized_save_format(get_value(CONFIG_SAVE_FORMAT)),
         )
         form.addRow(tr("Default export format"), self._format_combo)
-
-        self._resize_combo = self._combo(
-            card,
-            [(key, tr(name)) for key, name in RESIZE_MODES],
-            normalized_resize_mode(
-                get_section(CONFIG_CHART_SECTION).get(CONFIG_RESIZE_MODE)
-            ),
-        )
-        form.addRow(tr("Chart sizing"), self._resize_combo)
 
         card_layout.addLayout(form)
 
@@ -246,16 +215,11 @@ class SettingsDialog(QDialog):
         set_value(CONFIG_APP_STYLE, self._value(self._style_combo))
         set_value("language", self._value(self._language_combo))
         set_value(CONFIG_SAVE_FORMAT, self._value(self._format_combo))
-        update_section(
-            CONFIG_CHART_SECTION,
-            **{CONFIG_RESIZE_MODE: self._value(self._resize_combo)},
-        )
 
         applogger.info(
-            "Settings saved: style=%s language=%s format=%s resize=%s",
+            "Settings saved: style=%s language=%s format=%s",
             self._value(self._style_combo),
             self._value(self._language_combo),
             self._value(self._format_combo),
-            self._value(self._resize_combo),
         )
         self.accept()

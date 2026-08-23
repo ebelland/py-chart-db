@@ -16,8 +16,8 @@ import sys
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import QSize
-from PySide6.QtGui import QColor, QPalette, QPixmap
+from PySide6.QtCore import QSize, Qt
+from PySide6.QtGui import QColor, QPainter, QPalette, QPixmap
 
 from app.styles import style
 from app.styles.style import ActionSpec, action, action_menu_item
@@ -543,6 +543,44 @@ class _FakeScreen:
 
     def devicePixelRatio(self) -> float:
         return self._ratio
+
+
+def test_a_non_square_source_is_centred_on_a_square_canvas(qapp) -> None:
+    """The bug: a trash can is narrower than it is tall. scaled(...,
+    KeepAspectRatio) alone returns a pixmap sized to *that* glyph, not to the
+    square slot every icon in a menu is supposed to share - so a document icon
+    sat flush against its label while a narrower one left a visible gap, in
+    the same menu. Every icon must report the same footprint regardless of
+    what shape its own glyph happens to be.
+    """
+    narrow = QPixmap(8, 20)
+    narrow.fill(Qt.GlobalColor.transparent)
+
+    pixmap = style._tinted_pixmap(narrow, 20, "#000000", ratio=1.0)
+
+    assert (pixmap.width(), pixmap.height()) == (20, 20)
+
+
+def test_the_non_square_glyph_lands_centred_not_flush(qapp) -> None:
+    """Painted flush at (0, 0), a narrower glyph would still be off-centre
+    even inside a square pixmap - centring is a placement, not just a size."""
+    narrow = QPixmap(8, 20)
+    narrow.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(narrow)
+    painter.fillRect(0, 0, 8, 20, QColor("black"))
+    painter.end()
+
+    pixmap = style._tinted_pixmap(narrow, 20, "#000000", ratio=1.0)
+    image = pixmap.toImage()
+
+    opaque_columns = [
+        x for x in range(image.width())
+        if any(image.pixelColor(x, y).alpha() > 20 for y in range(image.height()))
+    ]
+    assert opaque_columns, "the glyph must still be drawn somewhere"
+    left_margin = opaque_columns[0]
+    right_margin = image.width() - 1 - opaque_columns[-1]
+    assert abs(left_margin - right_margin) <= 1
 
 
 def test_icons_are_rasterised_at_the_display_s_pixel_density(qapp) -> None:

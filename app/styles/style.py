@@ -53,6 +53,11 @@ _STYLES_DIR = _APP_DIR / "styles"
 _IS_MACOS = platform.system().lower() == "darwin"
 _IS_WINDOWS = platform.system().lower().startswith("win")
 
+#: Public alias, for the few callers outside this module that need the
+#: platform check but have no reason to reach into a private module constant
+#: (main_window.py's menu bar, at the moment).
+IS_MACOS: bool = _IS_MACOS
+
 MenuCallback = Callable[..., Any]
 ShortcutLike = QKeySequence.StandardKey | QKeySequence | str | int | None
 
@@ -632,6 +637,19 @@ def _tinted_pixmap(
     those is worth.  The bitmap is built at the physical size and then labelled
     with its ratio, so Qt draws it one-for-one instead of interpolating - the
     difference between a sharp icon and a smeared one.
+
+    The result is always exactly ``size * ratio`` square, whatever the source's
+    own proportions.  SF Symbols are not square - a trash can is narrower than
+    it is tall, a document narrower still - and ``scaled(..., KeepAspectRatio)``
+    on its own returns a pixmap sized to *that* glyph rather than to the slot
+    every icon is supposed to share.  Qt's menu icon column takes its width
+    from the pixmap it is handed, so those items sat at a different horizontal
+    offset from their text than the ones next to them - a document icon flush
+    against its label, a trash can with a visible gap, in the same menu.  The
+    Segoe Fluent path this is the counterpart of never had the problem: a
+    glyph painted with ``Qt.AlignCenter`` into a fixed-size rect is centred by
+    construction.  Centring here, after scaling, is what makes the two paths
+    agree.
     """
     physical = max(1, int(round(size * ratio)))
     scaled = (
@@ -656,6 +674,20 @@ def _tinted_pixmap(
             painter.fillRect(scaled.rect(), qcolor)
         finally:
             painter.end()
+
+    if scaled.width() != physical or scaled.height() != physical:
+        canvas = QPixmap(physical, physical)
+        canvas.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(canvas)
+        try:
+            painter.drawPixmap(
+                (physical - scaled.width()) // 2,
+                (physical - scaled.height()) // 2,
+                scaled,
+            )
+        finally:
+            painter.end()
+        scaled = canvas
 
     # Without this Qt treats the bitmap as logical pixels and draws it at twice
     # the intended size.

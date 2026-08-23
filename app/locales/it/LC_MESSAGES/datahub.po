@@ -56,6 +56,14 @@ msgid "A UNION needs at least two tables."
 msgstr "Servono almeno due tabelle per una UNION."
 
 
+msgid "A calibration run with uncertainty in what was applied and in what was measured."
+msgstr "Una serie di calibrazione con incertezza sia su ciò che è stato applicato sia su ciò che è stato misurato."
+
+
+msgid "A daily average that is computed on every read rather than stored, so editing the query updates the chart."
+msgstr "Una media giornaliera calcolata a ogni lettura invece che salvata, quindi modificare la query aggiorna il grafico."
+
+
 msgid "A derivative or an integral rarely shares a scale with the series it came from - d/dx of a slow drift is near zero beside data in the thousands - so a new axis is the default. Same axis overlays them when the ranges are comparable; a new figure keeps the result out of this chart entirely."
 msgstr "Una derivata o un integrale raramente condivide la scala della serie di origine - la d/dx di una deriva lenta è quasi zero accanto a dati dell'ordine delle migliaia - quindi l'impostazione predefinita è un nuovo asse. Stesso asse sovrappone le curve quando gli intervalli sono confrontabili; nuova figura tiene il risultato del tutto fuori da questo grafico."
 
@@ -70,6 +78,10 @@ msgstr "Una funzione tracciata di solito serve a essere confrontata con i dati, 
 
 msgid "A new language is applied the next time the app starts."
 msgstr "La nuova lingua verrà applicata al prossimo avvio dell'applicazione."
+
+
+msgid "A process that shifts part-way through. Run Series operations, Control Chart on the series to see the shift caught."
+msgstr "Un processo che si sposta a metà percorso. Esegui Operazioni sulle serie, Carta di controllo sulla serie per vedere lo spostamento rilevato."
 
 
 msgid "A query named '{name}' already exists. Replace it?"
@@ -336,6 +348,10 @@ msgid "Batch size for Monte Carlo resampling. Auto lets SciPy choose."
 msgstr "Dimensione del lotto per il ricampionamento Monte Carlo. Auto lascia scegliere a SciPy."
 
 
+msgid "Batch yields - distributions compared"
+msgstr "Rese dei lotti - distribuzioni a confronto"
+
+
 msgid "Best fit"
 msgstr "Fit migliore"
 
@@ -384,12 +400,20 @@ msgid "Build a multi-peak expression"
 msgstr "Costruisci un’espressione multi-picco"
 
 
+msgid "Build one of the shipped demo projects and open it"
+msgstr "Crea uno dei progetti dimostrativi inclusi e aprilo"
+
+
 msgid "Builds a 1D multi-peak expression. Edit generated parameters before fitting."
 msgstr "Costruisce un'espressione multipicco 1D. Modifica i parametri generati prima del fit."
 
 
 msgid "Calculus"
-msgstr "Calcolo"
+msgstr "Derivate/Integrali"
+
+
+msgid "Calibration - error bars on both axes"
+msgstr "Calibrazione - barre d'errore su entrambi gli assi"
 
 
 msgid "Cancel"
@@ -698,6 +722,10 @@ msgstr "Crea una nuova scheda grafico per la tabella corrente"
 
 msgid "Create a new plot tab from the current data context."
 msgstr "Crea una nuova scheda grafico dal contesto dati corrente."
+
+
+msgid "Create demo"
+msgstr "Crea demo"
 
 
 msgid "Create new figure (new tab)"
@@ -1092,6 +1120,10 @@ msgid "Eval X:"
 msgstr "X di valutazione:"
 
 
+msgid "Every chart type in the set, over six tables and two saved queries."
+msgstr "Ogni tipo di grafico dell'insieme, su sei tabelle e due query salvate."
+
+
 msgid "Example user-defined linear function. Edit or replace this class."
 msgstr "Esempio di funzione lineare definita dall'utente. Modificala o sostituisci la classe."
 
@@ -1332,6 +1364,10 @@ msgid "Flexible peak shape between Gaussian-like and Lorentzian-like profiles."
 msgstr "Forma di picco flessibile tra profili gaussiani e lorentziani."
 
 
+msgid "Flow against pressure, with energy as colour and weight as marker size: four variables on two axes."
+msgstr "Portata rispetto alla pressione, con l'energia come colore e il peso come dimensione del marcatore: quattro variabili su due assi."
+
+
 msgid "Fluent (Windows 11)"
 msgstr "Fluent (Windows 11)"
 
@@ -1398,6 +1434,10 @@ msgstr "Finestra di processo gaussiana"
 
 msgid "Generalized logistic with an additional shape parameter."
 msgstr "Logistica generalizzata con un parametro di forma aggiuntivo."
+
+
+msgid "Getting started - a bit of everything"
+msgstr "Per iniziare - un po' di tutto"
 
 
 msgid "Gompertz growth"
@@ -1944,6 +1984,10 @@ msgid "Monte Carlo"
 msgstr "Monte Carlo"
 
 
+msgid "Monthly throughput per line, with the spread on each bar."
+msgstr "Produttività mensile per linea, con la dispersione su ogni barra."
+
+
 msgid "More accurate on smooth data than the trapezoidal rule. Assumes the curve is well approximated by parabolas."
 msgstr "Più accurata del metodo dei trapezi su dati regolari. Presuppone che la curva sia ben approssimata da parabole."
 
@@ -2152,6 +2196,10 @@ msgid "On"
 msgstr "Attiva"
 
 
+msgid "One Gaussian peak on a sloping baseline. Run Series operations, Fit and pick Gaussian peak: the starting values come from the data."
+msgstr "Un picco gaussiano su una linea di base inclinata. Esegui Operazioni sulle serie, Fit e scegli picco gaussiano: i valori iniziali vengono dai dati."
+
+
 msgid "One-sample t-test"
 msgstr "Test t a un campione"
 
@@ -2194,6 +2242,10 @@ msgstr "Apri il log dell'applicazione"
 
 msgid "Open the application settings"
 msgstr "Apri le impostazioni dell'applicazione"
+
+
+msgid "Operating points - scatter coloured by a third variable"
+msgstr "Punti operativi - dispersione colorata da una terza variabile"
 
 
 msgid "Optimise the parameters and preview the result"
@@ -2264,6 +2316,10 @@ msgid "Parameters"
 msgstr "Parametri"
 
 
+msgid "Particle sizes - histogram of two populations"
+msgstr "Dimensioni delle particelle - istogramma di due popolazioni"
+
+
 msgid "Paste"
 msgstr "Incolla"
 
@@ -2278,6 +2334,10 @@ msgstr "Famiglia di picchi:"
 
 msgid "Peak functions"
 msgstr "Funzioni di picco"
+
+
+msgid "Peak scan - ready for the Fit operation"
+msgstr "Scansione di picco - pronta per l'operazione Fit"
 
 
 msgid "Peaks"
@@ -2414,6 +2474,10 @@ msgstr "Anteprima del risultato"
 
 msgid "Process response with an optimum x value and symmetric fall-off."
 msgstr "Risposta di processo con un valore ottimo di x e calo simmetrico."
+
+
+msgid "Process run - ready for a control chart"
+msgstr "Serie di processo - pronta per una carta di controllo"
 
 
 msgid "Projection"
@@ -2744,6 +2808,10 @@ msgid "Save chart as"
 msgstr "Salva il grafico come"
 
 
+msgid "Save demo project"
+msgstr "Salva progetto dimostrativo"
+
+
 msgid "Save error"
 msgstr "Errore di salvataggio"
 
@@ -2774,6 +2842,10 @@ msgstr "Query salvate"
 
 msgid "Saved queries:"
 msgstr "query salvate:"
+
+
+msgid "Saved query - a chart built on a query"
+msgstr "Query salvata - un grafico costruito su una query"
 
 
 msgid "Scale and direction"
@@ -2914,6 +2986,10 @@ msgstr "Seleziona una o più serie di origine."
 
 msgid "Semiconductor and process"
 msgstr "Semiconduttori e processo"
+
+
+msgid "Sensor network - time series with a gap"
+msgstr "Rete di sensori - serie temporale con un'interruzione"
 
 
 msgid "Series"
@@ -3324,6 +3400,10 @@ msgid "The query is not valid and was not saved:\n\n{error}"
 msgstr "La query non è valida e non è stata salvata:\n\n{error}"
 
 
+msgid "The same four batches as a violin plot and as a box plot: one shows the shape, the other the summary, and batch D is why that matters."
+msgstr "Gli stessi quattro lotti come grafico a violino e come box plot: uno mostra la forma, l'altro la sintesi, e il lotto D è il motivo per cui questo conta."
+
+
 msgid "The search found nothing better than the declared values, which are unchanged."
 msgstr "La ricerca non ha trovato niente di meglio dei valori dichiarati, che restano invariati."
 
@@ -3369,12 +3449,20 @@ msgid "This operation needs both an x and a y role.\n\nThese series cannot be pr
 msgstr "Questa operazione richiede sia il ruolo x sia il ruolo y.\n\nQueste serie non possono essere elaborate:\n\n{series}\n\nImposta i ruoli mancanti in Proprietà serie e riprova."
 
 
+msgid "Three sensors sampled hourly. One loses power, and the chart draws the outage as a gap rather than a line through it."
+msgstr "Tre sensori campionati ogni ora. Uno perde alimentazione, e il grafico disegna l'interruzione come un vuoto invece che come una linea che la attraversa."
+
+
 msgid "Threshold multiplier applied to the method's spread estimate."
 msgstr "Moltiplicatore di soglia applicato alla stima di dispersione del metodo."
 
 
 msgid "Threshold:"
 msgstr "Soglia:"
+
+
+msgid "Throughput - bar chart with error bars"
+msgstr "Produttività - grafico a barre con barre d'errore"
 
 
 msgid "Tick direction"
@@ -3443,6 +3531,10 @@ msgstr "Prova tutte le distribuzioni di SciPy"
 
 msgid "Two exponential time constants plus offset."
 msgstr "Due costanti di tempo esponenziali più offset."
+
+
+msgid "Two overlapping populations in one histogram."
+msgstr "Due popolazioni sovrapposte in un unico istogramma."
 
 
 msgid "Two-sided"
@@ -3827,5 +3919,3 @@ msgstr "{series}: {error}"
 
 msgid "{series}\nx: {x}\ny: {y}"
 msgstr "{series}\nx: {x}\ny: {y}"
-
-

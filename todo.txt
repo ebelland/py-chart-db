@@ -17,25 +17,7 @@ P0-7  settings: drop the ChartPanel fit mode
      figure starts with, not a duplicate. Worth keeping under that reading;
      revisit if it still feels redundant once tried.
 
-P0-13 [DONE] ChartPanel: fit mode moved from the popup menu to Figure
-      Properties
-      Was three checkable menu items kept in sync by comparing an action's
-      *translated* label against the mode - so on any language but English
-      the checkmarks silently stopped matching the real mode. Now one combo
-      in Figure Properties ("Display"), storing the mode key rather than
-      the label. ChartPanel.resize_mode is a public property; the wiring is
-      FigurePropertiesWidget.set_resize_mode_control(current, on_change),
-      called by main_window next to the other property widgets - separately
-      from set_connected_figure, since the mode is state ChartPanel owns and
-      persists itself rather than a descriptor key routed through
-      figure_options_requested.
-
 P0-8  figure: width, height and dpi do not take effect
-
-P0-11  figure: manual spacing is never applied
-     Manual spacing and the four layout engines are both exposed (P3-1); the
-     manual numbers appear to be written and then overridden by whichever
-     engine is active. Check that choosing manual spacing disables the engine.
 
 P0-05  ChartPanel: selecting Axis:Kwargs while switching panels opens a modal
 
@@ -43,8 +25,9 @@ P0-12  properties: mplstyle picker: use a file browser.
 
 P0-10 global: locale must follow the platform locale. Add Auto to settings
 
-P0-1after series operations all panels are redrawn
+P0-13 after series operations all panels are redrawn
 
+P0-15: Fit. Stima etch da riorganizzare.
 ================================================================
 NEW - requested after the review
 ================================================================
@@ -123,8 +106,6 @@ P2-5  ChartPanel: downsample large series for display (LTTB) above ~50k points
       shrinks the hit test and the draw together. This is the next
       interactivity item worth doing.
 
-P2-6  table list widget + table preview widget: inconsistent look on macOS
-
 P2-7  menu popup: icons not aligned with their text
 
 P2-8  table view: colour data by value
@@ -133,11 +114,7 @@ P2-8  table view: colour data by value
 P2-9  global: split config.json into user settings and application config
       [was: "split config.json in user and config"]
       The file currently mixes the action catalogue with per-session window
-      geometry, so every run dirties the working tree.
-
-P2-10 query builder: column/table autocomplete in the editor
-      get_columns() already exists; a QCompleter over table and column names
-      is a small amount of code and makes the editor feel finished.
+      geometry, so every run dirties the working tree
 
 P2-11 undo for descriptor edits
       Operations write generated tables and deletes are final. Even a simple
@@ -149,12 +126,7 @@ P2-12 series operations: inline preview plot beside the numeric results
 
 P2-13 style.py: read presentation straight from config.json
 
-P2-14 [DONE] localization of the catalogues
-      Operation Names/Descriptions and the whole function library (57 names,
-      57 descriptions, 10 categories) are translated, and two tests walk the
-      scanners rather than a hand-written list so anything added later is
-      covered the day it is written. Renderer Category/Description are the
-      last block still in English.
+
 
 
 ================================================================

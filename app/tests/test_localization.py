@@ -104,17 +104,22 @@ def test_labels_held_in_tables_are_translated_too() -> None:
     these tables has to be named here by hand - which is the cost of holding UI
     text as data, and the reason to keep such tables few.
     """
-    from app.dialogs.settings_dialog import RESIZE_MODES
     from app.styles.style import APP_STYLE_LABELS
 
     # LANGUAGE_NAMES is deliberately absent: a language picker names each
     # language in that language - Italiano stays Italiano in the English UI -
     # so those are endonyms rather than strings to translate, and the dialog
     # passes them without tr() for the same reason.
+    #
+    # RESIZE_MODES lived here too, until the Settings dialog stopped offering
+    # a global default fit mode at all - see app/dialogs/settings_dialog.py.
+    # Its replacement, app.widgets.chart_panel.RESIZE_MODE_CHOICES, is covered
+    # by test_the_fit_mode_choices_are_translated below instead: it carries a
+    # tooltip alongside each label, which this flat list of labels has no
+    # room for.
     catalog = i18n._parse_po(PO_PATH)
     labels = [
         *APP_STYLE_LABELS.values(),
-        *(label for _key, label in RESIZE_MODES),
     ]
     missing = sorted({label for label in labels if label not in catalog})
 
@@ -234,6 +239,45 @@ def test_the_axis_grid_and_tick_choices_are_translated() -> None:
         )
         for _value, label in choices
         if label and label not in catalog
+    }
+
+    assert sorted(missing) == []
+
+
+def test_the_demo_project_names_and_summaries_are_translated() -> None:
+    """The Create demo picker reads both from DEMO_PROJECTS as data.
+
+    Same blind spot as the fit-mode choices above: no literal at the call
+    site, so xgettext and the main sweep cannot see them.
+    """
+    from app.data.demo_project import DEMO_PROJECTS
+
+    catalog = i18n._parse_po(PO_PATH)
+    missing = {
+        text
+        for demo in DEMO_PROJECTS
+        for text in (demo.file_name, demo.summary)
+        if text and text not in catalog
+    }
+
+    assert sorted(missing) == []
+
+
+def test_the_fit_mode_choices_are_translated() -> None:
+    """The combo in Figure Properties reads label and tooltip from data.
+
+    RESIZE_MODE_CHOICES replaced Settings' RESIZE_MODES (labels only, no
+    tooltip) when the fit-mode picker moved to being per-figure; this is that
+    table's equivalent of test_labels_held_in_tables_are_translated_too.
+    """
+    from app.widgets.chart_panel import RESIZE_MODE_CHOICES
+
+    catalog = i18n._parse_po(PO_PATH)
+    missing = {
+        text
+        for _value, label, tooltip in RESIZE_MODE_CHOICES
+        for text in (label, tooltip)
+        if text and text not in catalog
     }
 
     assert sorted(missing) == []
