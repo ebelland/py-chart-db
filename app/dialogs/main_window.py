@@ -1310,13 +1310,21 @@ class MainWindow(QMainWindow):
                 append=True,
             )
         )
+        figure_count_before = self._tabs.count()
         dialog.exec()
         panel.reload()
         self._table_panel.reload()
+
         # An operation may have created a figure of its own, which is a new
-        # chart tab rather than a change to this one - reloading only the panel
-        # left it invisible until the next restart.
-        self._reload_tabs()
+        # chart tab rather than a change to this one - reloading only the
+        # panel left it invisible until the next restart. But _reload_tabs()
+        # rebuilds every tab from scratch - a full ChartPanel, a full render,
+        # for every figure in the database - which is what made every Apply
+        # redraw every chart regardless of how many the operation actually
+        # touched. Only worth paying for when a figure was actually added;
+        # the panel.reload() above already covers the ordinary case.
+        if len(self._repo.load_figures_from_db()) != figure_count_before:
+            self._reload_tabs()
         self._update_properties_for_current_chart()
    
 

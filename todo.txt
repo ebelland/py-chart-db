@@ -25,9 +25,9 @@ P0-12  properties: mplstyle picker: use a file browser.
 
 P0-10 global: locale must follow the platform locale. Add Auto to settings
 
-P0-13 after series operations all panels are redrawn
+P0-13 after series operations all panels are redrawn [DONE: _open_series_operation only calls the full _reload_tabs rebuild when the figure count actually changed; otherwise just the current panel reloads]
 
-P0-15: Fit. Stima etch da riorganizzare.
+P0-15: Fit. Stima etch da riorganizzare. [DONE: "Stima" block rebuilt as a QFormLayout, one control per row; cards use apply_card_layout]
 ================================================================
 NEW - requested after the review
 ================================================================
