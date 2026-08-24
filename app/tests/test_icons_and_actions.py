@@ -52,176 +52,71 @@ def actions() -> dict[str, ActionSpec]:
 
 
 # ----------------------------------------------------------------------
-# Layout of the icon folders
+# No shipped icon files at all
 # ----------------------------------------------------------------------
-def test_there_is_one_icon_folder() -> None:
-    """There used to be three.
+def test_nothing_ships_an_icon_file() -> None:
+    """There were three folders and 67 SVGs; there are none.
 
-    A "macOs" and a "win11" folder were searched before "common", so a
-    hand-drawn icon could look a little more like the platform it was drawn
-    for. SF Symbols, Segoe Fluent and the desktop's own theme all answer
-    before any SVG now, and each is the platform's real icon set rather than
-    an impression of one - so the platform folders were reached only when a
-    Mac had no pyobjc or a PC had no Fluent font, and what they offered there
-    was a second drawing of the same thing.
+    The chain reads SF Symbols on macOS, Segoe Fluent on Windows, the
+    desktop's icon theme everywhere else - three real icon sets, each the
+    platform's own. What sat underneath them was a drawing made once, by
+    hand, matching no system in particular, and reached only by a Mac with no
+    pyobjc, a PC with no Fluent font or a Linux box with no theme installed.
+
+    Those three cases now show no icon rather than a hand-drawn one. That is
+    the decision this test pins: a fallback nobody sees is a set of files
+    everybody maintains.
     """
-    assert (ICONS_DIR / "common").is_dir()
-
-    folders = sorted(path.name for path in ICONS_DIR.iterdir() if path.is_dir())
-    assert folders == ["common"], f"platform icon folders are gone: {folders}"
+    assert not APP_DIR.joinpath("icons").exists()
+    assert list(APP_DIR.rglob("*.svg")) == []
 
 
-def test_no_icons_are_left_at_the_top_level() -> None:
-    assert list(ICONS_DIR.glob("*.svg")) == []
+def test_no_stylesheet_asks_for_an_icon_file() -> None:
+    """A Qt stylesheet takes url(file) and cannot be handed a themed QIcon.
 
-
-def test_platform_prefixes_are_gone() -> None:
-    """win_x / mac_x became x, and then stopped existing at all."""
-    stray = [
-        path.name
-        for path in ICONS_DIR.rglob("*.svg")
-        if path.stem.startswith(("win_", "mac_"))
-    ]
-    assert stray == []
-
-
-def test_every_shipped_icon_lives_in_common() -> None:
-    """One folder, so there is one answer to "where is this icon?".
-
-    The check this replaces was that every platform icon also existed in
-    common - the invariant that made deleting the platform folders safe, and
-    which has nothing left to guard now that they are gone.
+    That is what kept four chevrons - up, down, and a light-ink copy of each -
+    in the repository after every other icon had been replaced. The rules that
+    named them are gone, and Qt draws the platform's own arrow for a combo box
+    and a spin box when no image is given.
     """
-    outside = [
-        str(path.relative_to(ICONS_DIR))
-        for path in ICONS_DIR.rglob("*.svg")
-        if path.parent != ICONS_DIR / "common"
+    asking = [
+        str(path.relative_to(APP_DIR))
+        for path in APP_DIR.rglob("*.qss")
+        if ".svg" in path.read_text(encoding="utf-8")
     ]
 
-    assert outside == []
+    assert asking == []
+
+
+def test_no_code_still_reaches_for_the_file_lookup() -> None:
+    """resolve_icon_path, get_icon_file_name and _icon_url are gone with it."""
+    for name in ("resolve_icon_path", "get_icon_file_name", "_icon_url", "_svg_icon"):
+        assert not hasattr(style, name), f"{name} outlived the files it read"
 
 
 # ----------------------------------------------------------------------
-# Nothing unused, nothing dangling
+# The catalogue still names an icon for everything
 # ----------------------------------------------------------------------
-# How an SVG id reaches the resolver.  An action reaches it through its "icon"
-# field in config.json; anything else names the file directly in code.
-_ICON_REFERENCE_PATTERNS = [
-    re.compile(r"""icon\s*=\s*["']([\w ]+)["']"""),
-    re.compile(r"""icon_name\s*=\s*["']([\w ]+)["']"""),
-    re.compile(r"""load_icon\(\s*["']([\w ]+)["']"""),
-    re.compile(r"""create_toolbar_button\(\s*[^,]+,\s*["']([\w ]+)["']"""),
-]
+def test_every_action_names_all_three_icon_sets() -> None:
+    """One name per backend, because each covers a platform the others do not.
 
-
-def _referenced_icon_names() -> set[str]:
-    """Return every SVG id the application can ask for.
-
-    Two kinds of reference, kept apart on purpose.  ``from_config`` are SVG ids
-    an action names in config.json.  ``from_code`` are tokens written at a call
-    site, most of which are *action ids* rather than file names - and an action
-    id that happens to match a file name (``copy``, ``delete``) must not count
-    as a reference to that file, or the check would pass for icons nothing can
-    reach.  Only the second set is filtered.
+    An action missing SFSymbol is blank on macOS, missing SegoeFluent is blank
+    on Windows, and missing ThemeIcon is blank everywhere else. There is no
+    shipped SVG underneath any more to hide the gap, so the catalogue has to
+    be complete rather than nearly complete.
     """
-    from_config = {
-        str(entry["icon"]).strip().lower()
-        for entry in get_section("actions").values()
-        if isinstance(entry, dict) and entry.get("icon")
+    incomplete = {
+        action_id: [
+            field
+            for field in ("SFSymbol", "SegoeFluent", "ThemeIcon")
+            if not entry.get(field)
+        ]
+        for action_id, entry in get_section("actions").items()
+        if isinstance(entry, dict)
+        and not all(entry.get(field) for field in ("SFSymbol", "SegoeFluent", "ThemeIcon"))
     }
-    names: set[str] = set()
 
-    for path in APP_DIR.rglob("*.py"):
-        if "__pycache__" in path.parts:
-            continue
-        text = path.read_text(encoding="utf-8", errors="replace")
-        for pattern in _ICON_REFERENCE_PATTERNS:
-            for match in pattern.finditer(text):
-                names.add(Path(match.group(1)).stem.strip().lower())
-
-    for path in APP_DIR.rglob("*.qss"):
-        for match in re.finditer(r"([\w.\-]+)\.svg", path.read_text(encoding="utf-8")):
-            names.add(match.group(1).rsplit("/", 1)[-1].lower())
-
-    names -= set(get_section("actions"))
-    referenced = {name for name in names | from_config if name}
-
-    # A "<name>_on_dark" file is the dark-theme variant of "<name>", reached by
-    # _icon_url building the name at runtime rather than naming it in source.
-    # Without this the variants read as unused and the check would push someone
-    # to delete the chevrons the dark theme needs.
-    referenced |= {f"{name}_on_dark" for name in referenced}
-    return referenced
-
-
-def _icon_stems() -> set[str]:
-    return {path.stem.lower() for path in ICONS_DIR.rglob("*.svg")}
-
-
-def test_no_icon_file_is_unused() -> None:
-    """An icon nobody asks for is up to three files to ship and none to see."""
-    unused = sorted(_icon_stems() - _referenced_icon_names())
-    assert unused == [], f"these icons are never requested: {unused}"
-
-
-def test_every_configured_svg_icon_has_a_file() -> None:
-    """A name with no file is a blank button and a line in the log."""
-    missing = [
-        f"{action_id} -> {entry['icon']}"
-        for action_id, entry in get_section("actions").items()
-        if isinstance(entry, dict)
-        and entry.get("icon")
-        and style.resolve_icon_path(str(entry["icon"])) is None
-    ]
-    assert missing == []
-
-
-def test_every_action_has_some_presentation() -> None:
-    """An action with no icon, no glyph and no symbol is an empty button."""
-    naked = [
-        action_id
-        for action_id, entry in get_section("actions").items()
-        if isinstance(entry, dict)
-        and not entry.get("icon")
-        and not entry.get("SFSymbol")
-        and not entry.get("SegoeFluent")
-    ]
-    assert naked == []
-
-
-# ----------------------------------------------------------------------
-# Resolution
-# ----------------------------------------------------------------------
-def test_a_name_resolves_to_a_file(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(style.platform, "system", lambda: "Linux")
-    assert style.get_icon_file_name("clear") == "common/clear.svg"
-
-
-@pytest.mark.parametrize("system", ["Windows", "Darwin", "Linux"])
-def test_every_platform_resolves_to_the_same_file(
-    system: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The lookup no longer depends on which machine is asking.
-
-    It used to: a platform folder was searched first, so the same name gave
-    win11/new.svg, macOs/new.svg or common/new.svg. The three drawings have
-    been replaced by three real icon sets that answer earlier in the chain,
-    and one shared drawing is what is left underneath them.
-    """
-    monkeypatch.setattr(style.platform, "system", lambda: system)
-
-    assert style.get_icon_file_name("new") == "common/new.svg"
-    assert style.get_icon_file_name("clear") == "common/clear.svg"
-
-
-def test_an_unknown_name_resolves_to_nothing() -> None:
-    assert style.resolve_icon_path("definitely_not_an_icon") is None
-    assert style.resolve_icon_path("") is None
-    assert style.resolve_icon_path(None) is None
-
-
-def test_resolution_is_case_insensitive() -> None:
-    assert style.resolve_icon_path("Clustering") == style.resolve_icon_path("clustering")
+    assert incomplete == {}
 
 
 # ----------------------------------------------------------------------
@@ -242,7 +137,8 @@ def test_an_unknown_action_degrades_to_a_placeholder() -> None:
     """A typo must not take the menu down with it."""
     spec = action("no_such_action")
     assert spec.action_id == "no_such_action"
-    assert spec.icon is None
+    assert spec.text == ""
+    assert spec.theme_icon is None
 
 
 def test_a_missing_catalogue_does_not_raise(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -470,14 +366,23 @@ def test_the_symbol_cache_remembers_failures(monkeypatch: pytest.MonkeyPatch) ->
     assert icon.isNull()
 
 
-def test_a_symbol_that_cannot_be_drawn_falls_back_to_the_svg(
-    monkeypatch: pytest.MonkeyPatch,
+def test_a_symbol_that_cannot_be_drawn_falls_through_to_the_theme(
+    qapp, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The fallback is the whole reason every action also names an SVG."""
+    """A Mac with no pyobjc used to land on a shipped SVG. It lands on the
+    icon theme now, and on nothing at all where there is no theme - which is
+    the trade this made deliberately."""
+    from PySide6.QtGui import QIcon
+
     monkeypatch.setattr(style.platform, "system", lambda: "Darwin")
     monkeypatch.setattr(style, "_IS_MACOS", True)
     monkeypatch.setattr(style, "_create_sf_symbol_icon", lambda *_a, **_k: style.QIcon())
 
+    if not style._installed_icon_themes():
+        pytest.skip("no icon theme installed on this machine")
+
+    style.ensure_icon_theme()
+    style._THEME_ICON_CACHE.clear()
     assert not style.load_icon("new").isNull()
 
 
@@ -818,13 +723,25 @@ def test_the_helper_starts_transparent(qapp) -> None:
 # Theme icons: the backend that covers Linux
 # ----------------------------------------------------------------------
 def test_every_action_names_a_theme_icon(actions) -> None:
-    """Without one, an action falls straight through to its SVG on Linux -
-    and three of them ship no SVG, so they were blank buttons."""
+    """It is the only backend left on Linux, and there is nothing beneath it."""
     missing = sorted(
-        action_id for action_id, spec in actions.items() if not spec.theme_icon
+        action_id
+        for action_id, spec in actions.items()
+        if not style._theme_icon_names(spec.theme_icon)
     )
 
     assert missing == []
+
+
+def test_an_alternative_theme_name_is_allowed_and_ordered(actions) -> None:
+    """No single freedesktop name is in every theme: "office-chart-line" is
+    Breeze's and Papirus's, and GNOME ships no chart icon at all. A list is
+    tried best-first, so Breeze gets the chart and Adwaita the fallback."""
+    assert style._theme_icon_names("one") == ("one",)
+    assert style._theme_icon_names(["one", "two"]) == ("one", "two")
+    assert style._theme_icon_names(None) == ()
+
+    assert style._theme_icon_names(actions["new_plot"].theme_icon)[0] == "office-chart-line"
 
 
 def test_no_theme_name_is_invented(actions) -> None:
@@ -837,9 +754,10 @@ def test_no_theme_name_is_invented(actions) -> None:
     known = style.known_theme_icon_names()
     unknown = sorted(
         {
-            spec.theme_icon
+            name
             for spec in actions.values()
-            if spec.theme_icon and spec.theme_icon not in known
+            for name in style._theme_icon_names(spec.theme_icon)
+            if name not in known
         }
     )
 
@@ -864,7 +782,11 @@ def test_camel_case_becomes_the_freedesktop_spelling() -> None:
 
 def test_every_extra_name_is_actually_used(actions) -> None:
     """The list is deliberate decisions, not a graveyard."""
-    configured = {spec.theme_icon for spec in actions.values() if spec.theme_icon}
+    configured = {
+        name
+        for spec in actions.values()
+        for name in style._theme_icon_names(spec.theme_icon)
+    }
     unused = sorted(style.EXTRA_THEME_ICON_NAMES - configured)
 
     assert unused == []
@@ -897,27 +819,25 @@ def test_an_empty_name_asks_the_theme_for_nothing(qapp) -> None:
     assert style._create_theme_icon(None).isNull()
 
 
-def test_a_missing_theme_icon_falls_through_to_the_svg(qapp) -> None:
-    """The whole reason the SVGs are still shipped."""
+def test_a_missing_theme_icon_now_draws_nothing(qapp) -> None:
+    """It used to fall through to a shipped SVG. There is no longer one."""
     spec = ActionSpec(
         action_id="probe",
-        icon="add",
         text="Probe",
         description="",
         theme_icon="no-such-icon-anywhere",
     )
 
-    assert not style.icon_from_action_spec(spec).isNull()
-    assert style.icon_source_for_action(spec) == "svg"
+    assert style.icon_from_action_spec(spec).isNull()
+    assert style.icon_source_for_action(spec) == "none"
 
 
-def test_an_action_with_neither_a_theme_icon_nor_an_svg_reports_none(qapp) -> None:
+def test_an_action_naming_no_icon_at_all_reports_none(qapp) -> None:
     spec = ActionSpec(
         action_id="probe",
-        icon=None,
         text="Probe",
         description="",
-        theme_icon="no-such-icon-anywhere",
+        theme_icon="",
     )
 
     assert style.icon_source_for_action(spec) == "none"

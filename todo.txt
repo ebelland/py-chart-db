@@ -159,49 +159,35 @@ N-5   sqlite_repo: 3013 lines in one module
       changes. The dataclass with a mutable OrderedDict field and the series
       cache belong with the connection, not with the descriptors.
 
-N-6   icons: finish the SFSymbol / Segoe Fluent migration
-      [THEME BACKEND DONE. The migration had a hole the size of Linux: SF
-      Symbols are macOS's and Segoe Fluent is Windows's, so every other
-      desktop fell straight through to the SVGs in app/icons - and three
-      actions (edit, nav_series_operations, run) name no SVG at all, so they
-      were blank buttons. QIcon.fromTheme is now the third step, from a
-      ThemeIcon field on all 51 actions, and on a GNOME/Adwaita desktop it
-      answers for 49 of them: 0 blanks, 2 left on SVG (the Plot button and
-      the SQL filter, neither of which has a system equivalent).
-      Names are validated against QIcon.ThemeIcon plus an explicit extras
-      list, because a typo is silent - fromTheme returns null and the SVG
-      takes over. Adwaita 45 dropped the full-colour action icons, so the
-      plain name is tried and then the -symbolic one; that covers Adwaita and
-      Breeze together.]
-      [ALSO DONE: ensure_icon_theme(). The theme backend is silent when it
-      fails - fromTheme returns null and the SVG takes over - so a desktop
-      that names no theme looked exactly like one from before theme icons
-      existed. GNOME and KDE set the name through their platform
-      integration; a bare window manager (i3, XFCE without its settings
-      daemon) sets nothing, which was a whole class of Linux desktop getting
-      the hand-drawn icons for no reason. main.py now probes Qt's search
-      paths for an installed theme and sets it, plus a fallback theme in
-      every case. Nothing is overridden: a user who chose Papirus keeps it.
-      hicolor counts as unset, because a theme with no action icons is not
-      one this application can draw from.
-      Also checked and clean: every macOs/win11 icon already has a common
-      fallback, and the four SVGs no action names are all in use - the QSS
-      chevrons (down_on_dark/up_on_dark, via _icon_url) and two table-preview
-      menu items (hide/invert). Nothing to delete.]
-      [AND THE DELETING, in part: app/icons/macOs and app/icons/win11 are
-      gone - 32 files. They were searched ahead of common/ from when a
-      hand-drawn icon was the only way to look like the platform it was
-      drawn for, and with SF Symbols, Fluent and the theme all answering
-      first they were reached only when a Mac had no pyobjc or a PC had no
-      Fluent font - where they offered a second drawing of the same thing.
-      9 of the 32 were byte-identical to their common/ twin. The lookup no
-      longer depends on which machine is asking, and ICON_PLATFORM_DIRS is
-      gone with them. All 35 files left in common/ are referenced.]
-      What is left of the deleting needs machines rather than code:
-      style.report_icon_sources() names the SVGs still doing work where it
-      runs, so run it on a GNOME box, a KDE box, a Mac and a Windows machine
-      and remove what none of them reports. On GNOME/Adwaita it is down to
-      two - new_plot and sql_filter, neither of which has a system icon.
+N-6   icons: finish the SFSymbol / Segoe Fluent migration [DONE]
+      The migration had a hole the size of Linux: SF Symbols are macOS's and
+      Segoe Fluent is Windows's, so every other desktop fell through to the
+      SVGs in app/icons - and three actions named no SVG at all, so they were
+      blank buttons. QIcon.fromTheme is now the third step, from a ThemeIcon
+      field on all 51 actions, validated against QIcon.ThemeIcon plus an
+      explicit extras list because a typo fails silently. A ThemeIcon may be
+      a list, tried best-first: no one freedesktop name is in every theme.
+      Adwaita 45 dropped the full-colour action icons, so the plain name is
+      tried and then the -symbolic one, covering Adwaita and Breeze together.
+      ensure_icon_theme() names an installed theme when the desktop names
+      none, which is what a bare window manager leaves.
+
+      And then the deleting, in full: app/icons is gone, all 67 files.
+      They were reached only by a Mac with no pyobjc, a PC with no Fluent
+      font or a Linux box with no theme, and were a drawing of the same
+      thing the three real icon sets already have. With that gone,
+      ICON_PLATFORM_DIRS, _icon_search_dirs, resolve_icon_path,
+      get_icon_file_name, _svg_icon, _svg_icon_or_empty, _icon_url and the
+      SVG caches went with them, and the "icon" field left the catalogue.
+      The QSS chevrons were the last holdout - a stylesheet takes url(file)
+      and cannot be handed a QIcon - and their rules were removed, so Qt
+      draws the platform's own arrow.
+      Measured on GNOME/Adwaita: 51 of 51 actions from the theme, none
+      blank. The test that requires all three names per action found two
+      gaps the SVG had been hiding (create_demo had no Fluent glyph,
+      export_xlsx had neither) - both filled.
+      Note: icon_from_svg_source is untouched. That is inline SVG source
+      carried by series operations on the class, not a file.
 
 N-8   ChartPanel: "Add vertical line" / "Add horizontal line"
       Same context menu, with a small dialog for the line style, persisted in

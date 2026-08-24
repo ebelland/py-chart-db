@@ -529,6 +529,318 @@ Tests: `app/tests/test_chart_panel_selection.py`,
   rule added to `macos_native.qss` explicitly, or it falls through to the
   unstyled native bevel. `zoom_fitButton` (the "Adatta"/fit-to-window
   button) is the worked example.
+- Icons: three backends, tried in this order by `icon_from_action_spec` (read
+  its docstring for the reasoning):
+  1. `SFSymbol` on macOS — the system's own set;
+  2. `SegoeFluent` on Windows — likewise;
+  3. `ThemeIcon` anywhere, through `QIcon.fromTheme` — a freedesktop name,
+     which is what covers Linux: the desktop already has an icon theme the
+     user chose, and this makes the app's Open look like every other Open on
+     that machine.
+
+  There is **no fourth step**. `app/icons/` and its 67 SVGs are gone — they
+  were drawings made once, by hand, matching no system in particular, and
+  reached only by a Mac with no pyobjc, a PC with no Fluent font or a Linux
+  box with no icon theme. Those three cases now show no icon, deliberately: a
+  fallback almost nobody sees is a set of files everybody maintains.
+
+  So **every action must name all three**, and a test enforces it — a missing
+  `SFSymbol` is a blank button on macOS, a missing `ThemeIcon` is a blank
+  button everywhere else, and nothing hides the gap any more.
+
+  `ThemeIcon` may be a list, tried best-first: no single freedesktop name is
+  in every theme (`office-chart-line` is Breeze's and Papirus's; GNOME ships
+  no chart icon at all), so the Plot button names the chart first and a
+  spreadsheet second. Names are validated against `QIcon.ThemeIcon` — read
+  from Qt at import by `_standard_theme_icon_names`, so the list grows with
+  Qt — plus `style.EXTRA_THEME_ICON_NAMES`. Validation matters because the
+  failure is silent: `fromTheme` returns a null icon on a typo and says
+  nothing.
+
+  `ensure_icon_theme()` (called from `main.py`) makes step 3 work on a desktop
+  that names no theme. GNOME and KDE set one through their platform
+  integration; a bare window manager does not, and `fromTheme` then fails for
+  everything. It probes Qt's search paths, names an installed theme, and sets
+  a fallback theme in every case. Nothing is overridden: a user who chose
+  Papirus keeps Papirus. `hicolor` counts as unset, since it carries almost no
+  action icons.
+
+  Two theme quirks are handled. GNOME's Adwaita dropped the full-colour action
+  icons at version 45, so `document-open` is gone there and
+  `document-open-symbolic` is the icon; `_theme_icon_candidates` asks for the
+  plain name then the symbolic one, covering Adwaita and Breeze together. And
+  theme icons are *not* tinted, unlike the two glyph backends: the theme
+  already ships light and dark variants, and painting over one would replace
+  artwork the user chose with a flat silhouette.
+
+  A Qt stylesheet is the one place none of this reaches: it takes `url(file)`
+  and cannot be handed a `QIcon`. That is what kept four chevrons in the
+  repository after everything else had gone. The rules naming them were
+  removed, and Qt draws the platform's own arrow for a combo box and a spin
+  box when no `image` is given.
+
+  Inline SVG *source* (`icon_from_svg_source`) is unaffected and is still how
+  plugin-carried artwork arrives — a series operation carries its `Icon` as
+  path data on the class, not as a file.
+
+  `style.report_icon_sources()` returns the action ids each backend answers
+  for *on the machine it runs on*, and what lands under `"none"` is what that
+  machine cannot draw at all. On GNOME/Adwaita it reports 51 of 51 from the
+  theme.
+
+### 7.2 Adding a series operation
+
+A series operation is a self-contained plugin: one file under
+`app/series_operations/`, dialog and artwork included (`Icon` is inline SVG
+path data on the class, not a file — see `app/series_operations/
+dialog_base.py`'s module docstring and any existing
+operation for the shape). `app/scanners/series_operation_scanner.py`
+discovers it the same way the renderer scanner discovers chart types.
+Operations write their result back as a new table prefixed with `_`
+(`generated_table_name`) so the source list can group/hide generated tables
+separately from imported ones.
+
+#### Declaring parameters instead of building them
+
+Set `PARAMS` on the class and the base builds the form, wires every control
+to `refresh_results`, reads the values back by name, and shows or hides each
+row — no `build_parameter_selector`, no signal connections, no
+`_refresh_visibility`:
+
+```python
+PARAMS = (
+    FloatParam("threshold", "Threshold:", default_value=3.0,
+               minimum=0.1, maximum=30.0,
+               visible_for={"model": (OUTLIER_ZSCORE, OUTLIER_MAD)}),
+    IntParam("window", "Window size:", default_value=11,
+             minimum=3, maximum=9999, odd_only=True,
+             visible_for={"model": (OUTLIER_ROLLING,)}),
+)
+```
+
+Read them with `self.parameter_values()`, which returns **every** declared
+name whether or not its row is visible — an operation reading a parameter
+belonging to another model gets that parameter's default rather than a
+`KeyError`.
+
+- `app/series_operations/parameter_spec.py` — the declarations. Plain data,
+  no Qt import, so they stay testable without a window server.
+- `app/series_operations/parameter_form.py` — builds the widgets.
+
+`visible_for` maps *another* parameter's name to the values for which this
+row is shown. It may name something the form does not own — `model` is the
+base's own combo — because `ParameterForm` takes a `context` callable;
+`parameter_context()` supplies `model` by default.
+
+`odd_only` matters more than it looks: `savgol_filter` and `medfilt` both
+reject an even window with an exception raised from inside SciPy that names
+neither the control the user moved nor the series it was moved on.
+
+`PARAMS` is optional. An operation that leaves it empty keeps overriding
+`build_parameter_selector` by hand, which is still the right answer for a
+genuinely unusual control. The outlier dialog is the converted example.
+
+Honest note on the payoff: converting the outlier dialog changed it from 790
+lines to 794. It did not shrink. The gain is in the invariants — visibility
+rules and widgets are the same data so they cannot drift, a new parameter
+cannot be added without its signal connection, and range clamping happens in
+one place — not in the line count.
+
+#### Validating input before the operation runs
+
+Declare what the operation needs of its data and the base checks it:
+
+```python
+INPUT_MINIMUM_POINTS = 3
+INPUT_REQUIRES_SORTED_X = True
+INPUT_REQUIRES_UNIQUE_X = True
+INPUT_REQUIRES_UNIFORM_X = False
+INPUT_REQUIRES_VARYING_Y = False
+```
+
+Then call one of two methods on the materialized arrays:
+
+- `prepare_input_xy(x, y, label=...)` — validates **and repairs**, returning
+  cleaned arrays. Drops non-finite points always; sorts and averages
+  duplicate x according to the declarations. Every repair is reported.
+- `validate_input_xy(x, y, label=..., raise_on_error=False)` — reports only.
+  Use this whenever the result is mapped back to source rows: the outlier
+  detector matches by rowid and the cluster dialog by frame position, so
+  reordering would move each mark onto a different row.
+
+Requirements are declared rather than assumed because a validator that
+rejects data an operation handles fine is worse than none — it blocks real
+work and teaches people to dismiss it. An FFT needs uniform spacing;
+`np.gradient` does not. A spline needs unique x; clustering reads an
+observation matrix where repeated x is two ordinary observations.
+
+Severity depends on whether a repair is coming: duplicate x is fatal to a
+spline, but averaging is a defensible fix, so it is an error when nobody
+will fix it and a warning when somebody will (`repairable=True`, which
+`prepare_input_xy` passes).
+
+The three failure modes this exists for all produce *wrong answers* rather
+than errors — unsorted x smoothed as a sequence, a spline through duplicate
+x, and `pd.to_numeric(errors="coerce")` turning a text column into an
+all-NaN array with no complaint.
+
+The check itself is `app/utils/series_validation.py`: pure numpy, no Qt, no
+pandas. Tests in `app/tests/test_series_validation.py`, about half of which
+assert what it must **not** reject.
+
+#### The operations that ship
+
+| Operation | Reads | Produces |
+| --- | --- | --- |
+| Fit | one series | fitted curve + parameters |
+| Interpolation | one series | resampled curve |
+| Smoothing | one series | smoothed curve |
+| Outliers | one series | `Hide` flags on the source rows |
+| Spectral | one series | spectrum on a new axis |
+| Clustering | one series | cluster labels / split series |
+| Statistics | one series | a report, no series |
+| **Calculus** | one series | derivative or integral |
+| **Peaks** | one series | located peaks + measurements |
+| **Control Chart** | one series | chart values, limits, violations |
+| **Function** | *nothing* | an evaluated function |
+
+Three of these are worth knowing about before touching them.
+
+**Calculus** builds smoothing into the derivative and baseline subtraction
+into the integral, rather than leaving either as a step the user must
+remember. Differentiation amplifies noise — Savitzky-Golay beats a raw
+`np.gradient` by about 8x RMS on noisy data — and a peak on a raised baseline
+integrates to mostly baseline: a gaussian of true area 1.77 on an offset of 5
+comes out at 51.8 without subtraction.
+
+`savgol_filter` must be given `delta` set to the sample spacing, or it returns
+a derivative per *sample index* — correct only when the step happens to be 1.
+
+**Control Chart** estimates sigma from within-subgroup variation (average
+moving range over d2, or average within-subgroup range/standard deviation),
+**never** from the standard deviation of all the data. That is the whole idea:
+a process that has drifted has a large overall standard deviation *because* it
+drifted, so limits built from it are wide enough to contain the drift and the
+chart declares the process fine.
+
+The SPC constants (d2, d3, c4, A2, D3, D4, B3, B4) are tabulated rather than
+computed. c4 has a closed form, but d2 and d3 are integrals over the range
+distribution with no elementary form, and using anything but the published
+table would put these limits at odds with every other tool's.
+
+X-bar limits are derived from d2 and divided by sqrt(n) rather than applying
+the tabulated A2 shortcut, because A2 has the 3 of "three sigma" baked into it
+and the sigma multiplier is configurable here. The two agree to ~1e-3 of the
+limit, which is table rounding.
+
+Violations carry **every** Nelson rule a point broke, not the first: the rule
+numbers are historical, not a severity ranking.
+
+**Function** is the odd one out — it reads no source series and generates one,
+so it overrides `selected_series()` to return `[]`. `_run_operation` resolves
+its target from the selected *axis*, which is unaffected. Its function library
+comes from `FunctionScanner`, the same one the fit dialog uses, so a class
+dropped into `app/functions/user_functions.py` appears in both with no
+registration. Its range controls are declared in `PARAMS`; the function's own
+parameters are a table, because their number and names change with the
+selection and a declaration cannot express that.
+
+Tests for all four: `app/tests/test_new_operations.py`.
+
+### 7.3 The `.mplstyle` library
+
+`mplstyles/` ships a large set of `.mplstyle` files, organized into
+subfolders (`color/`, `color/discrete-rainbow/`, `journals/`, `languages/`,
+`misc/`). The Style dropdown on the Figure panel
+(`FigurePropertiesWidget._list_mplstyle_files`) walks the whole tree
+(`Path.rglob("*.mplstyle")`), not just the top level, and labels each entry
+`folder.subfolder.name` (dots joining the path relative to `mplstyles/`,
+extension dropped) so a style's origin stays visible in a flat dropdown. The
+same dropdown has a **Browse…** entry that opens a native file picker for a
+style kept anywhere else entirely (`_browse_for_style_file`). Adding a style
+is just dropping a `.mplstyle` file anywhere under `mplstyles/`, including a
+new subfolder — no registration needed.
+
+### 7.4 ChartPanel interaction
+
+Everything the chart does under the pointer is wired in
+`app/widgets/chart_panel.py`, through Matplotlib's own event system
+rather than Qt's — Matplotlib already knows which artist owns each pixel and
+can give a position in data coordinates, and redoing either against Qt
+coordinates would mean reimplementing marker sizes, transforms and axis
+scales for every renderer.
+
+| Event | Does |
+| --- | --- |
+| `scroll_event` | Zoom about the point under the cursor |
+| `pick_event` | Read out a point, a bar/wedge, or toggle a legend entry |
+| `button_press_event` | Ctrl+click creates an axis annotation |
+| `motion_notify_event` | Hover readout |
+
+**Hover** is throttled to `HOVER_INTERVAL_MS` (40ms) and **blitted**. Both
+matter: mouse motion arrives far faster than a hit test plus a repaint can be
+done, and a full `draw()` re-runs every renderer for every series. Restoring
+a cached bitmap and drawing one text box costs ~2.5ms whatever the data size,
+against 12–26ms for a full draw. What grows with the data is the hit test,
+which at 500k points is already the larger half of the budget.
+
+Two traps in the blitting, both of which silently defeat it:
+
+- The background must be captured with the annotation *hidden*, or it is
+  baked in and smears across the plot.
+- `_invalidate_hover_background` (on `draw_event`/`resize_event`) must drop
+  only the bitmap, never `_hover_axes`. Clearing both makes every hover
+  rebuild the annotation and force the full draw that blitting exists to
+  avoid — the blit path is then never reached at all.
+  `_discard_hover_annotation` is the separate, stronger reset, called from
+  `reload()` because `figure.clear()` destroys the artist itself.
+
+Hit distance is measured in **display pixels**, not data units: a chart of
+millivolts against seconds would otherwise treat a step along x as thousands
+of times nearer than one along y.
+
+**Picking** arms lines and collections with a tolerance in points, and
+patches with `picker=True` — a patch is a filled area, so "inside the shape"
+is the test, and a distance from its edge leaves the middle of a tall bar
+unclickable. Patches read out through `_describe_patch` rather than the point
+path: a bar reports its category and value, a wedge its share. Bar
+orientation comes from the `BarContainer`, not from the geometry, because a
+tall thin `barh` bar and a tall thin `bar` bar are the same rectangle.
+
+**Legend picking** toggles a series' visibility. Handles are matched to
+artists by label rather than by position, so a series drawn as several
+artists — a line plus its error bars — toggles as one. The entry dims instead
+of disappearing, so a hidden series still has something to click. Hidden
+series are skipped by the hover hit test.
+
+Tests: `app/tests/test_chart_panel_selection.py`,
+`app/tests/test_chart_panel_buffer.py`.
+
+## 8. Styling (`app/styles/`)
+
+- `style.py` is the shared factory: every button/menu-item/card in the app
+  goes through `create_action_button` / `create_menu_item` / `create_menu` /
+  `create_card_widget` rather than raw Qt constructors, so label/tooltip/icon
+  come from one place (`config.json`'s `actions` catalogue,
+  `action_presentation(action_id)`) and stay consistent. `MenuItem.icon`
+  accepts either a string (looked up through `load_icon`: action id → SVG
+  file name → Fluent glyph token, in that order) or a `QIcon` built
+  elsewhere (`icon_from_svg_source`) when a menu entry has to render
+  pixel-identical to an icon defined somewhere else in the app, e.g. the same
+  action's own inline-SVG artwork.
+- Two platform stylesheets, `macos_native.qss` and `fluent_win11.qss`, loaded
+  based on `sys.platform`. They are **not** symmetric by design: the macOS
+  file explicitly leaves standard controls (`QPushButton`, `QComboBox`, ...)
+  unstyled because Qt's Aqua style already renders them natively, and only
+  opts in bespoke, app-specific chrome by object name (read the file's own
+  "PLATFORM PARITY NOTES" header before touching either file). The Windows
+  file takes the opposite approach — a generic `QToolButton { ... }` fallback
+  rule styles every tool button uniformly. A consequence: a new
+  `QToolButton` built through `create_toolbar_button` gets Fluent styling
+  "for free" on Windows but needs its own `QToolButton#<action_id>Button`
+  rule added to `macos_native.qss` explicitly, or it falls through to the
+  unstyled native bevel. `zoom_fitButton` (the "Adatta"/fit-to-window
+  button) is the worked example.
 - Icons: four backends, tried in this order by `icon_from_action_spec` (read
   its docstring for the reasoning):
   1. `SFSymbol` on macOS — the system's own set;

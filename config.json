@@ -1,7 +1,6 @@
 {
   "actions": {
     "add": {
-      "icon": "add",
       "text": "Add",
       "description": "Add an item",
       "SFSymbol": "plus",
@@ -9,7 +8,6 @@
       "ThemeIcon": "list-add"
     },
     "add_series": {
-      "icon": "add",
       "text": "Add series",
       "description": "Add a series to the selected axis",
       "SFSymbol": "plus.circle",
@@ -17,7 +15,6 @@
       "ThemeIcon": "list-add"
     },
     "apply": {
-      "icon": "select_all",
       "text": "OK",
       "description": "Apply the changes",
       "SFSymbol": "checkmark.circle",
@@ -25,7 +22,6 @@
       "ThemeIcon": "object-select"
     },
     "clear": {
-      "icon": "clear",
       "text": "Clear",
       "description": "Clear the content",
       "SFSymbol": "xmark.circle",
@@ -33,7 +29,6 @@
       "ThemeIcon": "edit-clear"
     },
     "close": {
-      "icon": "clear",
       "text": "Cancel",
       "description": "Close the current window",
       "shortcut": "Ctrl+W",
@@ -42,7 +37,6 @@
       "ThemeIcon": "window-close"
     },
     "copy": {
-      "icon": "copy",
       "text": "Copy",
       "description": "Copy to the clipboard",
       "shortcut": "Ctrl+C",
@@ -51,15 +45,13 @@
       "ThemeIcon": "edit-copy"
     },
     "create_demo": {
-      "icon": "plot",
       "text": "Create demo",
       "description": "Build one of the shipped demo projects and open it",
       "SFSymbol": "wand.and.stars",
-      "SegoeFluent": "",
+      "SegoeFluent": "e8a5",
       "ThemeIcon": "document-new"
     },
     "credits": {
-      "icon": "info",
       "text": "Credits",
       "description": "Who made this, and what it is made of",
       "SFSymbol": "info.circle",
@@ -67,7 +59,6 @@
       "ThemeIcon": "help-about"
     },
     "delete": {
-      "icon": "delete",
       "text": "Delete",
       "description": "Delete the selection",
       "SFSymbol": "trash",
@@ -75,7 +66,6 @@
       "ThemeIcon": "edit-delete"
     },
     "dismiss": {
-      "icon": "clear",
       "text": "Close",
       "description": "Close this window",
       "SFSymbol": "xmark.circle",
@@ -83,7 +73,6 @@
       "ThemeIcon": "window-close"
     },
     "down": {
-      "icon": "down",
       "text": "Down",
       "description": "Down",
       "SFSymbol": "chevron.down",
@@ -91,7 +80,6 @@
       "ThemeIcon": "go-down"
     },
     "edit": {
-      "icon": "",
       "text": "Edit",
       "description": "Edit",
       "shortcut": "Ctrl+X",
@@ -100,7 +88,6 @@
       "ThemeIcon": "document-edit"
     },
     "export_csv": {
-      "icon": "csv",
       "text": "Export CSV",
       "description": "Export as a CSV file",
       "SFSymbol": "text.document",
@@ -108,15 +95,13 @@
       "ThemeIcon": "document-save-as"
     },
     "export_xlsx": {
-      "icon": "excel",
       "text": "Export Excel",
       "description": "Export as an Excel workbook",
-      "SFSymbol": "",
-      "SegoeFluent": "",
+      "SFSymbol": "tablecells",
+      "SegoeFluent": "f232",
       "ThemeIcon": "document-save-as"
     },
     "import": {
-      "icon": "import",
       "text": "Import",
       "description": "Import data into the database",
       "SFSymbol": "square.and.arrow.down",
@@ -124,7 +109,6 @@
       "ThemeIcon": "document-open"
     },
     "infer_params": {
-      "icon": "preview",
       "text": "Infer from expr",
       "description": "Detect the parameter count from the expression",
       "SFSymbol": "wand.and.stars",
@@ -132,7 +116,6 @@
       "ThemeIcon": "system-run"
     },
     "info": {
-      "icon": "info",
       "text": "Info",
       "description": "Show details",
       "SFSymbol": "info.circle",
@@ -140,7 +123,6 @@
       "ThemeIcon": "dialog-information"
     },
     "insert": {
-      "icon": "add",
       "text": "Insert",
       "description": "Insert at the cursor",
       "SFSymbol": "plus",
@@ -148,7 +130,6 @@
       "ThemeIcon": "list-add"
     },
     "log_viewer": {
-      "icon": "log",
       "text": "Log viewer",
       "description": "Open the application log viewer",
       "SFSymbol": "doc.text.magnifyingglass",
@@ -156,7 +137,6 @@
       "ThemeIcon": "document-properties"
     },
     "multi_peak": {
-      "icon": "add",
       "text": "Multi-peak...",
       "description": "Build a multi-peak expression",
       "SFSymbol": "chart.xyaxis.line",
@@ -164,7 +144,6 @@
       "ThemeIcon": "list-add"
     },
     "nav_chart_options": {
-      "icon": "options",
       "text": "Chart Options",
       "description": "Show chart options",
       "SFSymbol": "gearshape",
@@ -172,7 +151,6 @@
       "ThemeIcon": "preferences-system"
     },
     "nav_data": {
-      "icon": "data",
       "text": "Data",
       "description": "Show data tables",
       "SFSymbol": "table",
@@ -180,7 +158,6 @@
       "ThemeIcon": "x-office-spreadsheet"
     },
     "nav_menu": {
-      "icon": "menu",
       "text": "Menu",
       "description": "Show main menu",
       "SFSymbol": "line.horizontal.3",
@@ -188,7 +165,6 @@
       "ThemeIcon": "open-menu"
     },
     "nav_series_operations": {
-      "icon": "",
       "text": "Series Operations",
       "description": "Show series operations",
       "SFSymbol": "function",
@@ -196,7 +172,6 @@
       "ThemeIcon": "accessories-calculator"
     },
     "new": {
-      "icon": "new",
       "text": "New",
       "description": "Create a new database",
       "shortcut": "Ctrl+N",
@@ -205,15 +180,16 @@
       "ThemeIcon": "document-new"
     },
     "new_plot": {
-      "icon": "plot",
       "text": "Plot",
       "description": "Create a new plot tab",
       "SFSymbol": "chart.xyaxis.line",
       "SegoeFluent": "E9D2",
-      "ThemeIcon": "office-chart-line"
+      "ThemeIcon": [
+        "office-chart-line",
+        "x-office-spreadsheet"
+      ]
     },
     "open": {
-      "icon": "open",
       "text": "Open",
       "description": "Open a database",
       "shortcut": "Ctrl+O",
@@ -222,7 +198,6 @@
       "ThemeIcon": "document-open"
     },
     "optimize_db": {
-      "icon": "optimize",
       "text": "Optimize DB",
       "description": "Check the database, report problems, and compact it",
       "SFSymbol": "wrench.and.screwdriver",
@@ -230,7 +205,6 @@
       "ThemeIcon": "applications-system"
     },
     "paste": {
-      "icon": "paste",
       "text": "Paste",
       "description": "Paste from the clipboard",
       "shortcut": "Ctrl+V",
@@ -239,7 +213,6 @@
       "ThemeIcon": "edit-paste"
     },
     "preview": {
-      "icon": "preview",
       "text": "Preview",
       "description": "Preview the result",
       "SFSymbol": "eye",
@@ -247,7 +220,6 @@
       "ThemeIcon": "document-print-preview"
     },
     "query_builder": {
-      "icon": "query",
       "text": "Query Builder",
       "description": "Write, validate and save SQL queries",
       "SFSymbol": "text.magnifyingglass",
@@ -255,7 +227,6 @@
       "ThemeIcon": "edit-find"
     },
     "rcparam_add": {
-      "icon": "add",
       "text": "Add",
       "description": "Insert the selected rcParam into the editor",
       "SFSymbol": "plus",
@@ -263,7 +234,6 @@
       "ThemeIcon": "list-add"
     },
     "rcparam_delete": {
-      "icon": "delete",
       "text": "Remove",
       "description": "Remove the selected property",
       "SFSymbol": "trash",
@@ -271,7 +241,6 @@
       "ThemeIcon": "list-remove"
     },
     "rcparam_open": {
-      "icon": "open",
       "text": "Open",
       "description": "Load a .mplstyle file into the editor",
       "SFSymbol": "folder",
@@ -279,7 +248,6 @@
       "ThemeIcon": "document-open"
     },
     "rcparam_reset": {
-      "icon": "reload",
       "text": "Reset",
       "description": "Reset the selected property to the Matplotlib default",
       "SFSymbol": "arrow.clockwise",
@@ -287,7 +255,6 @@
       "ThemeIcon": "edit-undo"
     },
     "rcparam_save": {
-      "icon": "save",
       "text": "Save",
       "description": "Save the overrides as a .mplstyle file",
       "SFSymbol": "square.and.arrow.down",
@@ -295,7 +262,6 @@
       "ThemeIcon": "document-save"
     },
     "reload": {
-      "icon": "redo",
       "text": "Reload",
       "description": "Reload from the source",
       "SFSymbol": "arrow.clockwise",
@@ -303,7 +269,6 @@
       "ThemeIcon": "view-refresh"
     },
     "rename": {
-      "icon": "rename",
       "text": "Rename",
       "description": "Rename the selection",
       "SFSymbol": "pencil",
@@ -311,7 +276,6 @@
       "ThemeIcon": "document-edit"
     },
     "run": {
-      "icon": "",
       "text": "Run",
       "description": "Run the query",
       "shortcut": "Ctrl+R",
@@ -320,7 +284,6 @@
       "ThemeIcon": "media-playback-start"
     },
     "run_fit": {
-      "icon": "fit",
       "text": "Fit",
       "description": "Optimise the parameters and preview the result",
       "SFSymbol": "function",
@@ -328,7 +291,6 @@
       "ThemeIcon": "accessories-calculator"
     },
     "save": {
-      "icon": "save",
       "text": "Save",
       "description": "Save to a file",
       "SFSymbol": "square.and.arrow.down",
@@ -336,7 +298,6 @@
       "ThemeIcon": "document-save"
     },
     "select_all": {
-      "icon": "select_all",
       "text": "Select all",
       "description": "Select all items",
       "shortcut": "Ctrl+A",
@@ -345,7 +306,6 @@
       "ThemeIcon": "edit-select-all"
     },
     "settings": {
-      "icon": "settings",
       "text": "Settings",
       "description": "Open the application settings",
       "SFSymbol": "gearshape",
@@ -353,15 +313,16 @@
       "ThemeIcon": "preferences-system"
     },
     "sql_filter": {
-      "icon": "options",
       "text": "Filter",
       "description": "WHERE with the comparisons spelled out",
       "SFSymbol": "line.3.horizontal.decrease.circle",
       "SegoeFluent": "E71C",
-      "ThemeIcon": "view-filter"
+      "ThemeIcon": [
+        "view-filter",
+        "edit-find"
+      ]
     },
     "sql_join": {
-      "icon": "link",
       "text": "Join",
       "description": "LEFT JOIN keeping every row of the chosen table",
       "SFSymbol": "link",
@@ -369,7 +330,6 @@
       "ThemeIcon": "insert-link"
     },
     "sql_order": {
-      "icon": "down",
       "text": "Order",
       "description": "ORDER BY with an explicit direction",
       "SFSymbol": "arrow.up.arrow.down",
@@ -377,7 +337,6 @@
       "ThemeIcon": "view-sort-ascending"
     },
     "sql_select": {
-      "icon": "query",
       "text": "Select",
       "description": "SELECT over the chosen table",
       "SFSymbol": "line.3.horizontal.decrease",
@@ -385,7 +344,6 @@
       "ThemeIcon": "edit-select-all"
     },
     "sql_summary": {
-      "icon": "sum",
       "text": "Summary",
       "description": "Count, average, min and max, grouped by a column",
       "SFSymbol": "sum",
@@ -393,7 +351,6 @@
       "ThemeIcon": "accessories-calculator"
     },
     "sql_union": {
-      "icon": "sum",
       "text": "Union",
       "description": "UNION ALL of two tables with the same columns",
       "SFSymbol": "arrow.triangle.merge",
@@ -401,7 +358,6 @@
       "ThemeIcon": "insert-link"
     },
     "up": {
-      "icon": "up",
       "text": "Up",
       "description": "Up",
       "SFSymbol": "chevron.up",
@@ -409,7 +365,6 @@
       "ThemeIcon": "go-up"
     },
     "zoom_fit": {
-      "icon": "zoom_fit",
       "text": "Zoom to fit",
       "description": "Fit the whole chart in the panel",
       "SFSymbol": "arrow.up.left.and.arrow.down.right",
@@ -697,7 +652,7 @@
     "figure_height_cm": 120.19,
     "figure_dpi": 122.0
   },
-  "last_database": "/tmp/pytest-of-root/pytest-60/test_choosing_a_demo_builds_it0/peak scan demo.dhub",
+  "last_database": "/tmp/pytest-of-root/pytest-64/test_choosing_a_demo_builds_it0/peak scan demo.dhub",
   "window_geometry": {
     "main_window": {
       "x": 360,
@@ -805,7 +760,7 @@
     ],
     "data_page": [
       309,
-      621
+      622
     ]
   },
   "dialog_state": {

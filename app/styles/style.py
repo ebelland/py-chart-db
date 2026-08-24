@@ -51,7 +51,6 @@ from app.utils.i18n import tr
 
 _UI_DIR = Path(__file__).resolve().parent
 _APP_DIR = _UI_DIR.parent
-_ICONS_DIR = _APP_DIR / "icons"
 _STYLES_DIR = _APP_DIR / "styles"
 _IS_MACOS = platform.system().lower() == "darwin"
 _IS_WINDOWS = platform.system().lower().startswith("win")
@@ -144,18 +143,6 @@ class MenuItem:
 # ----------------------------------------------------------------------
 # Icons
 # ----------------------------------------------------------------------
-#: The one folder of shipped SVGs, and the last thing the icon chain reaches
-#: for.
-#:
-#: There used to be three: a "macOs" and a "win11" folder searched before this
-#: one, so that a hand-drawn icon could look a little more like the platform
-#: it was drawn for. SF Symbols, Segoe Fluent and the desktop's own icon theme
-#: all answer before any SVG now, and each of them is the platform's real icon
-#: set rather than an impression of one - so the platform folders were only
-#: ever reached when a Mac had no pyobjc or a PC had no Fluent font, and what
-#: they offered there was a second drawing of the same thing. They are gone;
-#: this is what those cases fall back to.
-ICON_COMMON_DIR: str = "common"
 
 _FLUENT_GLYPH_MIN = 0xE700
 _FLUENT_GLYPH_MAX = 0xF8FF
@@ -190,21 +177,6 @@ _MIN_PYOBJC_CORE: tuple[tuple[tuple[int, int], tuple[int, ...]], ...] = (
     ((3, 14), (12, 0)),  # 11.1's cp314 wheel predates the 3.14 release
     ((3, 10), (11, 0)),
 )
-
-
-def _icon_search_dirs() -> list[Path]:
-    """Return the folders an SVG icon name is looked up in.
-
-    One, now that the platform folders are gone - kept as a list because the
-    lookup and its cache key are written around a search path, and a single
-    folder is a search path of one rather than a different mechanism.
-    """
-    return [_ICONS_DIR / ICON_COMMON_DIR]
-
-
-def _icon_search_key() -> tuple[str, ...]:
-    """Return the search directories as a hashable cache key."""
-    return tuple(str(directory) for directory in _icon_search_dirs())
 
 
 def _normalize_icon_name(icon: str | None) -> str:
@@ -453,6 +425,33 @@ def ensure_icon_theme() -> str:
     return current
 
 
+def _theme_icon_field(value: object) -> str | tuple[str, ...] | None:
+    """Normalise a catalogue ThemeIcon into one name or an ordered several.
+
+    A list is allowed because no single freedesktop name is in every theme.
+    "office-chart-line" is Breeze's and Papirus's, and GNOME has no chart icon
+    at all, so a plotting application's Plot button is either two names or a
+    blank button on GNOME. Written best-first: the name that means the thing,
+    then whatever is closest and widely shipped.
+    """
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple)):
+        names = tuple(str(name).strip() for name in value if str(name).strip())
+        if not names:
+            return None
+        return names[0] if len(names) == 1 else names
+    text = str(value).strip()
+    return text or None
+
+
+def _theme_icon_names(value: str | tuple[str, ...] | None) -> tuple[str, ...]:
+    """Return a ThemeIcon field as the ordered names to try."""
+    if not value:
+        return ()
+    return (value,) if isinstance(value, str) else tuple(value)
+
+
 def _theme_icon_candidates(token: str) -> tuple[str, ...]:
     """Return the names to try for one configured theme icon, best first."""
     if token.endswith(_THEME_ICON_SYMBOLIC_SUFFIX):
@@ -554,61 +553,6 @@ def _create_fluent_icon(
     icon = QIcon(pixmap)
     _FLUENT_ICON_CACHE[cache_key] = icon
     return icon
-
-
-@lru_cache(maxsize=None)
-def _svg_icon_path_cached(name: str, search_dirs: tuple[str, ...]) -> Path | None:
-    """Look the file up on disk.  Cached: the icon set does not change at run time.
-
-    Every button and every menu item resolves an icon, repeatedly - rebuilding
-    a toolbar asks for the same forty names again - and each miss costs one
-    stat per search directory.  Measured at 0.34 ms per ``load_icon`` before
-    this, which was most of the cost of opening a populated menu.
-
-    ``search_dirs`` is part of the key rather than read inside, because it
-    depends on the platform: caching on the name alone would answer for macOS
-    with whatever Windows was asked first.
-    """
-    for directory in search_dirs:
-        path = Path(directory) / f"{name}.svg"
-        if path.exists():
-            return path
-
-    return None
-
-
-def _svg_icon_path(icon_id: str | None) -> Path | None:
-    """Return an SVG icon path for a raw icon id. No aliases, no PNG/ICO."""
-    name = _normalize_icon_name(icon_id).lower()
-    if not name:
-        return None
-
-    return _svg_icon_path_cached(name, _icon_search_key())
-
-
-def resolve_icon_path(icon: str | None) -> Path | None:
-    """Return only SVG-based icon paths.
-
-    If ``icon`` is an action id, the action's regular ``icon`` field is used.
-    Platform-rendered symbol icons intentionally do not have paths.
-
-    An action whose id happens to match a file name falls through to that file
-    rather than resolving to nothing: ``new`` is both an action and new.svg,
-    and an action that names no SVG would otherwise make the file with the same
-    name unreachable - which is a trap, because the two are unrelated.
-    """
-    token = _normalize_icon_name(icon)
-    if not token or _is_fluent_glyph(token):
-        return None
-
-    path = _svg_icon_path(action(token).icon)
-    return path if path is not None else _svg_icon_path(token)
-
-
-def get_icon_file_name(icon: str) -> str | None:
-    """Return the SVG icon file name relative to the icons directory."""
-    path = resolve_icon_path(icon)
-    return None if path is None else str(path.relative_to(_ICONS_DIR))
 
 
 def _pyobjc_core_is_safe_to_import() -> bool:
@@ -972,32 +916,6 @@ def _tinted_pixmap(
     scaled.setDevicePixelRatio(ratio)
     return scaled
 
-_SVG_ICON_CACHE: dict[tuple[str, tuple[str, ...]], QIcon] = {}
-
-
-def _svg_icon(icon_id: str | None) -> QIcon:
-    """Return the shipped SVG for an id, or an empty icon when there is none.
-
-    A QIcon built from an SVG rasterises on demand at whatever size it is drawn,
-    so unlike the two bitmap paths this one needs neither a size nor a pixel
-    ratio in its key - the same object is correct on every display.  The search
-    directories are in the key for the same reason as above.
-    """
-    name = _normalize_icon_name(icon_id).lower()
-    if not name:
-        return QIcon()
-
-    key = (name, _icon_search_key())
-    cached = _SVG_ICON_CACHE.get(key)
-    if cached is not None:
-        return cached
-
-    path = _svg_icon_path(name)
-    icon = QIcon(str(path)) if path is not None else QIcon()
-    _SVG_ICON_CACHE[key] = icon
-    return icon
-
-
 _SVG_SOURCE_ICON_CACHE: dict[tuple[str, int, float], QIcon] = {}
 
 
@@ -1030,7 +948,7 @@ def icon_from_svg_source(
     into ``app/series_operations`` has to be the whole of it, artwork
     included.  See ``SeriesOperationDialogBase.Icon``.
 
-    Unlike ``_svg_icon`` this rasterises once at a chosen size, because the
+    Unlike the theme and glyph paths this rasterises once at a chosen size, because the
     QIcon is built from a pixmap rather than from a file Qt can re-read.  So
     the pixel ratio belongs in the key, exactly as it does for the SF Symbol
     and Fluent glyph paths.
@@ -1086,16 +1004,6 @@ def icon_from_svg_source(
     return icon
 
 
-def _svg_icon_or_empty(icon_id: str | None) -> QIcon:
-    """Return an SVG icon by name, or an empty icon when the file is missing.
-
-    SVG lookup already searches the platform-specific icon folder first and the
-    common folder second. There is no implicit fallback to the action id here:
-    only the configured ``icon`` value is considered.
-    """
-    return _svg_icon(icon_id) if _normalize_icon_name(icon_id) else QIcon()
-
-
 def icon_from_action_spec(spec: "ActionSpec") -> QIcon:
     """Return the icon for an action using the catalogue priority order.
 
@@ -1112,16 +1020,19 @@ def icon_from_action_spec(spec: "ActionSpec") -> QIcon:
        machine there is no theme to read, so it would only ever be a wasted
        lookup - and on the rare Linux-style desktop running under either, the
        native set is still the more native answer.
-    4. The SVG shipped in ``app/icons``, from the platform folder and then
-       from ``common``.
-    5. An empty ``QIcon``.
+    4. An empty ``QIcon``.
 
-    Step 4 is the one this application is trying to stop needing. Every action
-    naming an SVG is what kept a Mac without pyobjc from showing a toolbar of
-    blank buttons, and it is still the answer on a desktop with no icon theme
-    installed - but it is a drawing made once, by hand, that matches no
-    system in particular. ``report_icon_sources`` says which actions still
-    reach it on this machine, which is what makes deleting any of them safe.
+    There used to be a fifth step, and 67 files behind it: an SVG shipped in
+    ``app/icons``, drawn once by hand, matching no system in particular. It
+    was the answer for a Mac with no pyobjc, a PC with no Fluent font, and a
+    Linux box with no icon theme. Those are the three cases that now show no
+    icon at all, which was a deliberate choice: three real icon sets cover
+    every machine anyone actually runs, and a hand-drawn fallback for the
+    rest is a maintenance burden charged to everybody.
+
+    ``report_icon_sources`` says which backend answers for each action on the
+    machine it runs on, and what is left under ``"none"`` is what nothing can
+    draw there.
     """
     if _IS_MACOS and spec.sf_symbol:
         icon = _create_sf_symbol_icon(spec.sf_symbol)
@@ -1133,16 +1044,16 @@ def icon_from_action_spec(spec: "ActionSpec") -> QIcon:
         if not icon.isNull():
             return icon
 
-    if spec.theme_icon:
-        icon = _create_theme_icon(spec.theme_icon)
+    for name in _theme_icon_names(spec.theme_icon):
+        icon = _create_theme_icon(name)
         if not icon.isNull():
             return icon
 
-    return _svg_icon_or_empty(spec.icon)
+    return QIcon()
 
 
 #: Which backend answered for an action, in the order they are tried.
-ICON_SOURCES: tuple[str, ...] = ("sf_symbol", "segoe_fluent", "theme", "svg", "none")
+ICON_SOURCES: tuple[str, ...] = ("sf_symbol", "segoe_fluent", "theme", "none")
 
 
 def icon_source_for_action(spec: "ActionSpec") -> str:
@@ -1163,20 +1074,21 @@ def icon_source_for_action(spec: "ActionSpec") -> str:
     ):
         return "segoe_fluent"
 
-    if spec.theme_icon and theme_icon_is_available(spec.theme_icon):
+    if any(
+        theme_icon_is_available(name) for name in _theme_icon_names(spec.theme_icon)
+    ):
         return "theme"
 
-    return "svg" if not _svg_icon_or_empty(spec.icon).isNull() else "none"
+    return "none"
 
 
 def report_icon_sources() -> dict[str, list[str]]:
     """Return the action ids each icon backend answers for, on this machine.
 
-    The tool for retiring the shipped SVGs: what is left under ``"svg"`` on a
-    desktop with a real icon theme is exactly the set of drawings still doing
-    work, and what is under ``"none"`` is a hole. Run it, do not guess - the
-    failure mode of a missing theme name is silent, because fromTheme returns
-    a null icon and the SVG takes over without complaint.
+    What lands under ``"none"`` is what this machine cannot draw at all - the
+    only report that matters now that there is no shipped fallback beneath the
+    three real icon sets. Run it, do not guess: a mistyped theme name fails
+    silently, because ``fromTheme`` returns a null icon and says nothing.
     """
     report: dict[str, list[str]] = {source: [] for source in ICON_SOURCES}
     for action_id, spec in sorted(_catalog().items()):
@@ -1185,12 +1097,14 @@ def report_icon_sources() -> dict[str, list[str]]:
 
 
 def load_icon(icon: str | None) -> QIcon:
-    """Return an icon for an action id, SVG name, or Fluent glyph token.
+    """Return an icon for an action id, a Fluent glyph, or a theme name.
 
-    Action ids use ``icon_from_action_spec`` and therefore follow the catalogue
-    priority order. Non-action tokens are treated literally: a Fluent glyph token
-    is rendered as Fluent, and any other token is looked up as an SVG name. When
-    a token cannot be rendered or found, the result is an empty ``QIcon``.
+    Action ids go through :func:`icon_from_action_spec` and follow the
+    catalogue's priority order. Anything else is taken literally: a Fluent
+    glyph token is drawn as Fluent, and any other token is asked of the icon
+    theme - which is what the handful of menu items that name an icon without
+    being catalogue actions now pass, since the SVG names they used to pass
+    no longer exist. An unknown token is an empty ``QIcon``.
     """
     token = _normalize_icon_name(icon)
     if not token:
@@ -1203,7 +1117,7 @@ def load_icon(icon: str | None) -> QIcon:
     if _is_fluent_glyph(token):
         return _create_fluent_icon(token, color=_symbol_tint())
 
-    return _svg_icon_or_empty(token)
+    return _create_theme_icon(token)
 
 
 # ----------------------------------------------------------------------
@@ -1221,28 +1135,6 @@ def _load_qss(name: str) -> tuple[str | None, Path | None]:
     except Exception:
         applogger.exception("Failed to read QSS: %s", path)
         return None, None
-
-
-def _icon_url(icon_name: str, *, dark: bool = False) -> str:
-    """Return a repository-relative icon URL for QSS token replacement.
-
-    ``dark`` picks the light-ink variant.  The chevrons the sheets draw into
-    combo boxes and spin boxes are a single fixed-colour path, so on a dark
-    theme the original is a dark glyph on a dark background - present, correct,
-    and invisible.  A second file rather than a runtime tint because a Qt
-    stylesheet takes a ``url()`` and nothing else: there is no way to hand it a
-    QIcon we have already recoloured.
-    """
-    if dark:
-        # Resolved as a file directly, not through get_icon_file_name: that
-        # goes via the action catalogue first, and "down_on_dark" is a file
-        # name rather than an action - so every dark theme applied logged two
-        # warnings about actions nobody had claimed existed.
-        variant = _svg_icon_path(f"{icon_name}_on_dark")
-        if variant is not None:
-            return f"app/icons/{variant.relative_to(_ICONS_DIR).as_posix()}"
-    filename = get_icon_file_name(icon_name)
-    return f"app/icons/{filename}" if filename else ""
 
 
 #: What the user can choose between, and what each choice does.
@@ -1388,11 +1280,6 @@ def apply_platform_style(
         app.setStyleSheet("")
         return PlatformStyle(system, None)
 
-    # The chevrons are files, and there is a light-ink copy of each for the
-    # dark themes; see _icon_url.
-
-    themed = themed.replace("@ICON_CHEVRON_DOWN@", _icon_url("down", dark=palette.dark))
-    themed = themed.replace("@ICON_CHEVRON_UP@", _icon_url("up", dark=palette.dark))
     app.setStyleSheet(themed)
     return PlatformStyle(system, path)
 
@@ -1943,27 +1830,27 @@ class ActionSpec:
     """Everything the UI needs to present one action."""
 
     action_id: str
-    icon: str | None
     text: str
     description: str
     shortcut: ShortcutLike = None
     checkable: bool = False
     sf_symbol: str | None = None
     segoe_fluent: str | None = None
-    theme_icon: str | None = None
+    theme_icon: str | tuple[str, ...] | None = None
 
     @classmethod
     def from_config(cls, action_id: str, entry: dict[str, Any]) -> "ActionSpec":
         return cls(
             action_id=action_id,
-            icon=(entry.get("icon") or None),
             text=str(entry.get("text") or action_id),
             description=str(entry.get("description") or ""),
             shortcut=(entry.get("shortcut") or None),
             sf_symbol=(entry.get("SFSymbol") or entry.get("sf_symbol") or None),
             checkable=bool(entry.get("checkable", False)),
             segoe_fluent=(entry.get("SegoeFluent") or entry.get("segoe_fluent") or None),
-            theme_icon=(entry.get("ThemeIcon") or entry.get("theme_icon") or None),
+            theme_icon=_theme_icon_field(
+                entry.get("ThemeIcon") or entry.get("theme_icon")
+            ),
         )
 
     def translated_text(self) -> str:
@@ -2025,7 +1912,7 @@ def action(action_id: str) -> ActionSpec:
     # Empty, not a placeholder labelled with the id: a button reading
     # "series_outliers" looks like a working button with an odd name, and the
     # gap goes unnoticed.  A blank one does not.
-    return ActionSpec(key, None, "", "")
+    return ActionSpec(key, "", "")
 
 
 def action_menu_item(
