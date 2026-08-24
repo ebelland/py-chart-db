@@ -257,6 +257,25 @@ active property cycle, float columns → a colormap), `error_values` /
 `error_kwargs` (symmetric or asymmetric `xerr`/`yerr` from `ERROR_BAR_ROLES`
 columns), `apply_annotations`.
 
+For x/y/z renderers there is also `app/charts/grids.py`:
+`pivot_to_grid(df)` returns `(X, Y, Z)` when the rows form a *complete*
+Cartesian product of the distinct x and y values — any spacing, but no
+missing pairs — and `None` when they do not, and `finite_xyz(df)` returns
+the raw points with the non-finite rows dropped. Call the first one rather
+than writing a second grid check: the surface and contour renderers both
+split on it, and the two halves of each pair only agree about what "a grid"
+means because they ask the same function. The convention when it says no is
+to log an error naming the scattered variant and draw nothing, never to
+interpolate the missing cells.
+
+A renderer that adds a colorbar must pass `use_gridspec=False` to
+`figure.colorbar`. Renderers draw while the figure's layout engine is still
+`"none"` — `render_figure` applies the descriptor's layout mode only after
+every axis is drawn — and Matplotlib's default colorbar path builds a
+`GridSpecFromSubplotSpec` with zero-height padding rows in that state. A
+constrained or compressed engine set afterwards then divides by that zero and
+the whole figure fails to draw. See `ContourAxisRenderer._colorbar`.
+
 ### 7.2 Adding a series operation
 
 A series operation is a self-contained plugin: one file under

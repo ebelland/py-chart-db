@@ -581,6 +581,72 @@ def _figure_specs() -> list[FigureSpec]:
                 ),
             ],
         ),
+        FigureSpec(
+            name="13 · Wafer contour",
+            key="wafer_contour",
+            tables=("wafer_map",),
+            queries=(),
+            chart_type="Contour Plot",
+            title="Film thickness across a 300mm wafer",
+            x_label="x (mm)",
+            y_label="y (mm)",
+            axis_options={
+                # The same measurements as figure 11, read flat instead of
+                # lifted into a third axis. Which of the two is the better
+                # chart is the question this pair is here to let you answer:
+                # the surface shows the shape, the contour map reads values
+                # off it - and a wafer map is normally the second one.
+                "levels": "10",
+                "label_lines": True,
+                "label_format": "%d",
+                "colorbar": True,
+                "colorbar_label": "thickness (nm)",
+                # Circles on the chart should be circles on the wafer.
+                "aspect": "equal",
+            },
+            series=[
+                SeriesSpec(
+                    name="Thickness",
+                    sql=(
+                        "SELECT x_mm AS x, y_mm AS y, thickness_nm AS z "
+                        "FROM wafer_map"
+                    ),
+                    roles={"x": "x", "y": "y", "z": "z"},
+                    style={},
+                ),
+            ],
+        ),
+        FigureSpec(
+            name="14 · Terrain contour",
+            key="terrain_contour",
+            tables=("terrain_survey",),
+            queries=(),
+            chart_type="Contour Plot (Scattered)",
+            title="Elevation from scattered survey points",
+            x_label="easting (m)",
+            y_label="northing (m)",
+            axis_options={
+                # The contour lines stop at the convex hull of the survey
+                # points, which is exactly as far as the survey went - the
+                # thing interpolating onto a grid first would hide.
+                "cmap": "terrain",
+                "levels": "14",
+                "line_overlay": False,
+                "colorbar": True,
+                "colorbar_label": "elevation (m)",
+            },
+            series=[
+                SeriesSpec(
+                    name="Elevation",
+                    sql=(
+                        "SELECT easting_m AS x, northing_m AS y, elevation_m AS z "
+                        "FROM terrain_survey"
+                    ),
+                    roles={"x": "x", "y": "y", "z": "z"},
+                    style={},
+                ),
+            ],
+        ),
     ]
 
 
@@ -704,6 +770,14 @@ DEMO_PROJECTS: tuple[DemoProject, ...] = (
         "masked to the round wafer, and elevation at scattered survey "
         "points, triangulated rather than interpolated onto a grid.",
         ("wafer_map", "terrain_survey"),
+    ),
+    DemoProject(
+        "Contour maps - the same fields drawn flat",
+        "The wafer and the survey again as 2D contour maps, gridded and "
+        "triangulated. The gridded one is labelled and equal-aspect; the "
+        "scattered one stops at the hull of the points, which is as far as "
+        "the survey actually went.",
+        ("wafer_contour", "terrain_contour"),
     ),
 )
 

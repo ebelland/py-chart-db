@@ -42,6 +42,8 @@ SHOWCASE_CHART_TYPES: tuple[str, ...] = (
     "Text",
     "Surface Plot",
     "Surface Plot (Scattered)",
+    "Contour Plot",
+    "Contour Plot (Scattered)",
 )
 
 
@@ -71,10 +73,12 @@ def _create_source_tables(cur: sqlite3.Cursor, rng: np.random.Generator, n: int)
         CREATE TABLE src_intervals (task TEXT, start REAL, duration REAL);
         -- Labelled points for the text renderer.
         CREATE TABLE src_labels  (x REAL, y REAL, label TEXT);
-        -- A regular x/y grid, for the gridded surface renderer.
+        -- A regular x/y grid, read by the gridded surface renderer and by
+        -- the gridded contour renderer: the same field lifted into a third
+        -- axis or drawn flat on two.
         CREATE TABLE src_grid    (x REAL, y REAL, z REAL);
-        -- The same surface, sampled at scattered (non-gridded) points, for
-        -- the triangulated surface renderer.
+        -- The same field sampled at scattered (non-gridded) points, for the
+        -- two renderers that triangulate instead of pivoting.
         CREATE TABLE src_scatter3d (x REAL, y REAL, z REAL);
         """
     )
@@ -152,9 +156,9 @@ def _create_source_tables(cur: sqlite3.Cursor, rng: np.random.Generator, n: int)
         ],
     )
 
-    # Surface: a ripple, sampled on a regular grid and again at scattered
-    # points - the same shape, the two input layouts the surface renderers
-    # each need.
+    # A ripple, sampled on a regular grid and again at scattered points -
+    # the same shape in the two input layouts the surface and contour
+    # renderers each need.
     grid_axis = np.linspace(-3.0, 3.0, 20)
     grid_x, grid_y = np.meshgrid(grid_axis, grid_axis)
     grid_z = np.sin(np.hypot(grid_x, grid_y))
@@ -467,6 +471,38 @@ def _showcase_definitions() -> list[dict[str, Any]]:
             "name": "Scattered surface showcase",
             "labels": ("", ""),
             "axis_options": {"title": "Surface Plot (Scattered)", "projection": "3d"},
+            "series": [
+                ("ripple", "SELECT x, y, z FROM src_scatter3d", {}),
+            ],
+        },
+        {
+            # The same grid the surface showcase uses, drawn flat: filled
+            # bands, the line overlay on top of them and the levels written
+            # onto the lines, which is every part of the renderer in one
+            # picture. No colorbar - it is a second Axes, and the showcase
+            # test asserts one plot area per figure.
+            "chart_type": "Contour Plot",
+            "name": "Contour showcase",
+            "labels": ("x", "y"),
+            "axis_options": {
+                "title": "Contour Plot",
+                "levels": "12",
+                "label_lines": True,
+                "label_format": "%1.1f",
+            },
+            "series": [
+                ("ripple", "SELECT x, y, z FROM src_grid", {}),
+            ],
+        },
+        {
+            "chart_type": "Contour Plot (Scattered)",
+            "name": "Scattered contour showcase",
+            "labels": ("x", "y"),
+            "axis_options": {
+                "title": "Contour Plot (Scattered)",
+                "cmap": "magma",
+                "line_overlay": False,
+            },
             "series": [
                 ("ripple", "SELECT x, y, z FROM src_scatter3d", {}),
             ],

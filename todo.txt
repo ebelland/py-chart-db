@@ -17,22 +17,33 @@ P0-10 global: locale must follow the platform locale. Add Auto to settings
 NEW - requested after the review
 ================================================================
 
-N-4   Contour renderer, gridded and scattered
-      [3D SURFACE half is DONE - see N-11. What is left here is the 2D
-      contour/contourf family.]
-      Two shapes of input, one renderer: values on a regular grid go straight
-      to contour/contourf, and scattered x/y/z has to be interpolated onto one
-      first (griddata, or a triangulation with tricontour - the triangulation
-      is honest about where there is no data, the grid is not). Deciding which
-      case is in front of you is the part worth getting right: a "grid" that
-      is only nearly regular must not be treated as one.
-      SurfaceAxisRenderer._pivot_to_grid (app/charts/surface.py) is already
-      exactly that check - share it rather than write a second one.
+N-4   Gridded-data renderers
+      [CONTOUR half is DONE: app/charts/contour.py. ContourAxisRenderer
+      (contourf/contour) pivots x/y/z rows into a grid;
+      ContourScatteredAxisRenderer (tricontourf/tricontour) triangulates the
+      raw points, so the map covers the hull of what was measured and stops
+      there - griddata was the other option and was not taken, because a grid
+      fills the corners with numbers that look like measurements.
+      The grid check itself moved to app/charts/grids.pivot_to_grid and is
+      now shared with the surface renderers rather than duplicated;
+      finite_xyz is the scattered half, shared the same way. The two new
+      categories put "Gridded data" and "Irregularly gridded data" in the
+      chart picker for the first time. Demo project "Contour maps - the same
+      fields drawn flat" reuses the wafer and survey tables, so the surface
+      and contour readings of one dataset sit side by side.
+      Found on the way: a colorbar built while the layout engine is still
+      "none" - which is when every renderer draws - makes a gridspec with
+      zero-height rows, and a constrained engine applied afterwards divides
+      by it and the figure will not draw at all. contour.py's _colorbar
+      passes use_gridspec=False for that reason; regression test in
+      test_contour_axis.py. Any future renderer that adds a colorbar needs
+      the same, or the pipeline needs to set the layout engine before the
+      renderers run instead of after.]
+      What is left is the rest of the "Gridded data" family, per
+      matplotlib.org/stable/plot_types: pcolormesh, imshow/matshow and the
+      streamplot/quiver family on a regular grid - the same "is this actually
+      a grid" decision, which now has one implementation to call.
       Pairs with the heatmap/imshow line under P2-1.
-      Widened scope (per matplotlib.org/stable/plot_types "Gridded data"):
-      also covers pcolormesh, imshow/matshow and streamplot/quiver-family
-      plots on a regular grid - the same "is this actually a grid" decision
-      this item is already about.
 
 N-5   sqlite_repo: 3013 lines in one module
       Split by subject rather than by size - connection and pragmas, tables
@@ -72,7 +83,7 @@ P2 - VALUABLE
 P2-1  renderers that pair with infrastructure already built
         heatmap/imshow- no 2D renderer at all, despite scikit-image being a
                         declared dependency
-        contour
+        contour       - DONE, see N-4
 
 P2-3  series operation: baseline correction (ALS or rubber-band)
       Pure numpy/scipy. Prerequisite for meaningful peak areas.

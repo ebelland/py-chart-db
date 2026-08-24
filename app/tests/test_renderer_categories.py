@@ -68,6 +68,9 @@ def test_no_category_is_invented() -> None:
         ("Violin Plot", "Statistical distributions"),
         ("ECDF", "Statistical distributions"),
         ("Pie Chart", "Statistical distributions"),
+        ("Contour Plot", "Gridded data"),
+        ("Contour Plot (Scattered)", "Irregularly gridded data"),
+        ("Surface Plot", "3D and volumetric data"),
     ],
 )
 def test_each_renderer_lands_where_matplotlib_puts_it(
@@ -121,6 +124,8 @@ def test_the_picker_is_an_accordion_of_categories(dialog) -> None:
     assert headings == [
         "Pairwise data",
         "Statistical distributions",
+        "Gridded data",
+        "Irregularly gridded data",
         "3D and volumetric data",
     ]
 
@@ -219,6 +224,8 @@ def test_clearing_the_search_restores_the_headings(dialog) -> None:
     assert [toolbox.itemText(i) for i in range(toolbox.count())] == [
         "Pairwise data",
         "Statistical distributions",
+        "Gridded data",
+        "Irregularly gridded data",
         "3D and volumetric data",
     ]
 

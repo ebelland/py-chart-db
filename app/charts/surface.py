@@ -1,9 +1,10 @@
 """3D surface renderers, for data on a regular grid and for scattered points.
 
-Two shapes of input, two Matplotlib functions - the same split N-4 (the
-contour renderer) is built around, and for the same reason: a grid and a
-scattered cloud need genuinely different drawing calls, not one call fed
-differently-shaped arrays.
+Two shapes of input, two Matplotlib functions - the same split the contour
+renderers (app/charts/contour.py) are built around, and for the same
+reason: a grid and a scattered cloud need genuinely different drawing
+calls, not one call fed differently-shaped arrays.  The decision itself -
+is this actually a grid? - is shared with them, in app/charts/grids.py.
 
 ``SurfaceAxisRenderer`` pivots x/y/z rows into a regular grid and draws
 ``Axes.plot_surface``, for data sampled at every combination of some set of
@@ -25,9 +26,9 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
-import pandas as pd
 
 from app.charts.base import BaseAxisRenderer, SeriesData
+from app.charts.grids import finite_xyz, pivot_to_grid
 from app.logs.logger import applogger
 
 
@@ -180,7 +181,7 @@ class SurfaceAxisRenderer(BaseAxisRenderer):
 
         sd = valid_series[0]
         merged = self._merge_options(axis_options, sd.style or {})
-        grid = self._pivot_to_grid(sd.df)
+        grid = pivot_to_grid(sd.df)
         if grid is None:
             applogger.error(
                 "Surface Plot needs a complete grid: every x value paired "
@@ -203,27 +204,6 @@ class SurfaceAxisRenderer(BaseAxisRenderer):
             ax.view_init(**view)
 
         self.apply_annotations(ax, axis_options)
-
-    def _pivot_to_grid(self, df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
-        x = pd.to_numeric(df["x"], errors="coerce")
-        y = pd.to_numeric(df["y"], errors="coerce")
-        z = pd.to_numeric(df["z"], errors="coerce")
-        frame = pd.DataFrame({"x": x, "y": y, "z": z}).dropna()
-        if frame.empty:
-            return None
-
-        x_values = np.sort(frame["x"].unique())
-        y_values = np.sort(frame["y"].unique())
-        if x_values.size < 2 or y_values.size < 2:
-            return None
-
-        pivot = frame.pivot_table(index="y", columns="x", values="z", aggfunc="mean")
-        pivot = pivot.reindex(index=y_values, columns=x_values)
-        if pivot.isna().to_numpy().any():
-            return None
-
-        x_grid, y_grid = np.meshgrid(x_values, y_values)
-        return x_grid, y_grid, pivot.to_numpy(dtype=float)
 
     def _apply_circular_mask(
         self,
@@ -375,12 +355,7 @@ class TriSurfaceAxisRenderer(BaseAxisRenderer):
 
         sd = valid_series[0]
         merged = self._merge_options(axis_options, sd.style or {})
-        df = sd.df
-        x = pd.to_numeric(df["x"], errors="coerce").to_numpy(dtype=float)
-        y = pd.to_numeric(df["y"], errors="coerce").to_numpy(dtype=float)
-        z = pd.to_numeric(df["z"], errors="coerce").to_numpy(dtype=float)
-        finite = np.isfinite(x) & np.isfinite(y) & np.isfinite(z)
-        x, y, z = x[finite], y[finite], z[finite]
+        x, y, z = finite_xyz(sd.df)
         if x.size < 3:
             applogger.error(
                 "Surface Plot (Scattered) needs at least 3 points to "

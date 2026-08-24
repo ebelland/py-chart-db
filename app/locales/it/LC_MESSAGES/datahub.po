@@ -4003,3 +4003,9 @@ msgstr "Superfici 3D - a griglia e sparse"
 
 msgid "The same kind of measurement in the two layouts the surface renderers each need: film thickness on a regular wafer grid, masked to the round wafer, and elevation at scattered survey points, triangulated rather than interpolated onto a grid."
 msgstr "Lo stesso tipo di misura nei due formati richiesti dai renderer di superficie: lo spessore del film su una griglia regolare del wafer, mascherata sul wafer rotondo, e l'altimetria in punti di rilievo sparsi, triangolata anziché interpolata su una griglia."
+
+msgid "Contour maps - the same fields drawn flat"
+msgstr "Mappe di contorno - gli stessi campi disegnati in piano"
+
+msgid "The wafer and the survey again as 2D contour maps, gridded and triangulated. The gridded one is labelled and equal-aspect; the scattered one stops at the hull of the points, which is as far as the survey actually went."
+msgstr "Il wafer e il rilievo di nuovo come mappe di contorno 2D, a griglia e triangolata. Quella a griglia è etichettata e con aspetto uguale; quella sparsa si ferma all'inviluppo convesso dei punti, che è fin dove il rilievo è arrivato davvero."
