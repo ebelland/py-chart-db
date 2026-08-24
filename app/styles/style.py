@@ -144,7 +144,17 @@ class MenuItem:
 # ----------------------------------------------------------------------
 # Icons
 # ----------------------------------------------------------------------
-ICON_PLATFORM_DIRS: dict[str, str] = {"windows": "win11", "darwin": "macOs"}
+#: The one folder of shipped SVGs, and the last thing the icon chain reaches
+#: for.
+#:
+#: There used to be three: a "macOs" and a "win11" folder searched before this
+#: one, so that a hand-drawn icon could look a little more like the platform
+#: it was drawn for. SF Symbols, Segoe Fluent and the desktop's own icon theme
+#: all answer before any SVG now, and each of them is the platform's real icon
+#: set rather than an impression of one - so the platform folders were only
+#: ever reached when a Mac had no pyobjc or a PC had no Fluent font, and what
+#: they offered there was a second drawing of the same thing. They are gone;
+#: this is what those cases fall back to.
 ICON_COMMON_DIR: str = "common"
 
 _FLUENT_GLYPH_MIN = 0xE700
@@ -183,20 +193,17 @@ _MIN_PYOBJC_CORE: tuple[tuple[tuple[int, int], tuple[int, ...]], ...] = (
 
 
 def _icon_search_dirs() -> list[Path]:
-    """Return platform-specific and common SVG icon folders."""
-    platform_dir = ICON_PLATFORM_DIRS.get(platform.system().lower())
-    dirs = [_ICONS_DIR / platform_dir] if platform_dir else []
-    dirs.append(_ICONS_DIR / ICON_COMMON_DIR)
-    return dirs
+    """Return the folders an SVG icon name is looked up in.
+
+    One, now that the platform folders are gone - kept as a list because the
+    lookup and its cache key are written around a search path, and a single
+    folder is a search path of one rather than a different mechanism.
+    """
+    return [_ICONS_DIR / ICON_COMMON_DIR]
 
 
 def _icon_search_key() -> tuple[str, ...]:
-    """Return the search directories as a hashable cache key.
-
-    Recomputed per call rather than cached: it reads ``platform.system()``,
-    which the tests substitute to check that a platform folder wins over
-    ``common``, and a cached key would make that substitution invisible.
-    """
+    """Return the search directories as a hashable cache key."""
     return tuple(str(directory) for directory in _icon_search_dirs())
 
 

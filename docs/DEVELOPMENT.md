@@ -537,7 +537,7 @@ Tests: `app/tests/test_chart_panel_selection.py`,
      which is what covers Linux: the desktop already has an icon theme the
      user chose, and this makes the app's Open look like every other Open on
      that machine;
-  4. the SVG in `app/icons/{macOs,win11,common}/`, as the last resort.
+  4. the SVG in `app/icons/common/`, as the last resort.
 
   Inline SVG source (`icon_from_svg_source`) is separate and still the way
   plugin-carried artwork arrives.
@@ -558,11 +558,27 @@ Tests: `app/tests/test_chart_panel_selection.py`,
   the theme already ships light and dark variants, and painting over one
   would replace artwork the user chose with a flat silhouette.
 
-  The shipped SVGs are on their way out — they are drawings made once, by
-  hand, that match no system in particular. `style.report_icon_sources()`
-  returns the action ids each backend answers for *on the machine it runs
-  on*, which is how to find out which SVGs are still doing work before
-  deleting any. On a GNOME desktop it currently reports 49 of 51 from the
+  `ensure_icon_theme()` (called from `main.py`) is what makes step 3 work on
+  a desktop that names no theme. GNOME and KDE set one through their platform
+  integration; a bare window manager does not, and `fromTheme` then fails for
+  everything — silently, because the SVG takes over. It probes Qt's search
+  paths, names an installed theme, and sets a fallback theme in every case.
+  Nothing is overridden: a user who chose Papirus keeps Papirus. `hicolor`
+  counts as unset, since it carries almost no action icons.
+
+  There used to be three SVG folders — `macOs/` and `win11/` searched ahead
+  of `common/` — from when a hand-drawn icon was the only way to look like
+  the platform it was drawn for. Three real icon sets answer ahead of any SVG
+  now, so those were reached only when a Mac had no pyobjc or a PC had no
+  Fluent font, and what they gave there was a second drawing of the same
+  thing. They are gone; `common/` is the single last resort, and the lookup
+  no longer depends on which machine is asking.
+
+  `style.report_icon_sources()` returns the action ids each backend answers
+  for *on the machine it runs on*. That is how to find out which of the 35
+  remaining SVGs are still doing work before deleting any more — and it has
+  to be run on a GNOME box, a KDE box, a Mac and a Windows machine, because
+  each answers differently. On GNOME/Adwaita it reports 49 of 51 from the
   theme; the two left are the Plot button and the SQL filter, which have no
   system equivalent.
 

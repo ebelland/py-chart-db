@@ -188,7 +188,16 @@ N-6   icons: finish the SFSymbol / Segoe Fluent migration
       fallback, and the four SVGs no action names are all in use - the QSS
       chevrons (down_on_dark/up_on_dark, via _icon_url) and two table-preview
       menu items (hide/invert). Nothing to delete.]
-      What is left is the deleting, and it needs machines rather than code:
+      [AND THE DELETING, in part: app/icons/macOs and app/icons/win11 are
+      gone - 32 files. They were searched ahead of common/ from when a
+      hand-drawn icon was the only way to look like the platform it was
+      drawn for, and with SF Symbols, Fluent and the theme all answering
+      first they were reached only when a Mac had no pyobjc or a PC had no
+      Fluent font - where they offered a second drawing of the same thing.
+      9 of the 32 were byte-identical to their common/ twin. The lookup no
+      longer depends on which machine is asking, and ICON_PLATFORM_DIRS is
+      gone with them. All 35 files left in common/ are referenced.]
+      What is left of the deleting needs machines rather than code:
       style.report_icon_sources() names the SVGs still doing work where it
       runs, so run it on a GNOME box, a KDE box, a Mac and a Windows machine
       and remove what none of them reports. On GNOME/Adwaita it is down to

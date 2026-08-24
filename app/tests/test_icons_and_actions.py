@@ -11,6 +11,13 @@ glyph sets exists and where the desktop already has an icon theme the user
 chose.  Before it existed, every Linux install fell straight to the SVGs, and
 three actions that name no SVG at all showed as blank buttons.
 
+The SVGs themselves are down to one folder.  There were three - a "macOs" and
+a "win11" searched ahead of "common" - from when a hand-drawn icon was the
+only way to look like the platform it was drawn for.  Three real icon sets
+answer ahead of any SVG now, so those folders were reached only when a Mac had
+no pyobjc or a PC had no Fluent font, and what they gave there was a second
+drawing of the same thing.
+
 The tests below pin what cannot be seen by looking at the running app: that a
 named icon has a file, that no icon file is shipped for nobody, and that the
 catalogue survives a config.json that is missing or half-edited.
@@ -47,9 +54,21 @@ def actions() -> dict[str, ActionSpec]:
 # ----------------------------------------------------------------------
 # Layout of the icon folders
 # ----------------------------------------------------------------------
-def test_the_three_icon_folders_exist() -> None:
-    for name in ("common", "win11", "macOs"):
-        assert (ICONS_DIR / name).is_dir(), f"missing icon folder {name}"
+def test_there_is_one_icon_folder() -> None:
+    """There used to be three.
+
+    A "macOs" and a "win11" folder were searched before "common", so a
+    hand-drawn icon could look a little more like the platform it was drawn
+    for. SF Symbols, Segoe Fluent and the desktop's own theme all answer
+    before any SVG now, and each is the platform's real icon set rather than
+    an impression of one - so the platform folders were reached only when a
+    Mac had no pyobjc or a PC had no Fluent font, and what they offered there
+    was a second drawing of the same thing.
+    """
+    assert (ICONS_DIR / "common").is_dir()
+
+    folders = sorted(path.name for path in ICONS_DIR.iterdir() if path.is_dir())
+    assert folders == ["common"], f"platform icon folders are gone: {folders}"
 
 
 def test_no_icons_are_left_at_the_top_level() -> None:
@@ -57,7 +76,7 @@ def test_no_icons_are_left_at_the_top_level() -> None:
 
 
 def test_platform_prefixes_are_gone() -> None:
-    """win_x / mac_x became x inside their own folder."""
+    """win_x / mac_x became x, and then stopped existing at all."""
     stray = [
         path.name
         for path in ICONS_DIR.rglob("*.svg")
@@ -66,12 +85,20 @@ def test_platform_prefixes_are_gone() -> None:
     assert stray == []
 
 
-def test_every_platform_icon_has_a_common_fallback() -> None:
-    """A platform with no folder of its own must still get every icon."""
-    common = {path.name for path in (ICONS_DIR / "common").glob("*.svg")}
-    for folder in ("win11", "macOs"):
-        for path in (ICONS_DIR / folder).glob("*.svg"):
-            assert path.name in common, f"{folder}/{path.name} has no common fallback"
+def test_every_shipped_icon_lives_in_common() -> None:
+    """One folder, so there is one answer to "where is this icon?".
+
+    The check this replaces was that every platform icon also existed in
+    common - the invariant that made deleting the platform folders safe, and
+    which has nothing left to guard now that they are gone.
+    """
+    outside = [
+        str(path.relative_to(ICONS_DIR))
+        for path in ICONS_DIR.rglob("*.svg")
+        if path.parent != ICONS_DIR / "common"
+    ]
+
+    assert outside == []
 
 
 # ----------------------------------------------------------------------
@@ -170,21 +197,20 @@ def test_a_name_resolves_to_a_file(monkeypatch: pytest.MonkeyPatch) -> None:
     assert style.get_icon_file_name("clear") == "common/clear.svg"
 
 
-def test_the_platform_folder_wins(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(style.platform, "system", lambda: "Windows")
-    assert style.get_icon_file_name("new") == "win11/new.svg"
-
-    monkeypatch.setattr(style.platform, "system", lambda: "Darwin")
-    assert style.get_icon_file_name("new") == "macOs/new.svg"
-
-
-def test_common_is_used_when_the_platform_has_no_variant(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize("system", ["Windows", "Darwin", "Linux"])
+def test_every_platform_resolves_to_the_same_file(
+    system: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(style.platform, "system", lambda: "Darwin")
-    # There is no macOs/clear.svg; the shared one is correct. (It used to be
-    # clustering, which stopped existing when the operations began carrying
-    # their artwork on the class instead of in this folder.)
+    """The lookup no longer depends on which machine is asking.
+
+    It used to: a platform folder was searched first, so the same name gave
+    win11/new.svg, macOs/new.svg or common/new.svg. The three drawings have
+    been replaced by three real icon sets that answer earlier in the chain,
+    and one shared drawing is what is left underneath them.
+    """
+    monkeypatch.setattr(style.platform, "system", lambda: system)
+
+    assert style.get_icon_file_name("new") == "common/new.svg"
     assert style.get_icon_file_name("clear") == "common/clear.svg"
 
 
