@@ -34,7 +34,17 @@ LOCALES_DIR: Path = Path(__file__).resolve().parent.parent / "locales"
 DOMAIN: str = "datahub"
 DEFAULT_LANGUAGE: str = "en"
 
-# Set through set_language(); read on every lookup.
+#: Stored in config.json to mean "whatever this machine is set to".  A
+#: sentinel rather than an empty string, because empty already means "the key
+#: was never written" everywhere else in the config, and the two want
+#: different answers: an unset key is a fresh install, which should follow the
+#: platform, while "auto" is a choice the user made and can be shown back to
+#: them in the combo as the choice they made.
+AUTO_LANGUAGE: str = "auto"
+
+# Set through set_language(); read on every lookup.  Always a real language
+# code - AUTO_LANGUAGE is resolved on the way in, never stored here, so that
+# every lookup is a dictionary hit rather than a locale query.
 _language: str = DEFAULT_LANGUAGE
 
 
@@ -196,18 +206,68 @@ def available_languages() -> list[str]:
 
 
 def language() -> str:
-    """Return the active language code."""
+    """Return the active language code.
+
+    Always a real code: ``set_language(AUTO_LANGUAGE)`` resolves before it
+    stores, so a caller that wants to know what is *shown* asks here and one
+    that wants to know what was *chosen* reads config.json.
+    """
     return _language
 
 
-def set_language(code: str) -> str:
-    """Set the active language and return what was actually selected.
+def platform_language() -> str:
+    """Return the language this machine is set to, as a bare code.
 
-    An unknown code is refused rather than silently accepted, so a typo in
+    Qt is asked rather than the standard library: ``locale.getlocale`` reports
+    the C locale until someone calls ``setlocale``, and the ``LANG``
+    environment variable it falls back to is a Unix convention that Windows
+    and macOS do not follow - which is where an "Auto" that reads the
+    environment would quietly always mean English.  ``QLocale.system()`` reads
+    the real user setting on all three, and needs no QApplication.
+
+    Only the language half is kept: the catalogues are named ``it``, not
+    ``it_IT``, and a regional variant should still find the language's
+    catalogue.  A machine set to something nothing is translated into falls
+    back to English, which is what the untranslated source strings are.
+    """
+    try:
+        from PySide6.QtCore import QLocale
+
+        name = str(QLocale.system().name() or "")
+    except Exception:  # pragma: no cover - depends on the Qt build
+        applogger.warning(
+            "Could not read the platform locale; using %s.",
+            DEFAULT_LANGUAGE,
+            show_dialog=False,
+            raise_error=False,
+        )
+        return DEFAULT_LANGUAGE
+
+    code = name.split("_", 1)[0].split("-", 1)[0].strip().lower()
+    if code and code in available_languages():
+        return code
+
+    applogger.info(
+        "Platform locale %r has no catalogue; using %s.", name, DEFAULT_LANGUAGE
+    )
+    return DEFAULT_LANGUAGE
+
+
+def set_language(code: str) -> str:
+    """Set the active language and return the code actually selected.
+
+    ``AUTO_LANGUAGE`` - and an empty value, which is a config.json that has
+    never been written - resolve through :func:`platform_language`.  An
+    unknown code is refused rather than silently accepted, so a typo in
     config.json shows up in the log instead of as an untranslated interface.
     """
     global _language
-    clean = str(code or "").strip() or DEFAULT_LANGUAGE
+    clean = str(code or "").strip().lower()
+    if clean in ("", AUTO_LANGUAGE):
+        _language = platform_language()
+        applogger.info("Language set to follow the platform: %s", _language)
+        return _language
+
     if clean != DEFAULT_LANGUAGE and clean not in available_languages():
         applogger.warning(
             "No catalogue for '%s'; keeping %s.",

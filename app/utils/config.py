@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from app.logs.logger import applogger
+from app.utils.i18n import AUTO_LANGUAGE
 
 
 def _repo_root() -> Path:
@@ -153,8 +154,18 @@ def set_last_database(db_path: Path) -> None:
 
 
 def get_language() -> str:
-    """Return the configured UI language code."""
-    return str(get_value("language", "en") or "en")
+    """Return the configured UI language *setting*, which may be "auto".
+
+    Returned as stored, not resolved: ``i18n.set_language`` turns "auto" into
+    the platform's language, and the Settings dialog needs the raw value to
+    show Auto back as the choice that was made rather than as the language it
+    happened to resolve to.
+
+    A config.json with no language key means a fresh installation, and a fresh
+    installation should speak the language the machine is set to rather than
+    English - so the fallback is "auto" and not a code.
+    """
+    return str(get_value("language", AUTO_LANGUAGE) or AUTO_LANGUAGE)
 
 
 def get_import_data_dialog_config() -> dict[str, Any]:

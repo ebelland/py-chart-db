@@ -12,10 +12,70 @@ P0-6  style pickers: an "auto" option that defers to rcParams
      .mplstyle actually governs the look of a new series.
 
 P0-10 global: locale must follow the platform locale. Add Auto to settings
+      [DONE: i18n.AUTO_LANGUAGE is the stored sentinel and
+      i18n.platform_language() resolves it through QLocale.system() - not
+      locale.getlocale(), which reports the C locale until someone calls
+      setlocale, and not $LANG, which is a Unix convention Windows and macOS
+      do not follow. Only the language half of it_CH is kept, so a regional
+      variant finds its catalogue. Settings lists Auto first, labelled with
+      the language it currently resolves to, and stores the sentinel rather
+      than the resolved code so a machine that changes its locale follows it.
+      config.get_language() now defaults to auto for a config.json with no
+      language key, which is what a fresh installation has.]
 
 ================================================================
 NEW - requested after the review
 ================================================================
+
+N-12  Six reported bugs, and the Table renderer's roles [DONE]
+      Axis properties had no Z anything. The manual range, the scale and the
+      direction are now per axis for x, y AND z (axis_options.LIMIT_AXES,
+      separate from AXES, which stays 2D because it drives the grid and tick
+      controls). A 2D axes has no set_zlim, so the renderer skips what it
+      cannot set and keeps the value: switching the projection to 3d later
+      finds the range still there. The limit modes are relabelled - "Manual
+      (all axes)" - and z is manual in every mode but Automatic, because a
+      mode per combination of three axes is eight entries in a combo and buys
+      nothing over an empty box already meaning "leave this end alone".
+
+      Query builder: New query asked for a name, and asked whether to replace
+      an existing query of that name, before there was any statement to store
+      - and then Save could still refuse it. New query now makes an empty
+      draft and asks nothing; the name is asked for once, at Save, after the
+      statement validates. Nothing was ever written early (new_query returns
+      an unstored descriptor), so this is about the order of the questions,
+      not about stray rows.
+
+      Optimize Database showed its findings as extra lines of the message
+      box's main text, cut off at twenty. Now: the problems inline, the whole
+      grouped report - unreferenced tables included - behind Show Details,
+      where it scrolls and can be copied, and nothing truncated.
+      show_message grew a details= parameter for it, and both it and ask()
+      now set Qt.PlainText: AutoText guesses at rich text, and one table
+      named <old> would have collapsed every newline in a report to a space.
+
+      Import dialog: pasting after opening a file put the file's rows back
+      under the clipboard's table name. The paste handler's last line called
+      _refresh_preview, which read self.file_name and nothing else. The
+      preview now dispatches on the source mode, pasting clears the file
+      source, and the clipboard text is kept - so header, delimiter and the
+      skip counts re-apply to pasted data, which they never did.
+
+      Startup no longer offers to build the demo set on a first run and then
+      fall back to an open dialog with nothing in it to open. It creates (or
+      reopens) "Data Hub.dhub" in the home directory and says nothing. The
+      demo is still File, Create demo. startup.offer_demo/demo_failed are
+      gone from the catalogue; startup.default_database_failed replaces them
+      for the one case a file cannot solve, an unwritable home.
+
+      Table renderer: the chart picker's role panel said "No renderer roles
+      declared." It now declares column_1..column_8 as optional slots. The
+      headers stay the source columns' own names, which is why SeriesData
+      carries the series' role map - the SQL aliases region AS column_1, so
+      the frame no longer knows what the column was called. Mapping none of
+      them still draws every column, which is what SELECT * produces and what
+      every Table figure already saved carries.
+
 
 N-4   Gridded-data renderers
       [CONTOUR half is DONE: app/charts/contour.py. ContourAxisRenderer

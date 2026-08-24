@@ -49,6 +49,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox, QWidget
 
 from app.logs.logger import applogger
@@ -256,12 +257,26 @@ def show_message(
     message_id: str,
     *,
     title: str | None = None,
+    details: str | None = None,
     **fields: Any,
 ) -> None:
     """Show one catalogued message.
 
     ``title`` overrides the catalogue for the dialogs that name themselves at
     runtime (a series operation titles its boxes after the operation).
+
+    ``details`` is for findings rather than prose - the list of problems a
+    database check turned up, say.  It goes behind Show Details, which is
+    Qt's own scrollable, selectable, copy-and-pasteable pane: a list of
+    twenty is unreadable as twenty more lines in the box, and a list of two
+    hundred makes the box taller than the screen.  The catalogue text still
+    says what happened; this says what exactly.
+
+    Both are shown as plain text.  Qt's default is AutoText, which guesses
+    at rich text and, having guessed, treats every newline as a space - so
+    one table called ``<old>`` would collapse a whole report onto one line.
+    Nothing in the catalogue is written as HTML, so there is nothing to lose
+    by saying so.
     """
     spec = message(message_id)
     catalog_title, text = spec.translated(**fields)
@@ -269,7 +284,10 @@ def show_message(
     box = QMessageBox(parent)
     box.setIcon(_ICONS.get(spec.level, QMessageBox.Icon.Information))
     box.setWindowTitle(title or catalog_title)
+    box.setTextFormat(Qt.TextFormat.PlainText)
     box.setText(text)
+    if details and details.strip():
+        box.setDetailedText(details)
     box.exec()
 
 
@@ -293,6 +311,7 @@ def ask(
     box = QMessageBox(parent)
     box.setIcon(_ICONS.get(spec.level, QMessageBox.Icon.Question))
     box.setWindowTitle(title or catalog_title)
+    box.setTextFormat(Qt.TextFormat.PlainText)
     box.setText(text)
     box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
     box.setDefaultButton(

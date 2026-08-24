@@ -1,10 +1,16 @@
 """The query builder: starting a query, and building one from a field.
 
-The dialog was rewritten around two ideas - a query is *named first* and
-saved later, and the SQL buttons act on the table and field chosen beside
-them rather than pasting a skeleton at the cursor. Both are easy to break in
-ways nothing else notices: a draft that gets written to the database before it
-runs leaves rows no chart can read, and a clause command that appends instead
+Two ideas, both easy to break in ways nothing else notices.
+
+New query makes an empty draft and asks nothing. Naming it up front - which
+is what it used to do - put two decisions about *storing* something in front
+of the user before there was anything to store, including "replace the
+existing query of that name?" about a statement that had not been written
+yet, let alone run. The name is asked for once, at Save, after the statement
+validates; a draft that never validates is never named and never written.
+
+And the SQL buttons act on the table and field chosen beside them rather
+than pasting a skeleton at the cursor: a clause command that appends instead
 of replacing produces a statement with two WHERE clauses that SQLite refuses.
 """
 from __future__ import annotations
@@ -76,57 +82,170 @@ def dialog(qapp, repo: SqliteRepo, monkeypatch: pytest.MonkeyPatch) -> QueryBuil
     return built
 
 
-def _new_query(dialog: QueryBuilderDialog, name: str, monkeypatch) -> None:
-    """Press New and answer its name prompt with *name*."""
+def _prompts(monkeypatch, answer: str, *, accepted: bool = True) -> list[str]:
+    """Answer the save-time name prompt, recording what it was prefilled with."""
     from PySide6.QtWidgets import QInputDialog
 
+    seen: list[str] = []
+
+    def fake(_parent, _title, _label, text="", **_kwargs):
+        seen.append(text)
+        return answer, accepted
+
+    monkeypatch.setattr(QInputDialog, "getText", staticmethod(fake))
+    return seen
+
+
+def _save_as(dialog: QueryBuilderDialog, name: str, monkeypatch) -> bool:
+    """Press Save and answer the name prompt with *name*."""
+    _prompts(monkeypatch, name)
+    return dialog.save()
+
+
+def _silence_boxes(monkeypatch) -> list[str]:
+    """Swallow the message boxes save() shows, recording their ids."""
+    import app.dialogs.query_builder_dialog as module
+
+    shown: list[str] = []
     monkeypatch.setattr(
-        QInputDialog, "getText", staticmethod(lambda *_a, **_k: (name, True))
+        module, "show_message", lambda _p, message_id, **_k: shown.append(message_id)
     )
-    dialog._new_query()
+    monkeypatch.setattr(module, "ask", lambda _p, _message_id, **_k: True)
+    return shown
 
 
 # ----------------------------------------------------------------------
 # Starting a query
 # ----------------------------------------------------------------------
-def test_a_new_query_is_named_but_not_yet_stored(dialog, repo, monkeypatch) -> None:
-    """A query earns its row by running. save_query refuses empty SQL and the
-    builder refuses a statement that fails validation, so a row written here
-    would be one no chart could read."""
-    _new_query(dialog, "daily", monkeypatch)
+def test_new_query_makes_an_empty_draft_and_asks_nothing(
+    dialog, repo, monkeypatch
+) -> None:
+    """The whole point of the rework: no name prompt, and no row."""
+    seen = _prompts(monkeypatch, "never asked")
+    before = {saved.name for saved in repo.list_queries()}
 
-    assert dialog.current_name == "daily"
-    assert repo.get_query("daily") is None
-    assert dialog.sql == ""
-
-
-def test_cancelling_the_name_prompt_changes_nothing(dialog, repo, monkeypatch) -> None:
-    from PySide6.QtWidgets import QInputDialog
-
-    dialog._editor.setPlainText("SELECT 1 AS a")
-    monkeypatch.setattr(
-        QInputDialog, "getText", staticmethod(lambda *_a, **_k: ("", False))
-    )
     dialog._new_query()
 
-    assert dialog.sql == "SELECT 1 AS a"
+    assert seen == [], "New query must not ask for a name"
+    assert dialog.sql == ""
+    assert {saved.name for saved in repo.list_queries()} == before
 
 
-def test_a_named_draft_is_stored_on_save(dialog, repo, monkeypatch) -> None:
-    _new_query(dialog, "daily", monkeypatch)
+def test_a_draft_carries_a_free_name_to_suggest_later(dialog, repo) -> None:
+    """Named by the repository, so the suggestion cannot clash on arrival."""
+    dialog._new_query()
+
+    assert dialog.current_name
+    assert repo.get_query(dialog.current_name) is None
+
+
+def test_an_invalid_draft_is_never_named_and_never_stored(
+    dialog, repo, monkeypatch
+) -> None:
+    """A query earns its row by running. Asking for a name and then refusing
+    to save under it is the flow this replaced."""
+    shown = _silence_boxes(monkeypatch)
+    seen = _prompts(monkeypatch, "daily")
+    dialog._new_query()
+    dialog._editor.setPlainText("SELECT * FROM no_such_table")
+
+    assert dialog.save() is False
+    assert seen == [], "nothing to name: the statement does not run"
+    assert shown == ["query.invalid"]
+    assert repo.get_query("daily") is None
+
+
+def test_a_valid_draft_is_named_once_and_stored(dialog, repo, monkeypatch) -> None:
+    _silence_boxes(monkeypatch)
+    dialog._new_query()
     dialog._apply_command("select")
 
-    assert dialog.save() is True
+    assert _save_as(dialog, "daily", monkeypatch) is True
     saved = repo.get_query("daily")
     assert saved is not None and "batch_yields" in saved.sql
 
 
-def test_the_suggested_name_skips_the_one_just_saved(dialog, repo, monkeypatch) -> None:
-    _new_query(dialog, "Query 1", monkeypatch)
+def test_the_prompt_offers_the_draft_name_it_already_has(
+    dialog, repo, monkeypatch
+) -> None:
+    _silence_boxes(monkeypatch)
+    dialog._new_query()
+    suggested = dialog.current_name
     dialog._apply_command("select")
+    seen = _prompts(monkeypatch, "daily")
+
     dialog.save()
 
+    assert seen == [suggested]
+
+
+def test_saving_again_does_not_ask_a_second_time(dialog, repo, monkeypatch) -> None:
+    """Apply is pressed repeatedly while a query is being worked on."""
+    _silence_boxes(monkeypatch)
+    dialog._new_query()
+    dialog._apply_command("select")
+    _save_as(dialog, "daily", monkeypatch)
+
+    seen = _prompts(monkeypatch, "should not be used")
+    dialog._editor.setPlainText("SELECT batch FROM batch_yields")
+
+    assert dialog.save() is True
+    assert seen == []
+    saved = repo.get_query("daily")
+    assert saved is not None and saved.sql == "SELECT batch FROM batch_yields"
+
+
+def test_cancelling_the_name_prompt_stores_nothing_and_keeps_the_sql(
+    dialog, repo, monkeypatch
+) -> None:
+    _silence_boxes(monkeypatch)
+    dialog._new_query()
+    dialog._editor.setPlainText("SELECT 1 AS a")
+    _prompts(monkeypatch, "", accepted=False)
+
+    assert dialog.save() is False
+    assert dialog.sql == "SELECT 1 AS a"
+    assert repo.list_queries() == []
+
+
+def test_a_name_a_table_already_owns_is_refused_at_save(
+    dialog, repo, monkeypatch
+) -> None:
+    """A saved query named after a table can never be selected back: the
+    table always wins when the name is resolved."""
+    shown = _silence_boxes(monkeypatch)
+    dialog._new_query()
+    dialog._apply_command("select")
+
+    assert _save_as(dialog, "batch_yields", monkeypatch) is False
+    assert shown == ["query.name_is_a_table"]
+    assert repo.get_query("batch_yields") is None
+
+
+def test_the_suggested_name_skips_the_one_just_saved(dialog, repo, monkeypatch) -> None:
+    _silence_boxes(monkeypatch)
+    dialog._new_query()
+    dialog._apply_command("select")
+    _save_as(dialog, "Query 1", monkeypatch)
+
     assert repo.next_query_name() == "Query 2"
+
+
+def test_loading_a_saved_query_never_re_asks_for_its_name(
+    dialog, repo, monkeypatch
+) -> None:
+    """Its name is already the user's; Apply should just write."""
+    _silence_boxes(monkeypatch)
+    repo.save_query("existing", "SELECT batch FROM batch_yields")
+    dialog.load_query("existing")
+
+    seen = _prompts(monkeypatch, "should not be used")
+    dialog._editor.setPlainText("SELECT yield_pct FROM batch_yields")
+
+    assert dialog.save() is True
+    assert seen == []
+    saved = repo.get_query("existing")
+    assert saved is not None and saved.sql == "SELECT yield_pct FROM batch_yields"
 
 
 # ----------------------------------------------------------------------

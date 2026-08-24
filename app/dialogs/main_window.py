@@ -85,6 +85,13 @@ class MainWindow(QMainWindow):
     uses zero minimum sizes and a scrollable properties page.
     """
 
+    #: How many database-check problems the message box lists inline before
+    #: it stops and points at Show Details, which holds all of them.  Enough
+    #: that the usual report is complete on sight, few enough that a database
+    #: with hundreds of dangling references does not make a box taller than
+    #: the screen.
+    MAX_PROBLEMS_SHOWN: int = 20
+
     def __init__(self, repo: SqliteRepo, db_path: Path) -> None:
         super().__init__()
         self._repo = repo
@@ -1404,23 +1411,35 @@ class MainWindow(QMainWindow):
    
 
     def _on_optimize_db(self) -> None:
-        """Check the database, report what it found, then compact it."""
+        """Check the database, report what it found, then compact it.
+
+        The findings go in the box twice on purpose: the problems inline, so
+        that what is wrong is readable without clicking anything, and the whole
+        grouped report - unreferenced tables included - behind Show Details,
+        where it scrolls and can be copied into a bug report.  The status bar
+        keeps the count, which is all it has room for.
+        """
         report = self._repo.optimize_db()
         self.statusBar().showMessage(report.summary(), 10_000)
 
         if report.is_healthy:
             return
 
+        shown = report.problems[: self.MAX_PROBLEMS_SHOWN]
+        lines = [report.summary(), "", *shown]
+        remaining = len(report.problems) - len(shown)
+        if remaining > 0:
+            lines.append(
+                _("...and {count} more, under Show Details.").format(count=remaining)
+            )
+
         show_message(
             self,
             "database.check_found_problems",
-            report=(
-                report.summary()
-                + "\n\n"
-                + "\n".join(report.problems[:20])
-                + ("\n..." if len(report.problems) > 20 else "")
-            ),
+            report="\n".join(lines),
+            details=report.details(),
         )
+
     def _on_credits(self) -> None:
         """Show who made this and what it is made of."""
         CreditsDialog(parent=self).exec()

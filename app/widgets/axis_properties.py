@@ -355,7 +355,8 @@ class AxisPropertiesWidget(QWidget):
 
         self._x_scale_combo = QComboBox(section)
         self._y_scale_combo = QComboBox(section)
-        for combo in (self._x_scale_combo, self._y_scale_combo):
+        self._z_scale_combo = QComboBox(section)
+        for combo in (self._x_scale_combo, self._y_scale_combo, self._z_scale_combo):
             self._configure_combo_width(combo, minimum_contents_length=12)
             for scale in AXIS_SCALES:
                 combo.addItem(scale, scale)
@@ -363,7 +364,12 @@ class AxisPropertiesWidget(QWidget):
 
         self._x_scale_base_spin = QDoubleSpinBox(section)
         self._y_scale_base_spin = QDoubleSpinBox(section)
-        for spin in (self._x_scale_base_spin, self._y_scale_base_spin):
+        self._z_scale_base_spin = QDoubleSpinBox(section)
+        for spin in (
+            self._x_scale_base_spin,
+            self._y_scale_base_spin,
+            self._z_scale_base_spin,
+        ):
             stdSizeAndlayout(spin)
             spin.setRange(1.1, 1000.0)
             spin.setDecimals(2)
@@ -381,17 +387,25 @@ class AxisPropertiesWidget(QWidget):
 
         self._invert_x_check = QCheckBox(_("Invert X"), section)
         self._invert_y_check = QCheckBox(_("Invert Y"), section)
+        self._invert_z_check = QCheckBox(_("Invert Z"), section)
         invert_row = QWidget(section)
         invert_layout = QHBoxLayout(invert_row)
         stdSizeAndlayout(invert_layout)
         invert_layout.addWidget(self._invert_x_check)
         invert_layout.addWidget(self._invert_y_check)
+        invert_layout.addWidget(self._invert_z_check)
         invert_layout.addStretch(1)
 
         form.addRow(_("X scale"), self._x_scale_combo)
         form.addRow(_("X log base"), self._x_scale_base_spin)
         form.addRow(_("Y scale"), self._y_scale_combo)
         form.addRow(_("Y log base"), self._y_scale_base_spin)
+        # z alongside x and y rather than in a section of its own: it is the
+        # same three settings, and a 3D axis is not a different kind of axis.
+        # The renderer skips what a 2D axes has no setter for, so these are
+        # live on every chart type and matter on the ones with a z.
+        form.addRow(_("Z scale"), self._z_scale_combo)
+        form.addRow(_("Z log base"), self._z_scale_base_spin)
         form.addRow(_("Symlog threshold"), self._linthresh_spin)
         form.addRow(_("Direction"), invert_row)
 
@@ -458,7 +472,7 @@ class AxisPropertiesWidget(QWidget):
 
         self._limit_spins: dict[tuple[str, str], QDoubleSpinBox] = {}
         limit_rows: dict[str, QWidget] = {}
-        for axis in axis_options.AXES:
+        for axis in axis_options.LIMIT_AXES:
             row = QWidget(section)
             row_layout = QHBoxLayout(row)
             stdSizeAndlayout(row_layout)
@@ -481,6 +495,7 @@ class AxisPropertiesWidget(QWidget):
         form.addRow(_("Limits"), self._limits_mode_combo)
         form.addRow(_("X range"), limit_rows["x"])
         form.addRow(_("Y range"), limit_rows["y"])
+        form.addRow(_("Z range"), limit_rows["z"])
         self._update_limit_control_state()
         return form
 
@@ -535,12 +550,25 @@ class AxisPropertiesWidget(QWidget):
 
     def _update_scale_control_state(self) -> None:
         """Enable only the scale parameters the selected scales actually use."""
-        x_scale = str(self._x_scale_combo.currentData() or "linear")
-        y_scale = str(self._y_scale_combo.currentData() or "linear")
+        x_scale, y_scale, z_scale = self._selected_scales()
 
         self._x_scale_base_spin.setEnabled(x_scale in {"log", "symlog"})
         self._y_scale_base_spin.setEnabled(y_scale in {"log", "symlog"})
-        self._linthresh_spin.setEnabled("symlog" in {x_scale, y_scale})
+        self._z_scale_base_spin.setEnabled(z_scale in {"log", "symlog"})
+        self._linthresh_spin.setEnabled(
+            "symlog" in {x_scale, y_scale, z_scale}
+        )
+
+    def _selected_scales(self) -> tuple[str, str, str]:
+        """Return the chosen x, y and z scales, defaulting to linear."""
+        return tuple(  # type: ignore[return-value]
+            str(combo.currentData() or "linear")
+            for combo in (
+                self._x_scale_combo,
+                self._y_scale_combo,
+                self._z_scale_combo,
+            )
+        )
 
     # ------------------------------------------------------------------
     # Scale / tick / grid / spine options
@@ -552,11 +580,14 @@ class AxisPropertiesWidget(QWidget):
             self._col_span_spin,
             self._x_scale_combo,
             self._y_scale_combo,
+            self._z_scale_combo,
             self._x_scale_base_spin,
             self._y_scale_base_spin,
+            self._z_scale_base_spin,
             self._linthresh_spin,
             self._invert_x_check,
             self._invert_y_check,
+            self._invert_z_check,
             self._tick_length_spin,
             self._x_tick_rotation_spin,
             self._hide_spine_top_check,
@@ -599,12 +630,15 @@ class AxisPropertiesWidget(QWidget):
         self._col_span_spin.setValue(self._int_option(options, "col_span", 1))
         self._select_combo_value(self._x_scale_combo, options.get("x_scale"), "linear")
         self._select_combo_value(self._y_scale_combo, options.get("y_scale"), "linear")
+        self._select_combo_value(self._z_scale_combo, options.get("z_scale"), "linear")
         self._x_scale_base_spin.setValue(self._float_option(options, "x_scale_base", 10.0))
         self._y_scale_base_spin.setValue(self._float_option(options, "y_scale_base", 10.0))
+        self._z_scale_base_spin.setValue(self._float_option(options, "z_scale_base", 10.0))
         self._linthresh_spin.setValue(self._float_option(options, "x_linthresh", 1.0))
 
         self._invert_x_check.setChecked(bool(options.get("invert_x", False)))
         self._invert_y_check.setChecked(bool(options.get("invert_y", False)))
+        self._invert_z_check.setChecked(bool(options.get("invert_z", False)))
 
         # Through axis_options so a figure saved before these existed opens
         # with the settings it actually had, rather than with four Autos.
@@ -656,8 +690,7 @@ class AxisPropertiesWidget(QWidget):
         control is disabled, so that "not configured" stays distinguishable from
         "configured to zero" once the payload reaches the renderer.
         """
-        x_scale = str(self._x_scale_combo.currentData() or "linear")
-        y_scale = str(self._y_scale_combo.currentData() or "linear")
+        x_scale, y_scale, z_scale = self._selected_scales()
         tick_length = float(self._tick_length_spin.value())
 
         payload: dict[str, Any] = {
@@ -665,6 +698,7 @@ class AxisPropertiesWidget(QWidget):
             "col_span": int(self._col_span_spin.value()),
             "x_scale": x_scale,
             "y_scale": y_scale,
+            "z_scale": z_scale,
             "x_scale_base": (
                 float(self._x_scale_base_spin.value())
                 if x_scale in {"log", "symlog"}
@@ -675,17 +709,27 @@ class AxisPropertiesWidget(QWidget):
                 if y_scale in {"log", "symlog"}
                 else None
             ),
+            "z_scale_base": (
+                float(self._z_scale_base_spin.value())
+                if z_scale in {"log", "symlog"}
+                else None
+            ),
             "x_linthresh": (
                 float(self._linthresh_spin.value())
-                if "symlog" in {x_scale, y_scale}
+                if "symlog" in {x_scale, y_scale, z_scale}
                 else None
             ),
             "invert_x": bool(self._invert_x_check.isChecked()),
             "invert_y": bool(self._invert_y_check.isChecked()),
+            "invert_z": bool(self._invert_z_check.isChecked()),
             "tick_length": tick_length if tick_length > 0.0 else None,
             "x_tick_rotation": float(self._x_tick_rotation_spin.value()),
         }
+        # One threshold control for all three: symlog's linear region is a
+        # property of the data's units, and an axis whose scale is not symlog
+        # ignores the key entirely.
         payload["y_linthresh"] = payload["x_linthresh"]
+        payload["z_linthresh"] = payload["x_linthresh"]
 
         for (axis, which), combo in self._grid_combos.items():
             payload[axis_options.grid_key(axis, which)] = str(

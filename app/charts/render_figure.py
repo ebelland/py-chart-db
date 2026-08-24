@@ -390,11 +390,13 @@ def _build_series_data_list(
             continue
 
         df = _load_series_df(repo=repo, series_desc=series_desc)
+        roles = series_desc.roles if isinstance(series_desc.roles, dict) else {}
         output.append(
             SeriesData(
                 name=str(series_desc.name or ""),
                 df=df,
                 style=style,
+                roles=dict(roles),
             )
         )
 
@@ -521,8 +523,16 @@ GRID_WHICH: tuple[str, ...] = ("major", "minor", "both")
 
 
 def _apply_scales(ax: Any, options: dict[str, Any]) -> None:
-    """Apply per-axis scale, with a log base where the scale accepts one."""
-    for axis_name, setter_name in (("x", "set_xscale"), ("y", "set_yscale")):
+    """Apply per-axis scale, with a log base where the scale accepts one.
+
+    z is included and costs nothing on a 2D axes: ``set_zscale`` is not there
+    to be found, and the getattr below already skips a setter that is missing.
+    """
+    for axis_name, setter_name in (
+        ("x", "set_xscale"),
+        ("y", "set_yscale"),
+        ("z", "set_zscale"),
+    ):
         raw = options.get(f"{axis_name}_scale", "linear")
         scale = str(raw or "linear").strip().lower()
         if scale == "linear":
@@ -567,8 +577,17 @@ def _apply_inversion(ax: Any, options: dict[str, Any]) -> None:
 
     Uses the absolute ``set_inverted`` rather than ``invert_xaxis``: the latter
     toggles, so re-rendering an already inverted axis would flip it back.
+
+    ``zaxis`` is looked up rather than named, because a 2D axes has none - and
+    "invert z" on a scatter plot has to be a setting that does nothing, not
+    one that raises.
     """
-    for axis_name, axis_object in (("x", ax.xaxis), ("y", ax.yaxis)):
+    axes_objects = [("x", ax.xaxis), ("y", ax.yaxis)]
+    z_axis = getattr(ax, "zaxis", None)
+    if z_axis is not None:
+        axes_objects.append(("z", z_axis))
+
+    for axis_name, axis_object in axes_objects:
         wanted = bool(options.get(f"invert_{axis_name}", False))
         try:
             if bool(axis_object.get_inverted()) != wanted:
@@ -737,7 +756,13 @@ def _apply_limits(ax: Any, options: dict[str, Any]) -> None:
         except (TypeError, ValueError):
             applogger.warning("Invalid ylim: %r", ylim)
 
-    for axis in axis_options.AXES:
+    for axis in axis_options.LIMIT_AXES:
+        setter = getattr(ax, f"set_{axis}lim", None)
+        if setter is None:
+            # A 2D axes and a z limit: stored, ignored, and kept - switching
+            # the projection to 3d later must find the range still there.
+            continue
+
         if axis_options.is_automatic(options, axis):
             continue
 
@@ -764,7 +789,6 @@ def _apply_limits(ax: Any, options: dict[str, Any]) -> None:
                 )
                 low, high = high, low
 
-        setter = ax.set_xlim if axis == "x" else ax.set_ylim
         try:
             setter(low, high)
         except Exception:

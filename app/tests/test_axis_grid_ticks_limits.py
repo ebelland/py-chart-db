@@ -264,23 +264,106 @@ def test_two_identical_ends_are_ignored_rather_than_collapsing_the_axis() -> Non
 @pytest.mark.parametrize(
     "mode, automatic",
     [
-        (axis_options.LIMITS_AUTO, {"x", "y"}),
+        (axis_options.LIMITS_AUTO, {"x", "y", "z"}),
         (axis_options.LIMITS_AUTO_X, {"x"}),
         (axis_options.LIMITS_AUTO_Y, {"y"}),
         (axis_options.LIMITS_MANUAL, set()),
     ],
 )
 def test_each_mode_says_which_axis_is_automatic(mode: str, automatic: set) -> None:
+    """z is manual in every mode but the first.
+
+    A mode per combination of three axes would be eight entries in a combo,
+    and it buys nothing: an unset end already means "leave this end alone", so
+    a manual z with empty boxes behaves exactly like an automatic one.
+    """
     options = {"limits_mode": mode}
 
     assert {
-        axis for axis in axis_options.AXES if axis_options.is_automatic(options, axis)
+        axis
+        for axis in axis_options.LIMIT_AXES
+        if axis_options.is_automatic(options, axis)
     } == automatic
 
 
 def test_an_unknown_mode_falls_back_to_automatic() -> None:
     """A figure naming a mode this build does not have still opens."""
     assert axis_options.limits_mode({"limits_mode": "sideways"}) == axis_options.LIMITS_AUTO
+
+
+# ----------------------------------------------------------------------
+# The third axis
+# ----------------------------------------------------------------------
+def _limited_3d(**options):
+    figure = Figure()
+    ax = figure.add_subplot(111, projection="3d")
+    ax.plot([0.0, 1.0, 2.0], [0.0, 1.0, 4.0], [0.0, 2.0, 4.0])
+    _apply_limits(ax, options)
+    return ax
+
+
+def test_a_manual_z_range_reaches_a_3d_axes() -> None:
+    """The setting that did not exist: a surface's depth range was the data's."""
+    ax = _limited_3d(
+        limits_mode=axis_options.LIMITS_MANUAL, z_min=-2.0, z_max=8.0
+    )
+
+    assert ax.get_zlim() == (-2.0, 8.0)
+
+
+def test_one_empty_end_of_z_stays_automatic() -> None:
+    ax = _limited_3d(limits_mode=axis_options.LIMITS_MANUAL, z_min=0.0)
+
+    low, high = ax.get_zlim()
+    assert low == 0.0
+    assert high > 4.0
+
+
+def test_a_z_limit_on_a_2d_axes_is_ignored_rather_than_raising() -> None:
+    """It has to be *kept*, not refused: the projection can change later, and
+    a range typed before that must still be there afterwards."""
+    figure = Figure()
+    ax = figure.add_subplot(111)
+    ax.plot([0.0, 1.0], [0.0, 1.0])
+
+    _apply_limits(ax, {"limits_mode": axis_options.LIMITS_MANUAL, "z_min": 1.0, "z_max": 2.0})
+
+    assert not hasattr(ax, "get_zlim")
+
+
+def test_z_scale_and_direction_apply_to_a_3d_axes() -> None:
+    from app.charts.render_figure import _apply_inversion, _apply_scales
+
+    figure = Figure()
+    ax = figure.add_subplot(111, projection="3d")
+    ax.plot([1.0, 2.0], [1.0, 2.0], [1.0, 100.0])
+
+    _apply_scales(ax, {"z_scale": "log"})
+    _apply_inversion(ax, {"invert_z": True})
+
+    assert ax.get_zscale() == "log"
+    assert bool(ax.zaxis.get_inverted()) is True
+
+
+def test_z_scale_and_direction_are_silent_on_a_2d_axes() -> None:
+    from app.charts.render_figure import _apply_inversion, _apply_scales
+
+    figure = Figure()
+    ax = figure.add_subplot(111)
+    ax.plot([1.0, 2.0], [1.0, 2.0])
+
+    _apply_scales(ax, {"z_scale": "log"})
+    _apply_inversion(ax, {"invert_z": True})
+
+    assert ax.get_xscale() == "linear"
+
+
+def test_the_defaults_carry_a_z_range() -> None:
+    """defaults() is the shape of the payload: a key it misses, nothing writes."""
+    payload = axis_options.defaults()
+
+    assert payload["z_min"] is None
+    assert payload["z_max"] is None
 
 
 # ----------------------------------------------------------------------
@@ -402,6 +485,44 @@ def test_an_untouched_limit_is_saved_as_unset(widget) -> None:
 
     assert payload["x_min"] is None
     assert payload["y_max"] is None
+
+
+def test_the_widget_offers_a_range_for_every_limit_axis(widget) -> None:
+    """Three rows, not two: z had no control at all before."""
+    expected = {
+        (axis, edge)
+        for axis in axis_options.LIMIT_AXES
+        for edge in ("min", "max")
+    }
+
+    assert set(widget._limit_spins) == expected
+
+
+def test_a_typed_z_range_survives_the_round_trip(widget) -> None:
+    widget._load_extended_axis_options(
+        {"limits_mode": axis_options.LIMITS_MANUAL, "z_min": -3.5, "z_max": 7.25}
+    )
+    payload = widget._extended_axis_options_payload()
+
+    assert (payload["z_min"], payload["z_max"]) == (-3.5, 7.25)
+
+
+def test_the_z_scale_and_direction_round_trip(widget) -> None:
+    widget._load_extended_axis_options(
+        {"z_scale": "log", "z_scale_base": 2.0, "invert_z": True}
+    )
+    payload = widget._extended_axis_options_payload()
+
+    assert payload["z_scale"] == "log"
+    assert payload["z_scale_base"] == 2.0
+    assert payload["invert_z"] is True
+
+
+def test_the_z_log_base_is_only_written_for_a_log_scale(widget) -> None:
+    """Same rule the x and y bases follow: not configured beats zero."""
+    widget._load_extended_axis_options({"z_scale": "linear", "z_scale_base": 2.0})
+
+    assert widget._extended_axis_options_payload()["z_scale_base"] is None
 
 
 def test_a_typed_limit_survives_the_round_trip(widget) -> None:

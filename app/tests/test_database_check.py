@@ -160,3 +160,67 @@ def test_check_runs_before_vacuum(repo: SqliteRepo) -> None:
 def test_report_logging_does_not_raise(repo: SqliteRepo) -> None:
     repo.query_df("DROP TABLE good_table")
     repo.check_database().log()  # must not raise
+
+
+# ----------------------------------------------------------------------
+# What the user is shown
+# ----------------------------------------------------------------------
+def test_the_details_name_every_finding_under_its_heading(repo: SqliteRepo) -> None:
+    """The summary counts; this is the half that says what they were.
+
+    The box used to carry the problems as extra lines of its main text, cut
+    off at twenty. Twenty of forty-seven is a report nobody can finish acting
+    on, and QMessageBox's AutoText guessing means a single angle bracket in a
+    table name collapses the newlines that separate them.
+    """
+    repo.query_df("DROP TABLE good_table")
+    report = repo.check_database()
+
+    details = report.details()
+    assert "Series reading a missing table:" in details
+    for problem in report.problems:
+        assert problem in details
+
+
+def test_nothing_is_truncated(repo: SqliteRepo) -> None:
+    for index in range(30):
+        repo.upsert_link(
+            table_name=f"gone_{index}",
+            source_path=f"/tmp/gone_{index}.csv",
+            settings={},
+        )
+    report = repo.check_database()
+
+    details = report.details()
+    assert len(report.problems) >= 30
+    for problem in report.problems:
+        assert problem in details
+
+
+def test_unreferenced_tables_are_listed_even_though_they_are_not_problems(
+    repo: SqliteRepo,
+) -> None:
+    """"3 unreferenced table(s)" with no way to see which three is a line
+    nobody can do anything with."""
+    repo.query_df("CREATE TABLE IF NOT EXISTS nobody_charts_this (a INTEGER)")
+    report = repo.check_database()
+
+    assert "nobody_charts_this" in report.details()
+    assert report.is_healthy, "an unreferenced table is information, not a problem"
+
+
+def test_a_healthy_database_has_nothing_to_detail(repo: SqliteRepo) -> None:
+    assert repo.check_database().details() == ""
+
+
+def test_every_finding_list_appears_in_the_sections_table() -> None:
+    """SECTIONS is what the detail pane walks: a check whose findings are not
+    listed there is a check whose findings are never shown."""
+    from dataclasses import fields
+
+    from app.data.sqlite_repo import DatabaseReport
+
+    listed = {attribute for attribute, _heading in DatabaseReport.SECTIONS}
+    declared = {field.name for field in fields(DatabaseReport)}
+
+    assert declared - listed == set()

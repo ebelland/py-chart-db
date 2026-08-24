@@ -577,15 +577,10 @@
       "title": "Delete",
       "text": "Delete {count} selected items?\n\n{sources}\n\nCharts built on a saved query will stop finding their data."
     },
-    "startup.demo_failed": {
+    "startup.default_database_failed": {
       "level": "error",
       "title": "Welcome",
-      "text": "Could not build the demo project:\n{error}"
-    },
-    "startup.offer_demo": {
-      "level": "question",
-      "title": "Welcome",
-      "text": "There is no database yet.\n\nBuild the demo project? It writes a small example project - tables, saved queries and ready-made charts - so there is something to take apart. You can create your own database at any time."
+      "text": "Could not create a database in your home folder:\n{error}\n\nPick one to open instead."
     },
     "style.apply_callback_failed": {
       "level": "warning",

@@ -1,11 +1,23 @@
 """Table renderer: a data table drawn on an axis instead of a plot.
 
 Matplotlib's own ``Axes.table`` - rows and columns of text, not marks on a
-scale, so there is no x/y role system here: the series' own columns become
-the table's columns, and its rows become the table's rows.  Only the first
-selected series is drawn; a table has nowhere to put a second one that would
-not either overlap it or replace it, so later series are logged and skipped
-rather than silently merged into something the query never asked for.
+scale, so there is nothing for an x/y role to mean here.  What the roles do
+mean is *which* columns, and in what order: ``column_1`` .. ``column_8`` are
+optional slots, so the chart picker offers the same column choosers every
+other renderer does instead of an empty panel saying no roles are declared.
+Map none of them and every column the query returns is drawn, which is what
+a table did before the slots existed and what ``SELECT *`` still produces.
+
+The headers stay the source columns' own names.  A role aliases its column in
+the SQL, so the DataFrame arrives carrying ``column_1`` where it once carried
+``region`` - and a table headed "column_1" would be a table nobody can read.
+The original names come back from the series' role map, which is why
+``SeriesData`` carries one.
+
+Only the first selected series is drawn; a table has nowhere to put a second
+one that would not either overlap it or replace it, so later series are
+logged and skipped rather than silently merged into something the query never
+asked for.
 """
 from __future__ import annotations
 
@@ -15,11 +27,18 @@ from app.charts.base import BaseAxisRenderer, SeriesData
 from app.logs.logger import applogger
 
 
+#: The column slots the picker offers.  Eight because a table wider than
+#: that is unreadable at figure size long before it runs out of slots, and a
+#: fixed list is what the role panel needs - it builds one chooser per name.
+COLUMN_ROLES: list[str] = [f"column_{index}" for index in range(1, 9)]
+
+
 class TableAxisRenderer(BaseAxisRenderer):
     """Renders one series' rows and columns as a table.
 
-    Role columns: none - every column the series query returns becomes a
-    table column, in the order the query names them.
+    Role columns: ``column_1`` .. ``column_8``, all optional.  Mapping some
+    of them draws those columns, in slot order; mapping none draws every
+    column the query returns, in the order the query names them.
     """
 
     Name: str = "Table"
@@ -28,7 +47,10 @@ class TableAxisRenderer(BaseAxisRenderer):
     Link: str = "https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.table.html"
 
     RequiredRoles: list[str] = []
-    OptionalRoles: list[str] = []
+    OptionalRoles: list[str] = [
+        "column_1", "column_2", "column_3", "column_4",
+        "column_5", "column_6", "column_7", "column_8",
+    ]
 
     Kwargs: dict[str, object] = {
         "loc": {
@@ -92,12 +114,49 @@ class TableAxisRenderer(BaseAxisRenderer):
 
         sd = valid_series[0]
         merged = self._merge_options(axis_options, sd.style or {})
-        self._draw_table(ax, sd.df, merged)
+        df, headers = self._columns_to_draw(sd)
+        if df.empty or not headers:
+            return
+        self._draw_table(ax, df, headers, merged)
         ax.axis("off")
         self.apply_annotations(ax, axis_options)
 
-    def _draw_table(self, ax: Any, df: Any, options: dict[str, Any]) -> None:
-        col_labels = [str(column) for column in df.columns]
+    def _columns_to_draw(self, sd: SeriesData) -> tuple[Any, list[str]]:
+        """Return the frame to draw and the header for each of its columns.
+
+        Two shapes arrive here.  A series whose roles were mapped in the chart
+        picker carries ``column_1``.. columns, in which case those are drawn in
+        slot order and headed with the source columns the roles name.  A series
+        with no roles mapped carries the query's own columns - ``SELECT *``, or
+        SQL written by hand - and every one of them is drawn under its own
+        name.
+
+        A slot naming a column the query no longer returns is skipped rather
+        than drawn empty: the SQL is the authority on what came back, and a
+        blank column headed with a name is a column that looks like missing
+        data instead of a mapping that has gone stale.
+        """
+        roles = sd.roles if isinstance(sd.roles, dict) else {}
+        selected = [
+            (role, str(roles.get(role) or role))
+            for role in COLUMN_ROLES
+            if role in sd.df.columns
+        ]
+        if not selected:
+            return sd.df, [str(column) for column in sd.df.columns]
+
+        return (
+            sd.df[[role for role, _header in selected]],
+            [header for _role, header in selected],
+        )
+
+    def _draw_table(
+        self,
+        ax: Any,
+        df: Any,
+        col_labels: list[str],
+        options: dict[str, Any],
+    ) -> None:
         cell_text = df.astype(str).to_numpy().tolist()
         row_labels = (
             [str(value) for value in df.index]

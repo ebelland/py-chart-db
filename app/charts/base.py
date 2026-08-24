@@ -10,7 +10,7 @@ the columns it needs and the series SQL is responsible for aliasing to them.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 import numpy as np
 import pandas as pd
@@ -19,9 +19,19 @@ from matplotlib import colormaps, rcParams
 
 @dataclass(slots=True)
 class SeriesData:
+    """One series as a renderer sees it: its name, its rows, and its styling.
+
+    ``roles`` is the series descriptor's own role map - role name to the
+    source column the SQL aliased to it.  The DataFrame carries the aliases,
+    so a renderer that needs the *original* column name (the Table renderer
+    labels its columns with them) has nowhere else to get it.  Defaulted, so
+    the many places that build a SeriesData with three arguments still do.
+    """
+
     name: str
     df: pd.DataFrame
     style: dict
+    roles: dict = field(default_factory=dict)
 
 
 # ----------------------------------------------------------------------

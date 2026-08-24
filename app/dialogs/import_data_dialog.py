@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
+from collections.abc import Callable
 from typing import Optional
 
 import pandas as pd
@@ -54,6 +55,12 @@ from app.utils.i18n import _
 # -----------------------------------------------------------------------------
 # Reading helpers
 # -----------------------------------------------------------------------------
+
+
+#: The default table name for pasted data, and the stand-in for a file path
+#: wherever one is expected.  Named once: it is both what the table is called
+#: and what _safe_table_name_from_filename has to recognise as "not a path".
+CLIPBOARD_SOURCE_NAME: str = "from_clipboard"
 
 
 def sniff_delimiter(sample: str) -> str:
@@ -315,8 +322,13 @@ class ImportDataDialog(QDialog):
         self.result: Optional[ImportResult] = None
         self._df: Optional[pd.DataFrame] = None
 
-        # Source mode: controls auto-preview. Auto preview is enabled only after Browse.
+        # Which of the two sources the preview and the import read from.
+        # Every path that sets one must clear the other, or the dialog shows
+        # one source's data under the other's name - which is exactly what
+        # pasting after opening a file used to do.
         self._source_mode: str = "none"  # none|file|clipboard
+        self._clipboard_text: str = ""
+        self._path: str = ""
         self._last_auto_table: str = ""
 
         self.setWindowTitle(_("Import data"))
@@ -520,7 +532,14 @@ class ImportDataDialog(QDialog):
     # Preview
     # ------------------------------------------------------------------
     def _schedule_preview(self) -> None:
-        if self._source_mode != "file":
+        """Re-read the current source after the options settle.
+
+        Pasted text is re-read too. Header, delimiter and the two skip counts
+        describe how to *parse* a source, not where it came from, so a paste
+        that landed with the wrong delimiter used to be unfixable without
+        pasting it again.
+        """
+        if self._source_mode == "none":
             return
         self._preview_timer.start(250)
 
@@ -604,15 +623,42 @@ class ImportDataDialog(QDialog):
             self._refresh_preview()
 
     def _refresh_preview(self) -> None:
-        path = (self.file_name or "").strip()
-        if not path:
-            return
-        p = Path(path)
-        if not p.exists():
+        """Re-read whichever source is current and show it.
+
+        Dispatching on the source mode is the point. This used to read
+        ``self.file_name`` and nothing else, so a paste that arrived after a
+        file had been opened was overwritten by that file the moment anything
+        called this - which the paste handler itself did, on its last line.
+        """
+        if self._source_mode == "clipboard":
+            failure = self._show_frame(self._read_clipboard_source)
+            if failure is not None:
+                show_message(self, "import.clipboard_failed", error=failure)
             return
 
+        path = (self.file_name or "").strip()
+        if not path or not Path(path).exists():
+            return
+
+        failure = self._show_frame(lambda: self._read_source(path))
+        if failure is not None:
+            show_message(self, "import.preview_failed", error=failure)
+
+    def _show_frame(self, read: Callable[[], pd.DataFrame]) -> Exception | None:
+        """Read one source through *read*, then fill the columns and preview.
+
+        Shared by the file and the clipboard because the only difference
+        between them is the reading; everything after it - cleaning, the type
+        table, hiding the empty columns from the preview - is the same work,
+        and was the same work written twice.
+
+        The failure is returned rather than reported, so that each caller
+        names its own catalogue message at its own call site. The ids have to
+        be literals where show_message is called: that is what the sweep
+        proving every id is defined, and every defined id used, can see.
+        """
         try:
-            self._df = self._read_source(path)
+            self._df = read()
             self._apply_skip_last_and_clean()
 
             # Columns: keep empty columns (default Ignore)
@@ -630,12 +676,24 @@ class ImportDataDialog(QDialog):
             else:
                 self._preview.set_model(DataFramePreviewModel(df_prev, parent=self._preview.view))
 
+            return None
+
         except Exception as exc:  # noqa: BLE001
             applogger.exception("Preview failed: %s", exc)
-            show_message(self, "import.preview_failed", error=exc)
             self._df = None
             self._preview.clear()
             self._col_table.setRowCount(0)
+            return exc
+
+    def _read_clipboard_source(self) -> pd.DataFrame:
+        """Parse the remembered clipboard text with the current options."""
+        return read_clipboard_text(
+            self._clipboard_text,
+            skiprows=int(self._skip_rows.value()),
+            skipfooter=int(self._skip_last.value()),
+            header=bool(self._has_header.isChecked()),
+            delimiter=self._current_delim(),
+        )
 
     def _read_source(self, path: str) -> pd.DataFrame:
         delim = self._current_delim()
@@ -756,7 +814,7 @@ class ImportDataDialog(QDialog):
 
 
     def _safe_table_name_from_filename(self,path: str) -> str:
-        base = Path(path).stem.strip() if path!='from_clipboard' else path
+        base = path if path == CLIPBOARD_SOURCE_NAME else Path(path).stem.strip()
         if not base:
             base = "new_table"
         name = re.sub(r"[^0-9a-zA-Z_]+", "_", base)
@@ -806,44 +864,47 @@ class ImportDataDialog(QDialog):
         self._refresh_preview()
 
     def _on_load_clipboard(self) -> None:
-        '''Loads data from the clipboard'''
+        """Replace whatever is loaded with what is on the clipboard.
+
+        *Replace* is the whole job. The clipboard becomes the source, so the
+        file - if one was opened - stops being it: the remembered path, the
+        window title and the sheet list all go, and the table name is taken
+        from the clipboard rather than left naming a file the preview no
+        longer shows.
+
+        The text is kept rather than only its parse. Header, delimiter and
+        the skip counts can be changed afterwards, and re-reading the source
+        is how they take effect - which needs the source still to be here.
+        """
         text = QApplication.clipboard().text() or ""
+
+        # Parsed before anything is replaced: an empty clipboard must leave
+        # the dialog exactly as it was, not clear it and then say why.
         try:
-            df = read_clipboard_text(
+            probe = read_clipboard_text(
                 text,
                 skiprows=int(self._skip_rows.value()),
                 skipfooter=int(self._skip_last.value()),
                 header=bool(self._has_header.isChecked()),
                 delimiter=self._current_delim(),
             )
-            if df is None or df.empty:
-                show_message(self, "import.clipboard_empty")
-                return
-
-            self._source_mode = "clipboard"
-            self._update_sheet_choices("")
-            self._df = df
-            self._apply_skip_last_and_clean()
-
-            self._build_columns_table(include_empty=True)
-
-            # Preview hide empties
-            df_prev = self._df
-            if df_prev is not None:
-                empty_cols = self._empty_columns(df_prev)
-                if empty_cols:
-                    df_prev = df_prev.drop(columns=empty_cols)
-
-            if df_prev is None:
-                self._preview.clear()
-            else:
-                self._preview.set_model(DataFramePreviewModel(df_prev, parent=self._preview.view))
-            self._set_default_table_name('from_clipboard')
-            self._refresh_preview()
-
         except Exception as exc:  # noqa: BLE001
             applogger.exception("Clipboard preview failed: %s", exc)
             show_message(self, "import.clipboard_failed", error=exc)
+            return
+
+        if probe is None or probe.empty:
+            show_message(self, "import.clipboard_empty")
+            return
+
+        self._source_mode = "clipboard"
+        self._clipboard_text = text
+        self._path = ""
+        self._set_file_name_label("")
+        self._update_sheet_choices("")
+        self._set_default_table_name(CLIPBOARD_SOURCE_NAME)
+
+        self._refresh_preview()
 
     def _on_accept(self) -> None:
         if self._df is None:

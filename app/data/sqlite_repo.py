@@ -19,7 +19,7 @@ from collections.abc import Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 
 import numpy as np
 import pandas as pd
@@ -205,6 +205,41 @@ class DatabaseReport:
             )
             return f"Database check passed{extra}."
         return f"Database check found {len(self.problems)} problem(s)."
+
+    #: Every finding list, with the heading it is reported under.  One table,
+    #: so the log, the summary and the detail pane cannot come to disagree
+    #: about what was looked for - adding a check means adding it here.
+    SECTIONS: ClassVar[tuple[tuple[str, str], ...]] = (
+        ("integrity_errors", "Integrity"),
+        ("foreign_key_errors", "Foreign keys"),
+        ("orphan_descriptors", "Orphan descriptors"),
+        ("dangling_series", "Series reading a missing table"),
+        ("dangling_links", "Import links to a missing table"),
+        ("unreferenced_tables", "Unreferenced tables (not a problem)"),
+    )
+
+    def details(self) -> str:
+        """Return every finding, grouped under its heading, one per line.
+
+        The summary counts them; this says what they were.  Nothing is
+        truncated: a check that reports "47 problems" and then shows twenty of
+        them is a check the user cannot finish acting on, and the pane this
+        goes into scrolls.
+
+        Unreferenced tables are included even though they are not problems.
+        "3 unreferenced table(s)" with no way to see which three is a line
+        nobody can do anything with.
+        """
+        lines: list[str] = []
+        for attribute, heading in self.SECTIONS:
+            findings = getattr(self, attribute)
+            if not findings:
+                continue
+            if lines:
+                lines.append("")
+            lines.append(f"{heading}:")
+            lines.extend(f"  {finding}" for finding in findings)
+        return "\n".join(lines)
 
     def log(self) -> None:
         """Write the whole report to the log, worst first."""

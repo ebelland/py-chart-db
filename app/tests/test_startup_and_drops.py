@@ -5,6 +5,11 @@ Startup fell through to an open dialog whenever the remembered database was
 gone, which offers a list to someone who has nothing to pick from; and the
 window refused every drop, so a file dragged onto it did nothing at all and
 said nothing about why.
+
+Startup now asks nothing at all in the ordinary cases. It used to offer to
+build the demo set on a first run and fall back to that same empty open
+dialog when the offer was declined; these tests are largely about there being
+no question left to answer.
 """
 from __future__ import annotations
 
@@ -26,9 +31,8 @@ def no_dialogs(monkeypatch: pytest.MonkeyPatch) -> dict:
     """Answer every box and dialog from the test, and record what was asked."""
     asked: dict = {"ask": [], "message": [], "browse": 0, "demo": []}
 
-    monkeypatch.setattr(
-        startup, "ask", lambda _parent, message_id, **_k: asked["ask"].append(message_id) or False
-    )
+    # startup asks nothing any more; the list stays in the fixture so a
+    # question added back here fails a test instead of appearing silently.
     monkeypatch.setattr(
         startup,
         "show_message",
@@ -77,43 +81,57 @@ def test_a_remembered_database_that_is_gone_is_recreated_empty(
     assert no_dialogs["browse"] == 0
 
 
-def test_a_first_run_is_offered_the_demo_projects(
+def test_a_first_run_opens_an_empty_database_without_asking_anything(
     no_dialogs, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """And the complete one is the one that opens."""
-    built = [tmp_path / "Getting started.dhub", tmp_path / "One subject.dhub"]
+    """No demo offer, no open dialog: a project to start working in."""
     monkeypatch.setattr(startup, "get_last_database", lambda: "")
-    monkeypatch.setattr(startup, "ask", lambda *_a, **_k: True)
-    monkeypatch.setattr(startup, "build_demo_projects", lambda _target: built)
+    monkeypatch.setattr(startup.Path, "home", staticmethod(lambda: tmp_path))
 
-    assert startup.select_database() == built[0]
-    assert no_dialogs["browse"] == 0, "the demo answered the question"
+    chosen = startup.select_database()
+
+    assert chosen == tmp_path / startup.DEFAULT_DATABASE_NAME
+    assert chosen.exists()
+    assert no_dialogs["ask"] == [], "a first run is asked nothing"
+    assert no_dialogs["browse"] == 0
 
 
-def test_declining_the_demo_falls_back_to_the_open_dialog(
+def test_a_first_run_keeps_a_database_that_is_already_there(
+    no_dialogs, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A reset config.json must not blank the work it forgot about."""
+    existing = tmp_path / startup.DEFAULT_DATABASE_NAME
+    repo = SqliteRepo(db_path=existing)
+    repo.import_dataframe(
+        __import__("pandas").DataFrame({"a": [1, 2, 3]}), table_name="kept"
+    )
+    repo.close()
+
+    monkeypatch.setattr(startup, "get_last_database", lambda: "")
+    monkeypatch.setattr(startup.Path, "home", staticmethod(lambda: tmp_path))
+
+    assert startup.select_database() == existing
+
+    reopened = SqliteRepo(db_path=existing)
+    try:
+        assert "kept" in reopened.list_table_names()
+    finally:
+        reopened.close()
+
+
+def test_an_unwritable_home_says_so_and_falls_back_to_the_open_dialog(
     no_dialogs, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """The one case a file cannot solve: there is nowhere to write one."""
     monkeypatch.setattr(startup, "get_last_database", lambda: "")
 
-    assert startup.select_database() is None
-    assert no_dialogs["ask"] == ["startup.offer_demo"]
-    assert no_dialogs["browse"] == 1
-
-
-def test_a_demo_that_cannot_be_built_says_so_and_still_offers_the_dialog(
-    no_dialogs, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A failure to write the example must not be a failure to start."""
-    monkeypatch.setattr(startup, "get_last_database", lambda: "")
-    monkeypatch.setattr(startup, "ask", lambda *_a, **_k: True)
-
-    def explode(_target):
+    def explode(_path):
         raise OSError("read-only volume")
 
-    monkeypatch.setattr(startup, "build_demo_projects", explode)
+    monkeypatch.setattr(startup.SqliteRepo, "create_empty", staticmethod(explode))
 
     assert startup.select_database() is None
-    assert no_dialogs["message"] == ["startup.demo_failed"]
+    assert no_dialogs["message"] == ["startup.default_database_failed"]
     assert no_dialogs["browse"] == 1
 
 

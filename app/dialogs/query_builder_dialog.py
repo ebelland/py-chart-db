@@ -84,6 +84,11 @@ class QueryBuilderDialog(QDialog):
         super().__init__(parent)
         self._repo = repo
         self._current_name: str | None = None
+        # False while the name is one this dialog picked for a draft nobody
+        # has saved yet, which is what makes Save ask for it once and never
+        # again. Loading a saved query sets it: that name is already the
+        # user's.
+        self._name_confirmed: bool = False
 
         self.setWindowTitle(_("Query Builder"))
         self.setWindowIcon(load_icon("data"))
@@ -289,6 +294,7 @@ class QueryBuilderDialog(QDialog):
             applogger.warning("Saved query '%s' not found.", name)
             return
         self._current_name = saved.name
+        self._name_confirmed = True
         self._editor.setPlainText(saved.sql)
         self._reload_queries()
         self.validate()
@@ -317,32 +323,32 @@ class QueryBuilderDialog(QDialog):
         applogger.info("Deleted query '%s'.", name)
 
         if self._current_name == name:
+            # The row is gone, so its name is free again and no longer the
+            # user's confirmed choice: whatever they type next gets asked
+            # about like any other new draft.
             self._current_name = None
+            self._name_confirmed = False
             self._editor.clear()
             self._result_view.setModel(None)
         self._reload_queries()
 
     def _new_query(self) -> None:
-        """Create an unsaved named query descriptor through the repository."""
-        name, accepted = QInputDialog.getText(
-            self, _("New query"), _("Query name:")
-        )
-        if not accepted:
-            return
-        clean = name.strip()
-        if not clean:
-            show_message(self, "query.needs_a_name")
-            return
-        if self._repo.check_if_table_exists(clean):
-            show_message(self, "query.name_is_a_table", name=clean)
-            return
-        if self._repo.get_query(clean) is not None:
-            if not ask(self, "query.confirm_overwrite", name=clean):
-                return
+        """Start an empty draft. Nothing is asked, and nothing is written.
 
-        query = self._repo.new_query(name=clean)
-        self._current_name = query.name
-        self._editor.setPlainText(query.sql)
+        New query used to open a name prompt first and ask about overwriting
+        an existing query second - two decisions about storing something,
+        taken before there was anything to store. A statement that does not
+        validate can never be saved, so both questions belong at Save, where
+        :meth:`_resolve_name_for_save` now asks them.
+
+        The repository is still what names the draft: ``new_query`` picks the
+        first free ``Query <n>`` and writes no row, so the editor opens on a
+        blank statement under a name that is already known not to clash.
+        """
+        draft = self._repo.new_query()
+        self._current_name = draft.name
+        self._name_confirmed = False
+        self._editor.setPlainText(draft.sql)
         self._result_view.setModel(None)
         self._status.setText(_("New query, not saved yet."))
         self._query_combo.blockSignals(True)
@@ -560,24 +566,66 @@ class QueryBuilderDialog(QDialog):
         return True
 
     def save(self) -> bool:
-        """Validate and persist the current named query."""
+        """Validate, settle the name, then write the row. In that order.
+
+        Validation first, because a statement that does not run is not worth
+        naming - and because the alternative, asking for a name and then
+        refusing to save under it, is the flow this dialog used to have.
+        """
         if not self.validate():
             show_message(self, "query.invalid", error=self._status.text())
             return False
-        clean = (self._current_name or "").strip()
-        if not clean:
-            show_message(self, "query.needs_a_name")
+
+        clean = self._resolve_name_for_save()
+        if clean is None:
             return False
+
         try:
             self._repo.save_query(clean, self.sql)
         except Exception as exc:
             applogger.exception("Failed to save query '%s'", clean)
             show_message(self, "query.save_failed", error=exc)
             return False
+
+        self._current_name = clean
+        self._name_confirmed = True
         self._reload_queries()
         self._status.setText(f"Saved as '{clean}'.")
         applogger.info("Saved query '%s'.", clean)
         return True
+
+    def _resolve_name_for_save(self) -> str | None:
+        """Return the name to save under, asking for it once, or None to stop.
+
+        A draft is named the first time it is saved and never asked about
+        again, so editing a saved query and pressing Apply repeatedly does not
+        re-ask. The two checks that used to guard New query live here instead,
+        where they are about something real: a name a table already owns can
+        never be selected back (the table always wins), and a name another
+        query owns will replace it.
+        """
+        suggested = (self._current_name or "").strip()
+        if self._name_confirmed and suggested:
+            return suggested
+
+        name, accepted = QInputDialog.getText(
+            self, _("Save query"), _("Query name:"), text=suggested
+        )
+        if not accepted:
+            return None
+
+        clean = name.strip()
+        if not clean:
+            show_message(self, "query.needs_a_name")
+            return None
+        if self._repo.check_if_table_exists(clean):
+            show_message(self, "query.name_is_a_table", name=clean)
+            return None
+        if self._repo.get_query(clean) is not None and not ask(
+            self, "query.confirm_overwrite", name=clean
+        ):
+            return None
+        return clean
 
     def accept(self) -> None:  # noqa: D102 - Qt override
         self._remember_state()

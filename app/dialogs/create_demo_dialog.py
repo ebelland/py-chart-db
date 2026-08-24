@@ -4,10 +4,9 @@ The set itself - what each project shows, which figures and tables it needs -
 is app/data/demo_project.py's; this dialog only presents the choice and asks
 where to save it, the same way "New" asks where a blank database goes.
 
-First run offers the whole set automatically (see app/utils/startup.py) and
-opens the complete one. This is for afterwards: rebuilding one that got
-edited, or looking at a subject that was skipped the first time, without
-starting the application over.
+This is the only way in. A first run used to offer the whole set before the
+window was even up; it now starts on an empty database and says nothing, so
+the demo is something you go and get rather than something you decline.
 """
 from __future__ import annotations
 

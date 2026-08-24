@@ -50,8 +50,13 @@ from app.styles.style import (
     resolve_app_style,
     stdSizeAndlayout,
 )
-from app.utils.config import get_value, set_value
-from app.utils.i18n import available_languages, language, tr
+from app.utils.config import get_language, get_value, set_value
+from app.utils.i18n import (
+    AUTO_LANGUAGE,
+    available_languages,
+    platform_language,
+    tr,
+)
 
 #: Config key and choices for the default chart export format.  The chart
 #: panel's save dialog offers all of them whatever is chosen here; this only
@@ -74,10 +79,32 @@ DEFAULT_SAVE_FORMAT: str = "PNG"
 #: here.  A code with no entry shows as itself rather than being hidden: a new
 #: locale folder should appear in this list the moment it is added, named or
 #: not.
+#:
+#: Deliberately not translated: a language is listed under its own name, so
+#: that someone who has landed in a language they cannot read can still find
+#: the one they can.
 LANGUAGE_NAMES: dict[str, str] = {
     "en": "English",
     "it": "Italiano",
 }
+
+
+def language_choices() -> list[tuple[str, str]]:
+    """Return the (stored value, label) pairs for the language combo.
+
+    Auto comes first and is the honest default: it stores a sentinel rather
+    than the resolved code, so a machine that later changes its locale follows
+    it instead of staying on whatever it happened to be the day the setting
+    was saved.  The label names the language it currently resolves to, because
+    "Auto" on its own does not tell the user what they are about to get.
+    """
+    resolved = platform_language()
+    auto_label = tr("Auto") + f" ({LANGUAGE_NAMES.get(resolved, resolved)})"
+    return [
+        (AUTO_LANGUAGE, auto_label),
+        *((code, LANGUAGE_NAMES.get(code, code)) for code in available_languages()),
+    ]
+
 
 def normalized_save_format(value: object) -> str:
     """Return a supported export format, defaulting rather than raising."""
@@ -104,7 +131,10 @@ class SettingsDialog(QDialog):
 
         # Only to preselect the combo: nothing here changes the running app.
         self._entry_style = resolve_app_style()
-        self._entry_language = language()
+        # The stored setting, not the resolved language: a user who chose Auto
+        # must find Auto selected when they reopen this, not the code it
+        # happened to resolve to on this machine.
+        self._entry_language = get_language()
 
         root = QVBoxLayout(self)
         apply_dialog_shell(self, root, size="small")
@@ -133,10 +163,7 @@ class SettingsDialog(QDialog):
 
         self._language_combo = self._combo(
             card,
-            [
-                (code, LANGUAGE_NAMES.get(code, code))
-                for code in available_languages()
-            ],
+            language_choices(),
             self._entry_language,
         )
         form.addRow(tr("Language"), self._language_combo)

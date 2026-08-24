@@ -58,9 +58,22 @@ TICK_CHOICES: tuple[tuple[str, str], ...] = (
     ("inout", "Both sides"),
 )
 
-#: The axes and tick classes every one of those settings is written for.
+#: The axes and tick classes every grid and tick setting is written for.
+#: Two, not three: a 3D axes does have a z grid, but the four-way control this
+#: drives is a 2D idea and the renderers that draw in 3D own their own
+#: appearance. See LIMIT_AXES for the settings that do extend to z.
 AXES: tuple[str, ...] = ("x", "y")
 WHICH: tuple[str, ...] = ("major", "minor")
+
+#: The axes a scale, a direction and a manual range can be set for.  Three,
+#: because those three settings mean exactly the same thing on the depth axis
+#: of a 3D projection as they do on x and y, and there was previously no way
+#: to say any of them: a surface plot's z range was whatever the data was.
+#:
+#: A 2D axes simply has no z, and the renderer skips what it cannot set - so
+#: a z limit typed on a scatter plot is stored and ignored rather than
+#: refused, which is what a projection changed later needs.
+LIMIT_AXES: tuple[str, ...] = ("x", "y", "z")
 
 #: How the view range is decided.
 LIMITS_AUTO: str = "auto"
@@ -69,15 +82,21 @@ LIMITS_AUTO_Y: str = "auto_y"
 LIMITS_MANUAL: str = "manual"
 
 LIMIT_CHOICES: tuple[tuple[str, str], ...] = (
-    (LIMITS_AUTO, "Automatic (both axes)"),
-    (LIMITS_AUTO_X, "Automatic x, manual y"),
-    (LIMITS_AUTO_Y, "Automatic y, manual x"),
-    (LIMITS_MANUAL, "Manual (both axes)"),
+    (LIMITS_AUTO, "Automatic (all axes)"),
+    (LIMITS_AUTO_X, "Automatic x, manual y and z"),
+    (LIMITS_AUTO_Y, "Automatic y, manual x and z"),
+    (LIMITS_MANUAL, "Manual (all axes)"),
 )
 
 #: Which axis each mode leaves to Matplotlib.
+#:
+#: z is manual in every mode but the first, which costs nothing and is the
+#: only rule that stays sayable: the alternative - a mode per combination of
+#: three axes - is eight entries in a combo. An unset end is already "leave
+#: this end alone", so a manual z with both boxes empty behaves exactly as an
+#: automatic one until something is typed in it.
 _AUTOMATIC_AXES: dict[str, frozenset[str]] = {
-    LIMITS_AUTO: frozenset({"x", "y"}),
+    LIMITS_AUTO: frozenset({"x", "y", "z"}),
     LIMITS_AUTO_X: frozenset({"x"}),
     LIMITS_AUTO_Y: frozenset({"y"}),
     LIMITS_MANUAL: frozenset(),
@@ -196,6 +215,7 @@ def defaults() -> dict[str, Any]:
         for which in WHICH:
             payload[grid_key(axis, which)] = AUTO
             payload[tick_key(axis, which)] = AUTO
+    for axis in LIMIT_AXES:
         for edge in ("min", "max"):
             payload[limit_key(axis, edge)] = None
     payload["limits_mode"] = LIMITS_AUTO

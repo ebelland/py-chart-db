@@ -1,10 +1,17 @@
 """What has to be decided before the main window can be built.
 
 One question: which database is this run about?  Three answers, in order -
-the one named on the command line, the one the last run left behind, or one
-the user is asked for.
+the one named on the command line, the one the last run left behind, or a new
+empty one in the home directory.
 
-It lives here rather than in ``main.py`` because two of the three answers show
+No question is asked for any of them.  A first run used to offer to build the
+demo projects and, when that was declined, fall back to an open dialog: two
+boxes in front of someone who has not seen the application yet, the second of
+which can only open a file they do not have.  Starting on an empty project is
+the answer that needs no explaining, and the demo set is still one menu item
+away once the window is up (File, Create demo).
+
+It lives here rather than in ``main.py`` because the remaining fallback shows
 a box, and every box in this application comes from the catalogue in
 config.json (see ``app/utils/messages.py``).  A message id used only from the
 root script would sit outside the sweep that proves every id is defined and
@@ -16,18 +23,17 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QFileDialog, QWidget
 
-from app.data.demo_project import DEMO_PROJECTS, build_demo_projects
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
 from app.utils.config import get_last_database
 from app.utils.i18n import _
-from app.utils.messages import ask, show_message
+from app.utils.messages import show_message
 
-#: Where a first run writes the demo projects.  One folder in the home
-#: directory, because the demo is a *set* now - one file per subject, each
-#: named for what it shows - and ten loose .dhub files in someone's home is
-#: not a gift.
-DEMO_FOLDER_NAME: str = "Data Hub demo projects"
+#: What a run with nothing remembered opens.  The home directory, because it
+#: is the one place every desktop platform agrees the user can write to, and a
+#: fixed name, because the point is to have something to open rather than to
+#: name it well - Save as renames it later.
+DEFAULT_DATABASE_NAME: str = "Data Hub.dhub"
 
 #: The open dialog's filter.  ``.dhub`` first so the file the user is looking
 #: for is the one they see.
@@ -42,9 +48,13 @@ def select_database(
     """Return the database this run should open, or None to exit.
 
     The order is deliberate: an explicit argument beats a remembered path,
-    and a remembered path beats asking - because the common case is opening
-    the app on yesterday's work, and a dialog in front of that every morning
-    is a dialog nobody reads.
+    and a remembered path beats both - because the common case is opening the
+    app on yesterday's work, and a dialog in front of that every morning is a
+    dialog nobody reads.
+
+    None is returned only when there is nowhere to write and the user then
+    cancels the open dialog, which is the one case where the application
+    genuinely has no database to be about.
     """
     if argument and argument.strip():
         return Path(argument).expanduser().resolve()
@@ -53,12 +63,8 @@ def select_database(
     if remembered is not None:
         return remembered
 
-    # Nothing remembered: this is a first run, or config.json was reset.
-    demo = _offer_the_demo_project(parent)
-    if demo is not None:
-        return demo
-
-    return _ask_for_a_database(parent)
+    # Nothing remembered: a first run, or config.json was reset.
+    return _default_database(parent)
 
 
 def _remembered_database() -> Path | None:
@@ -87,33 +93,32 @@ def _remembered_database() -> Path | None:
         return None
 
 
-def _offer_the_demo_project(parent: QWidget | None) -> Path | None:
-    """Ask whether to build the demo project, and build it if so.
+def _default_database(parent: QWidget | None) -> Path | None:
+    """Return an empty database in the home directory, created if it is not there.
 
-    An empty database is a legitimate way to start and a terrible way to be
-    introduced: every panel is empty, and nothing in an empty window says what
-    the application is *for*.  The demo is a set of real projects built through
-    the same repository the app uses, one per subject and each named for what
-    it shows.
+    Nothing is asked, which is the whole point: the alternative was offering
+    to build the demo set and then, on "no", an open dialog with nothing in it
+    to open.  An empty project is a legitimate way to start, and the demo is
+    still reachable from File, Create demo once the window is up.
 
-    The complete one is what opens; the rest sit beside it in the folder,
-    which is what makes them findable - and they can be dropped straight onto
-    the window.
+    An existing file at that path is opened rather than replaced.
+    ``create_empty`` only connects, and connecting to a database that already
+    has tables in it leaves them exactly as they are - so running twice with a
+    reset config.json returns the user to their work rather than to a blank
+    file where it used to be.
+
+    The open dialog survives as the fallback for the one case that cannot be
+    solved by writing a file: a home directory that is not writable.
     """
-    if not ask(parent, "startup.offer_demo"):
-        return None
-
-    target = Path.home() / DEMO_FOLDER_NAME
-    applogger.info("Building %d demo projects in %s", len(DEMO_PROJECTS), target)
+    path = Path.home() / DEFAULT_DATABASE_NAME
+    applogger.info("No database remembered; starting on %s", path)
     try:
-        written = build_demo_projects(target)
+        return SqliteRepo.create_empty(path)
     except Exception as exc:  # noqa: BLE001
-        applogger.exception("Could not build the demo projects: %s", exc)
-        show_message(parent, "startup.demo_failed", error=exc)
-        return None
-
-    # The complete project first: see DEMO_PROJECTS.
-    return written[0] if written else None
+        # Read-only home, a full disk, or that name taken by a folder.
+        applogger.exception("Could not create a database at %s: %s", path, exc)
+        show_message(parent, "startup.default_database_failed", error=exc)
+        return _ask_for_a_database(parent)
 
 
 def _ask_for_a_database(parent: QWidget | None) -> Path | None:

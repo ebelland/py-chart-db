@@ -26,7 +26,7 @@ from app.dialogs.settings_dialog import (
     normalized_save_format,
 )
 from app.styles import style
-from app.utils import config
+from app.utils import config, i18n
 
 APP_DIR = Path(__file__).resolve().parent.parent
 
@@ -230,3 +230,107 @@ def test_the_save_dialog_honours_the_configured_format() -> None:
 
     assert "CONFIG_SAVE_FORMAT" in body
     assert 'chart_{self._figure_id}.png"' not in body
+
+
+# ----------------------------------------------------------------------
+# Auto: follow the platform
+# ----------------------------------------------------------------------
+def test_auto_is_offered_and_comes_first(qapp) -> None:
+    """A fresh installation should speak the machine's language, and the only
+    way to say that is a setting that is not a language code."""
+    from app.dialogs.settings_dialog import language_choices
+    from app.utils.i18n import AUTO_LANGUAGE
+
+    values = [value for value, _label in language_choices()]
+
+    assert values[0] == AUTO_LANGUAGE
+    assert set(values[1:]) == set(i18n.available_languages())
+
+
+def test_the_auto_label_names_the_language_it_resolves_to(qapp) -> None:
+    """"Auto" alone does not tell the user what they are about to get."""
+    from app.dialogs.settings_dialog import LANGUAGE_NAMES, language_choices
+
+    _value, label = language_choices()[0]
+    resolved = i18n.platform_language()
+
+    assert LANGUAGE_NAMES.get(resolved, resolved) in label
+
+
+def test_auto_is_stored_as_the_sentinel_not_as_the_resolved_code(
+    qapp, monkeypatch
+) -> None:
+    """Storing the resolved code would pin the app to whatever the machine
+    was set to the day the setting was saved."""
+    from app.dialogs import settings_dialog as module
+    from app.utils.i18n import AUTO_LANGUAGE
+
+    written: dict[str, str] = {}
+    monkeypatch.setattr(module, "set_value", lambda key, value: written.update({key: value}))
+    monkeypatch.setattr(module, "get_language", lambda: AUTO_LANGUAGE)
+
+    dialog = module.SettingsDialog()
+    dialog._save()
+
+    assert written["language"] == AUTO_LANGUAGE
+
+
+def test_a_saved_auto_reopens_as_auto(qapp, monkeypatch) -> None:
+    """Not as the language it happens to resolve to on this machine."""
+    from app.dialogs import settings_dialog as module
+    from app.utils.i18n import AUTO_LANGUAGE
+
+    monkeypatch.setattr(module, "get_language", lambda: AUTO_LANGUAGE)
+
+    dialog = module.SettingsDialog()
+
+    assert dialog._language_combo.currentData() == AUTO_LANGUAGE
+
+
+def test_setting_auto_resolves_to_a_language_that_has_a_catalogue() -> None:
+    from app.utils.i18n import AUTO_LANGUAGE, set_language
+
+    before = i18n.language()
+    try:
+        assert set_language(AUTO_LANGUAGE) in i18n.available_languages()
+    finally:
+        set_language(before)
+
+
+def test_an_unwritten_language_key_means_auto() -> None:
+    """A config.json that has never been written is a fresh installation."""
+    from app.utils import config
+    from app.utils.i18n import AUTO_LANGUAGE
+
+    assert config.get_language.__doc__
+    assert AUTO_LANGUAGE == "auto"
+
+
+def test_a_platform_locale_nothing_translates_falls_back_to_english(
+    monkeypatch,
+) -> None:
+    """Untranslated source strings *are* English, so that is the honest
+    fallback rather than the last language chosen."""
+    from PySide6.QtCore import QLocale
+
+    from app.utils import i18n as module
+
+    monkeypatch.setattr(
+        QLocale, "system", staticmethod(lambda: QLocale("fi_FI"))
+    )
+
+    assert module.platform_language() == module.DEFAULT_LANGUAGE
+
+
+def test_a_regional_variant_still_finds_its_language(monkeypatch) -> None:
+    """The catalogues are named it, not it_IT."""
+    from PySide6.QtCore import QLocale
+
+    from app.utils import i18n as module
+
+    monkeypatch.setattr(
+        QLocale, "system", staticmethod(lambda: QLocale("it_CH"))
+    )
+
+    assert module.platform_language() == "it"
+

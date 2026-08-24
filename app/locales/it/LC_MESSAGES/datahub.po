@@ -652,10 +652,6 @@ msgid "Cosine oscillation."
 msgstr "Oscillazione cosinusoidale."
 
 
-msgid "Could not build the demo project:\n{error}"
-msgstr "Impossibile creare il progetto dimostrativo:\n{error}"
-
-
 msgid "Could not build the preview:\n{error}"
 msgstr "Impossibile costruire l’anteprima:\n{error}"
 
@@ -3434,10 +3430,6 @@ msgstr "File"
 msgid "Hide"
 msgstr "Nascondi"
 
-msgid "There is no database yet.\n\nBuild the demo project? It writes a small example project - tables, saved queries and ready-made charts - so there is something to take apart. You can create your own database at any time."
-msgstr "Non c'è ancora nessun database.\n\nVuoi creare il progetto dimostrativo? Contiene un piccolo progetto di esempio - tabelle, query salvate e grafici già pronti - da cui partire. Puoi creare il tuo database in qualsiasi momento."
-
-
 msgid "These entries are not valid and were not applied:\n{entries}"
 msgstr "Queste voci non sono valide e non sono state applicate:\n{entries}"
 
@@ -4009,3 +4001,36 @@ msgstr "Mappe di contorno - gli stessi campi disegnati in piano"
 
 msgid "The wafer and the survey again as 2D contour maps, gridded and triangulated. The gridded one is labelled and equal-aspect; the scattered one stops at the hull of the points, which is as far as the survey actually went."
 msgstr "Il wafer e il rilievo di nuovo come mappe di contorno 2D, a griglia e triangolata. Quella a griglia è etichettata e con aspetto uguale; quella sparsa si ferma all'inviluppo convesso dei punti, che è fin dove il rilievo è arrivato davvero."
+
+msgid "Could not create a database in your home folder:\n{error}\n\nPick one to open instead."
+msgstr "Impossibile creare un database nella cartella home:\n{error}\n\nScegline uno da aprire."
+
+msgid "Could not build the demo project:\n{error}"
+msgstr "Impossibile creare il progetto dimostrativo:\n{error}"
+
+msgid "...and {count} more, under Show Details."
+msgstr "...e altri {count}, sotto Mostra dettagli."
+
+msgid "Z scale"
+msgstr "Scala Z"
+
+msgid "Z log base"
+msgstr "Base log Z"
+
+msgid "Z range"
+msgstr "Intervallo Z"
+
+msgid "Invert Z"
+msgstr "Inverti Z"
+
+msgid "Automatic (all axes)"
+msgstr "Automatico (tutti gli assi)"
+
+msgid "Automatic x, manual y and z"
+msgstr "Automatico x, manuale y e z"
+
+msgid "Automatic y, manual x and z"
+msgstr "Automatico y, manuale x e z"
+
+msgid "Manual (all axes)"
+msgstr "Manuale (tutti gli assi)"
