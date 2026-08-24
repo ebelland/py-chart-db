@@ -17,6 +17,16 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from app.logs.logger import applogger
+
+#: The largest grid this will pivot, in cells.
+#:
+#: Four million is a 2000 x 2000 map, which contour draws in about a second.
+#: Past that the cost is in Matplotlib rather than here, and a chart nobody
+#: can wait for is not a chart - so the frame is refused with a message
+#: naming the way out rather than drawn eventually.
+MAX_GRID_CELLS: int = 4_000_000
+
 
 def pivot_to_grid(
     df: pd.DataFrame,
@@ -59,8 +69,42 @@ def pivot_to_grid(
     if x_values.size < 2 or y_values.size < 2:
         return None
 
+    cells = int(x_values.size) * int(y_values.size)
+
+    # Answer "is this a grid?" by counting, before allocating anything.
+    #
+    # This is the whole reason the function is usable on real data. A
+    # complete Cartesian product of the distinct x and y values needs one row
+    # per cell, so a frame with fewer rows than cells cannot be one - and
+    # scattered data is exactly that case, badly: 10 000 points with no two
+    # sharing a coordinate means 10 000 x 10 000, and pivot_table would build
+    # all hundred million of them, spend three and a half seconds and a
+    # gigabyte of memory, and then be told there are holes in it. Thirty
+    # thousand points took the machine with it.
+    #
+    # Duplicates are averaged, so more rows than cells is fine; fewer never
+    # is.
+    if cells > len(frame):
+        return None
+
+    if cells > MAX_GRID_CELLS:
+        applogger.warning(
+            "This is a %d x %d grid - %s cells, past the %s this draws "
+            "without stalling. Aggregate it in the series SQL (GROUP BY a "
+            "rounded x and y) or plot a subset.",
+            x_values.size,
+            y_values.size,
+            f"{cells:,}",
+            f"{MAX_GRID_CELLS:,}",
+            show_dialog=False,
+            raise_error=False,
+        )
+        return None
+
     pivot = frame.pivot_table(index="y", columns="x", values="z", aggfunc="mean")
     pivot = pivot.reindex(index=y_values, columns=x_values)
+    # Counting cannot catch every hole: duplicates at one site can make the
+    # totals agree while some other pair is missing entirely.
     if pivot.isna().to_numpy().any():
         return None
 

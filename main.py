@@ -25,7 +25,7 @@ from app.dialogs.main_window import MainWindow
 
 from app.styles.style import apply_platform_style
 from app.utils.config import get_language, set_last_database
-from app.utils.i18n import set_language
+from app.utils.i18n import install_qt_translations, set_language
 from app.utils.startup import select_database
 
 
@@ -53,6 +53,11 @@ def run_app() -> int:
     # Language before any widget is built: menus read their labels through the
     # translator when they are constructed.
     applogger.info("Interface language: %s", set_language(get_language()))
+
+    # Qt's own strings, which ours cannot reach: QMessageBox builds its Yes
+    # and No from Qt's catalogue, so every confirmation in the app asked in
+    # the user's language and answered in English until this was installed.
+    install_qt_translations(app)
 
     apply_platform_style(app)
 

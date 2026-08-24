@@ -27,6 +27,7 @@ import gettext
 import struct
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 from app.logs.logger import applogger
 
@@ -280,6 +281,59 @@ def set_language(code: str) -> str:
 
     _language = clean
     return _language
+
+
+#: Qt's own catalogues, in the order they are loaded.  ``qtbase`` carries the
+#: standard dialog buttons - Yes, No, Cancel, Open, Save - and ``qt`` is the
+#: umbrella catalogue older builds used for the same strings.  Both are tried
+#: because which one a given PySide6 wheel ships has changed over releases.
+_QT_CATALOGUES: tuple[str, ...] = ("qtbase", "qt")
+
+#: Kept alive for the life of the process.  QCoreApplication.installTranslator
+#: does not take ownership, so a QTranslator that goes out of scope is
+#: collected and its strings silently revert to English - which is a bug that
+#: only shows up in a release build, once the collector runs.
+_qt_translators: list[Any] = []
+
+
+def install_qt_translations(app: Any) -> list[str]:
+    """Translate Qt's own strings - the dialog buttons above all.
+
+    ``QMessageBox`` builds its Yes and No from Qt's catalogue, not from ours:
+    the text never passes through :func:`tr`, so no amount of translating this
+    application reaches it.  Every confirmation in the app therefore asked in
+    Italian and answered in English until this was installed.
+
+    Returns the catalogue names actually loaded, which is what the tests
+    assert on - "it did not raise" is not the same as "it worked", and the
+    failure here is silent by nature.
+    """
+    from PySide6.QtCore import QLibraryInfo, QTranslator
+
+    if _language == DEFAULT_LANGUAGE:
+        # Qt's source strings are English, so there is nothing to load and a
+        # missing English catalogue is not a warning worth printing.
+        return []
+
+    directory = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
+    loaded: list[str] = []
+    for catalogue in _QT_CATALOGUES:
+        translator = QTranslator()
+        if not translator.load(f"{catalogue}_{_language}", directory):
+            continue
+        if not app.installTranslator(translator):
+            continue
+        _qt_translators.append(translator)
+        loaded.append(catalogue)
+
+    if not loaded:
+        applogger.info(
+            "Qt ships no %r translation in %s; its standard dialog buttons "
+            "stay in English.",
+            _language,
+            directory,
+        )
+    return loaded
 
 
 def tr(message: str) -> str:

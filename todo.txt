@@ -27,6 +27,40 @@ P0-10 global: locale must follow the platform locale. Add Auto to settings
 NEW - requested after the review
 ================================================================
 
+N-13  Four more from the field [DONE]
+      Message boxes answered in English. QMessageBox builds Yes and No from
+      Qt's own catalogue, not ours - the text never passes through tr(), so
+      no amount of translating this application reached it. i18n
+      .install_qt_translations loads qtbase_<lang>.qm at startup, which fixes
+      every standard button (Save, Cancel, Open) rather than just those two.
+      The QTranslator objects are kept in a module list: installTranslator
+      does not take ownership, and a collected one reverts silently.
+
+      "Contour plot rallenta il sistema", and it was not the contour.
+      pivot_to_grid called pivot_table before knowing anything about the
+      shape, so scattered x/y/z - every coordinate distinct - built an NxN
+      frame and then found holes in it: 10 000 points took 3.5 seconds and a
+      gigabyte, 30 000 took the machine. A complete Cartesian product needs
+      one row per cell, so counting refuses it in O(n): 10 000 points now
+      cost 2.3ms and 94MB, 200 000 cost 33ms. MAX_GRID_CELLS additionally
+      refuses a grid too large to draw, with a message naming the way out.
+      Measured, both before and after - see test_contour_axis.py.
+
+      Table was dangerous on a big table, and it was: Matplotlib lays out one
+      Text artist per cell in Python, so 5 000 rows was 15 000 artists and
+      over a second on every redraw, and an imported file was a hung window.
+      MAX_TABLE_ROWS draws the first 200 and logs what it cut; the cap is an
+      option, and the log names LIMIT in the series SQL as the real answer
+      for a big source. 100 000 rows: ~24s -> 42ms.
+
+      Booleans in the kwargs grid were text until clicked, and on macOS the
+      editor's checkbox was placed by the delegate rather than by the row, so
+      clicks missed it and the setting looked broken. They are check items
+      now - drawn by the view, present whether or not anything is being
+      edited, one click to toggle - and the delegate builds no editor for
+      them at all.
+
+
 N-12  Six reported bugs, and the Table renderer's roles [DONE]
       Axis properties had no Z anything. The manual range, the scale and the
       direction are now per axis for x, y AND z (axis_options.LIMIT_AXES,

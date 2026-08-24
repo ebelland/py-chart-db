@@ -175,3 +175,77 @@ def test_series_data_carries_the_role_map_the_headers_come_from() -> None:
 
     assert SeriesData(name="s", df=pd.DataFrame(), style={}).roles == {}
 
+
+# ----------------------------------------------------------------------
+# The Table renderer's row cap
+# ----------------------------------------------------------------------
+def _table_axes(rows: int, options: dict | None = None):
+    import pandas as pd
+    from matplotlib.figure import Figure
+
+    from app.charts.base import SeriesData
+    from app.charts.table import TableAxisRenderer
+
+    figure = Figure()
+    ax = figure.add_subplot(111)
+    TableAxisRenderer().render_axis(
+        ax=ax,
+        series=[
+            SeriesData(
+                name="s",
+                df=pd.DataFrame({"a": range(rows), "b": ["x"] * rows}),
+                style={},
+            )
+        ],
+        options=options or {},
+    )
+    return ax
+
+
+def test_a_big_table_is_capped_rather_than_drawn(qapp) -> None:
+    """Matplotlib lays out one Text artist per cell, in Python: 5 000 rows is
+    15 000 artists and over a second, and every redraw pays it again. A table
+    of a whole imported file was a hung window."""
+    from app.charts.table import MAX_TABLE_ROWS
+
+    ax = _table_axes(5_000)
+    body_rows = {key[0] for key in ax.tables[0].get_celld()} - {0}
+
+    assert len(body_rows) == MAX_TABLE_ROWS
+
+
+def test_a_small_table_is_drawn_whole(qapp) -> None:
+    ax = _table_axes(12)
+    body_rows = {key[0] for key in ax.tables[0].get_celld()} - {0}
+
+    assert len(body_rows) == 12
+
+
+def test_the_cap_is_the_leading_rows_not_a_sample(qapp) -> None:
+    """A sample would be a chart of rows the query never put in that order."""
+    ax = _table_axes(500, {"max_rows": 3})
+    first_column = [ax.tables[0][(row, 0)].get_text().get_text() for row in (1, 2, 3)]
+
+    assert first_column == ["0", "1", "2"]
+
+
+def test_the_cap_can_be_raised(qapp) -> None:
+    ax = _table_axes(500, {"max_rows": 300})
+    body_rows = {key[0] for key in ax.tables[0].get_celld()} - {0}
+
+    assert len(body_rows) == 300
+
+
+def test_an_unusable_cap_falls_back_to_the_default(qapp) -> None:
+    from app.charts.table import MAX_TABLE_ROWS
+
+    ax = _table_axes(5_000, {"max_rows": "lots"})
+    body_rows = {key[0] for key in ax.tables[0].get_celld()} - {0}
+
+    assert len(body_rows) == MAX_TABLE_ROWS
+
+
+def test_the_cap_is_not_forwarded_to_matplotlib(qapp) -> None:
+    """Axes.table has no max_rows keyword and would raise on one."""
+    assert _table_axes(10, {"max_rows": 5}).tables
+

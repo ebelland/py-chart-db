@@ -119,6 +119,28 @@ def _parse_text_value(text: str) -> object:
         return text
 
 
+def _make_check_item(item: QTreeWidgetItem, value: Any) -> None:
+    """Turn one row's value column into an always-visible checkbox.
+
+    A boolean used to be text that became a checkbox only while the row was
+    being edited: two clicks to change, and on macOS the editor's box sat
+    where the delegate put it rather than where the row was, so a click often
+    missed it entirely and the setting appeared not to work.
+
+    A check state is drawn by the view itself, so the box is there whether or
+    not anything is being edited, and one click toggles it on every platform.
+    The text is cleared because the box already says True or False, and a
+    label beside it would only be a second answer to the same question.
+    """
+    item.setFlags(
+        (item.flags() | Qt.ItemFlag.ItemIsUserCheckable) & ~Qt.ItemFlag.ItemIsEditable
+    )
+    item.setText(1, "")
+    item.setCheckState(
+        1, Qt.CheckState.Checked if bool(value) else Qt.CheckState.Unchecked
+    )
+
+
 def _kind_for_key(key: str, meta: Mapping[str, Any]) -> str:
     explicit = meta.get("kind", meta.get("editor"))
     if explicit:
@@ -193,6 +215,14 @@ class DictValueDelegate(QStyledItemDelegate):
 
         meta = self._panel.meta_for_key(key)
         kind = self._panel.kind_for_key(key)
+
+        if kind == "bool":
+            # None: the row carries a real checkbox of its own, drawn and
+            # clickable whether or not anything is being edited. An editor
+            # here would put a second one on top of it - and on macOS that
+            # one had to be found and hit before it would take a click at
+            # all, which is what made the boolean rows feel broken there.
+            return None
 
         if kind == "color":
             editor = MatplotlibColorCombo(parent, include_none=True)
@@ -503,7 +533,10 @@ class DictEditorPanel(QWidget):
                 item.setData(1, Qt.ItemDataRole.UserRole, value)
                 item.setToolTip(0, str(meta.get("description", "")))
                 item.setToolTip(1, str(meta.get("description", f"{key} ({self.kind_for_key(key)})")))
-                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+                if self.kind_for_key(key) == "bool":
+                    _make_check_item(item, value)
+                else:
+                    item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
                 item.setSizeHint(0, QSize(0, _MIN_ROW_HEIGHT))
                 item.setSizeHint(1, QSize(0, _MIN_ROW_HEIGHT))
                 self._key_items[key] = item
@@ -518,7 +551,10 @@ class DictEditorPanel(QWidget):
             return
         value = self._values.get(key)
         self.tree.blockSignals(True)
-        item.setText(1, _value_to_text(value))
+        if self.kind_for_key(key) == "bool":
+            _make_check_item(item, value)
+        else:
+            item.setText(1, _value_to_text(value))
         item.setData(1, Qt.ItemDataRole.UserRole, value)
         self.tree.blockSignals(False)
 
@@ -529,7 +565,14 @@ class DictEditorPanel(QWidget):
         if not key:
             return
         key_str = str(key)
-        value = self._coerce_value_from_text(key_str, item.text(1))
+
+        if self.kind_for_key(key_str) == "bool":
+            # The box is the value. Reading item.text(1) here would parse the
+            # empty label beside it and turn every toggle into False.
+            value: object = item.checkState(1) == Qt.CheckState.Checked
+        else:
+            value = self._coerce_value_from_text(key_str, item.text(1))
+
         self._values[key_str] = value
         item.setData(1, Qt.ItemDataRole.UserRole, value)
         self._emit_values_changed()

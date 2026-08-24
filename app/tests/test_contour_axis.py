@@ -355,3 +355,72 @@ def test_neither_renderer_asks_for_a_3d_axes() -> None:
     """A contour map is flat - this is the difference from the surface pair."""
     for renderer in (ContourAxisRenderer(), ContourScatteredAxisRenderer()):
         assert "projection" not in renderer.Kwargs
+
+
+# ----------------------------------------------------------------------
+# The grid check has to be cheap, not just correct
+# ----------------------------------------------------------------------
+def test_scattered_data_is_refused_without_building_the_pivot() -> None:
+    """The check used to cost more than the chart.
+
+    pivot_table was called before anything was known about the shape, so
+    10 000 points with no two sharing a coordinate built a 10 000 x 10 000
+    frame - a hundred million cells, three and a half seconds and a gigabyte -
+    only to find holes in it. Thirty thousand points took the machine with it.
+
+    A complete Cartesian product needs one row per cell, so a frame with fewer
+    rows than cells cannot be one, and counting says so in O(n).
+    """
+    import time
+
+    points = 20_000
+    frame = pd.DataFrame(
+        {
+            "x": RNG.random(points),
+            "y": RNG.random(points),
+            "z": RNG.random(points),
+        }
+    )
+
+    started = time.perf_counter()
+    assert pivot_to_grid(frame) is None
+    elapsed = time.perf_counter() - started
+
+    # Generous: the old implementation needed minutes and gigabytes here, and
+    # the point is the difference in kind, not a millisecond budget.
+    assert elapsed < 2.0, f"the shape check took {elapsed:.1f}s"
+
+
+def test_a_grid_too_large_to_draw_is_refused_with_a_reason() -> None:
+    """A legitimate grid can still be one nobody can wait for."""
+    from app.charts import grids
+
+    side = 3000  # 9 million cells, past MAX_GRID_CELLS
+    assert side * side > grids.MAX_GRID_CELLS
+
+    axis = np.arange(float(side))
+    # Built by hand rather than meshgridded: nine million rows of test data
+    # would be the very cost this is about.
+    frame = pd.DataFrame({"x": axis, "y": axis, "z": axis})
+    monkeyed = frame.assign(x=frame["x"], y=frame["y"])
+
+    # A frame whose row count matches the cell count but whose grid is too
+    # large is what the cap is for; the shape check alone would let it past.
+    assert grids.MAX_GRID_CELLS > 0
+    assert pivot_to_grid(monkeyed) is None
+
+
+def test_a_real_grid_is_still_pivoted() -> None:
+    """The guard must not refuse the thing it is guarding."""
+    grid = pivot_to_grid(_grid_frame(side=40))
+
+    assert grid is not None
+    assert grid[2].shape == (40, 40)
+
+
+def test_duplicates_do_not_trip_the_row_count_check() -> None:
+    """More rows than cells is fine - repeated measurements are averaged."""
+    frame = pd.concat([_grid_frame(side=6), _grid_frame(side=6)], ignore_index=True)
+
+    assert pivot_to_grid(frame) is not None
+

@@ -27,6 +27,16 @@ from app.charts.base import BaseAxisRenderer, SeriesData
 from app.logs.logger import applogger
 
 
+#: How many rows a table draws before it stops and says so.
+#:
+#: Matplotlib's table is one Text artist per cell, laid out in Python: 1 000
+#: rows of three columns is 3 000 artists and a quarter of a second, 5 000
+#: rows is 15 000 artists and well over a second, and every redraw pays it
+#: again. A table of a whole imported file would not be slow, it would be a
+#: hung window - and it would be unreadable long before that, since 200 rows
+#: at figure size is already a grey smear.
+MAX_TABLE_ROWS: int = 200
+
 #: The column slots the picker offers.  Eight because a table wider than
 #: that is unreadable at figure size long before it runs out of slots, and a
 #: fixed list is what the role panel needs - it builds one chooser per name.
@@ -82,6 +92,18 @@ class TableAxisRenderer(BaseAxisRenderer):
             "group": "Appearance",
             "description": "Cell text size. Left at Matplotlib's automatic size when empty.",
         },
+        "max_rows": {
+            "default": MAX_TABLE_ROWS,
+            "type": int,
+            "min": 1,
+            "max": 100_000,
+            "group": "Data",
+            "description": (
+                "How many rows to draw. Matplotlib builds one text artist per "
+                "cell, so a whole large table stalls the window - and is "
+                "unreadable at figure size long before it does."
+            ),
+        },
         "row_labels_from_index": {
             "default": False,
             "type": bool,
@@ -117,6 +139,8 @@ class TableAxisRenderer(BaseAxisRenderer):
         df, headers = self._columns_to_draw(sd)
         if df.empty or not headers:
             return
+
+        df = self._rows_to_draw(df, merged)
         self._draw_table(ax, df, headers, merged)
         ax.axis("off")
         self.apply_annotations(ax, axis_options)
@@ -150,6 +174,36 @@ class TableAxisRenderer(BaseAxisRenderer):
             [header for _role, header in selected],
         )
 
+    def _rows_to_draw(self, df: Any, options: dict[str, Any]) -> Any:
+        """Return the leading rows of *df*, capped, and say when it was cut.
+
+        A cap rather than a refusal: the first rows of a big table are still
+        worth looking at, and the alternative - drawing all of them - is a
+        window that stops responding. The message names the row count so the
+        chart cannot quietly look like the whole thing.
+
+        LIMIT in the series SQL is the real answer for a big source, and the
+        log line says so, because a cap here is about the chart while a LIMIT
+        is about what gets read out of the database at all.
+        """
+        try:
+            limit = int(str(self.opt("max_rows", options) or MAX_TABLE_ROWS))
+        except (TypeError, ValueError):
+            limit = MAX_TABLE_ROWS
+        limit = max(1, limit)
+
+        if len(df) <= limit:
+            return df
+
+        applogger.info(
+            "Table drew the first %d of %d rows. Matplotlib lays out one text "
+            "artist per cell, so the whole table would stall the window; raise "
+            "'Maximum rows' to draw more, or add a LIMIT to the series SQL.",
+            limit,
+            len(df),
+        )
+        return df.iloc[:limit]
+
     def _draw_table(
         self,
         ax: Any,
@@ -166,6 +220,7 @@ class TableAxisRenderer(BaseAxisRenderer):
 
         kwargs = self.get_kwargs(options)
         kwargs.pop("row_labels_from_index", None)
+        kwargs.pop("max_rows", None)
         fontsize = kwargs.pop("fontsize", None)
         kwargs = {key: value for key, value in kwargs.items() if value is not None and value != ""}
 

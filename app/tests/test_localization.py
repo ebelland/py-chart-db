@@ -351,3 +351,58 @@ def test_log_messages_are_not_translated(method: str) -> None:
                 translated.append(f"{path.relative_to(APP_DIR)}:{node.lineno}")
 
     assert translated == []
+
+
+# ----------------------------------------------------------------------
+# Qt's own strings, which ours cannot reach
+# ----------------------------------------------------------------------
+def test_qt_standard_buttons_are_translated(qapp) -> None:
+    """QMessageBox builds Yes and No from Qt's catalogue, not from ours.
+
+    The text never passes through tr(), so no amount of translating this
+    application reached it: every confirmation asked in Italian and answered
+    in English until a QTranslator was installed for Qt itself.
+    """
+    from PySide6.QtWidgets import QMessageBox
+
+    before = i18n.language()
+    try:
+        i18n.set_language("it")
+        loaded = i18n.install_qt_translations(qapp)
+        if not loaded:
+            pytest.skip("this PySide6 wheel ships no Italian Qt catalogue")
+
+        box = QMessageBox()
+        box.setStandardButtons(
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        labels = [button.text().replace("&", "") for button in box.buttons()]
+
+        assert "Yes" not in labels, labels
+        assert "Sì" in labels, labels
+    finally:
+        i18n.set_language(before)
+
+
+def test_english_loads_no_qt_catalogue(qapp) -> None:
+    """Qt's source strings are English; a missing en catalogue is not news."""
+    before = i18n.language()
+    try:
+        i18n.set_language("en")
+        assert i18n.install_qt_translations(qapp) == []
+    finally:
+        i18n.set_language(before)
+
+
+def test_the_translators_are_kept_alive(qapp) -> None:
+    """installTranslator does not take ownership, so a QTranslator that goes
+    out of scope is collected and its strings silently revert - a bug that
+    only appears once the collector runs."""
+    before = i18n.language()
+    try:
+        i18n.set_language("it")
+        i18n.install_qt_translations(qapp)
+        assert i18n._qt_translators
+    finally:
+        i18n.set_language(before)
+
