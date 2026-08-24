@@ -113,9 +113,24 @@ N-5   sqlite_repo: 3013 lines in one module
       cache belong with the connection, not with the descriptors.
 
 N-6   icons: finish the SFSymbol / Segoe Fluent migration
-      This is P0-7 plus the rest of it: seven of the failing tests are the
-      same cause. Actions naming SVGs that were deleted, win11/macOs icons
-      with no common fallback, and icon files nothing asks for any more.
+      [THEME BACKEND DONE. The migration had a hole the size of Linux: SF
+      Symbols are macOS's and Segoe Fluent is Windows's, so every other
+      desktop fell straight through to the SVGs in app/icons - and three
+      actions (edit, nav_series_operations, run) name no SVG at all, so they
+      were blank buttons. QIcon.fromTheme is now the third step, from a
+      ThemeIcon field on all 51 actions, and on a GNOME/Adwaita desktop it
+      answers for 49 of them: 0 blanks, 2 left on SVG (the Plot button and
+      the SQL filter, neither of which has a system equivalent).
+      Names are validated against QIcon.ThemeIcon plus an explicit extras
+      list, because a typo is silent - fromTheme returns null and the SVG
+      takes over. Adwaita 45 dropped the full-colour action icons, so the
+      plain name is tried and then the -symbolic one; that covers Adwaita and
+      Breeze together.]
+      What is left is the deleting: style.report_icon_sources() names the
+      SVGs still doing work on the machine it runs on, so run it on a GNOME
+      box, a KDE box, a Mac and a Windows machine and remove what nothing
+      reports. Plus the original scope - win11/macOs icons with no common
+      fallback, and icon files nothing asks for any more.
 
 N-8   ChartPanel: "Add vertical line" / "Add horizontal line"
       Same context menu, with a small dialog for the line style, persisted in

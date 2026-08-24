@@ -645,6 +645,12 @@ def _apply_ticks(ax: Any, options: dict[str, Any]) -> None:
     _apply_minor_ticks(ax, options)
 
     for axis in axis_options.AXES:
+        # tick_params(axis="z") is a ValueError on a 2D axes, and every 2D
+        # chart would log one per tick class. Skipped instead: the setting is
+        # kept in the descriptor for a projection that may yet become 3d.
+        if axis == "z" and not hasattr(ax, "zaxis"):
+            continue
+
         for which in axis_options.WHICH:
             setting = axis_options.tick_setting(options, axis, which)
             if setting == axis_options.AUTO:
@@ -691,14 +697,22 @@ def _tick_params(ax: Any, **kwargs: Any) -> None:
 
 
 def _apply_grid(ax: Any, options: dict[str, Any]) -> None:
-    """Apply the four grid settings.
+    """Apply the per-axis, per-class grid settings.
 
     Each one is applied, including the ones that say off: the previous
     version returned early when the grid was not wanted, so it could only ever
     add a grid. Against a style sheet with ``axes.grid: True`` - which the
     shipped ones have - that made "no grid" impossible to express.
+
+    A 3D axes goes elsewhere entirely; see :func:`_apply_grid_3d`.
     """
+    if hasattr(ax, "zaxis"):
+        _apply_grid_3d(ax, options)
+        return
+
     for axis in axis_options.AXES:
+        if axis == "z":
+            continue
         for which in axis_options.WHICH:
             setting = axis_options.grid_setting(options, axis, which)
             if setting == axis_options.AUTO:
@@ -715,6 +729,49 @@ def _apply_grid(ax: Any, options: dict[str, Any]) -> None:
                 applogger.exception(
                     "Failed to apply the %s %s grid", axis, which
                 )
+
+
+def _apply_grid_3d(ax: Any, options: dict[str, Any]) -> None:
+    """Apply one grid setting to a 3D axes, which is all it has.
+
+    ``Axes3D.grid`` is ``grid(visible=True, **kwargs)``: the axis and the tick
+    class are accepted and discarded, and the single flag draws or hides all
+    three panes together. Passing the six settings through the 2D loop
+    therefore did not do nothing - it did something misleading, applying
+    whichever combination happened to be last.
+
+    So the six are resolved into the one answer Matplotlib can take. The first
+    setting that is not "from the style", read x then y then z and major
+    before minor, decides for the box; a line style decides as "on", because
+    Matplotlib will not take a style here either. When every setting is AUTO
+    the style sheet keeps charge, which is what AUTO means everywhere else.
+    """
+    decided: str | None = None
+    for axis in axis_options.AXES:
+        for which in axis_options.WHICH:
+            setting = axis_options.grid_setting(options, axis, which)
+            if setting != axis_options.AUTO:
+                decided = setting
+                break
+        if decided is not None:
+            break
+
+    if decided is None:
+        return
+
+    visible = decided != axis_options.OFF
+    try:
+        ax.grid(visible)
+    except Exception:
+        applogger.exception("Failed to apply the 3D grid")
+        return
+
+    if decided not in (axis_options.ON, axis_options.OFF):
+        applogger.info(
+            "A 3D axes has one grid for the whole box, so the %r line style "
+            "was applied as simply 'on'.",
+            decided,
+        )
 
 
 def _apply_spines(ax: Any, options: dict[str, Any]) -> None:

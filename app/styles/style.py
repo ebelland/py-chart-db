@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import html
 import platform
+import re
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -273,6 +274,150 @@ def _best_fluent_font_family() -> str | None:
         if family in families:
             return family
     return None
+
+
+# ----------------------------------------------------------------------
+# Theme icons (freedesktop / QIcon.fromTheme)
+# ----------------------------------------------------------------------
+# The third icon backend, and the one that covers Linux.  SF Symbols are
+# macOS's and Segoe Fluent is Windows's; neither exists elsewhere, which left
+# every other desktop on the SVGs shipped in app/icons - drawn once, by hand,
+# and never matching the system they were drawn onto.  QIcon.fromTheme reads
+# the icon theme the desktop is already using, so the application's Open
+# looks like every other Open on that machine.
+#
+# The names are freedesktop's, from config.json's ThemeIcon field, and are
+# checked against the two sets below rather than trusted: a typo in a theme
+# name is silent - fromTheme returns a null icon and the SVG quietly takes
+# over - so the mistake would only ever show up as "why is this one icon
+# still the old drawing?".
+
+#: The names Qt itself standardises, taken from QIcon.ThemeIcon rather than
+#: typed out: this list grows with Qt, and a hand-written copy would not.
+#: "DocumentOpen" is the enum member; "document-open" is what it resolves to.
+def _standard_theme_icon_names() -> frozenset[str]:
+    """Return every freedesktop name QIcon.ThemeIcon knows, as strings."""
+    names: set[str] = set()
+    theme_icon = getattr(QIcon, "ThemeIcon", None)
+    if theme_icon is None:  # pragma: no cover - Qt older than 6.7
+        return frozenset()
+
+    for member in theme_icon.__members__:
+        if member == "NThemeIcons":
+            # A count, not an icon: Qt ends the enum with the number of
+            # entries in it, and asking a theme for "n-theme-icons" finds
+            # nothing.
+            continue
+        names.add(_camel_to_kebab(member))
+    return frozenset(names)
+
+
+def _camel_to_kebab(name: str) -> str:
+    """Turn ``DocumentOpen`` into ``document-open``."""
+    return re.sub(r"(?<!^)(?=[A-Z])", "-", name).lower()
+
+
+#: Names outside Qt's enum that this application uses anyway.  Each one is in
+#: the freedesktop Icon Naming Specification or is shipped by every major icon
+#: theme (Adwaita, Breeze, Papirus) - which is the bar for adding one.  Listed
+#: rather than allowed implicitly so that a typo is still caught: the test
+#: suite checks every configured name against these two sets together.
+EXTRA_THEME_ICON_NAMES: frozenset[str] = frozenset(
+    {
+        "accessories-calculator",
+        "applications-system",
+        "document-edit",
+        "object-select",
+        # No icon theme has a chart, and a plotting application's Plot button
+        # is the one place a drawing of our own is the honest answer. Breeze
+        # and Papirus ship this name; Adwaita does not, and there the SVG in
+        # app/icons takes over - which is the fallback doing its job rather
+        # than a gap.
+        "office-chart-line",
+        "open-menu",
+        "preferences-system",
+        "system-run",
+        # Likewise: Breeze has it, Adwaita dropped it, and "the rows matching
+        # a condition" has no better standard name.
+        "view-filter",
+        "view-sort-ascending",
+        "x-office-spreadsheet",
+    }
+)
+
+
+def known_theme_icon_names() -> frozenset[str]:
+    """Return every theme icon name this application is allowed to ask for."""
+    return _standard_theme_icon_names() | EXTRA_THEME_ICON_NAMES
+
+
+_THEME_ICON_CACHE: dict[str, QIcon] = {}
+
+
+#: Appended to a theme name when the plain one is not in the theme.
+#:
+#: Not a detail: GNOME's Adwaita stopped shipping the full-colour action
+#: icons at version 45 and now carries only the monochrome set, so on a
+#: current GNOME desktop ``document-open`` is missing and
+#: ``document-open-symbolic`` is the icon. KDE's Breeze and Papirus still
+#: ship both. Asking for the plain name first and this second is what covers
+#: the two, and in the right order: where both exist, the plain one is the
+#: theme's full-colour artwork and the more native answer.
+_THEME_ICON_SYMBOLIC_SUFFIX: str = "-symbolic"
+
+
+def _theme_icon_candidates(token: str) -> tuple[str, ...]:
+    """Return the names to try for one configured theme icon, best first."""
+    if token.endswith(_THEME_ICON_SYMBOLIC_SUFFIX):
+        return (token,)
+    return (token, token + _THEME_ICON_SYMBOLIC_SUFFIX)
+
+
+def _create_theme_icon(name: str | None) -> QIcon:
+    """Return the desktop's own icon for a freedesktop *name*, or an empty one.
+
+    Empty is the honest answer on a desktop with no icon theme installed, and
+    on Windows and macOS, where Qt has no theme to read at all.  The caller
+    falls through to the shipped SVG, which is why those are still here.
+
+    Not tinted, unlike the two glyph backends: a theme icon is already drawn
+    for the desktop's own light or dark variant, and painting over it would
+    replace artwork the user chose with a flat silhouette.
+    """
+    token = _normalize_icon_name(name)
+    if not token:
+        return QIcon()
+
+    cached = _THEME_ICON_CACHE.get(token)
+    if cached is not None:
+        return cached
+
+    icon = QIcon()
+    for candidate in _theme_icon_candidates(token):
+        try:
+            # hasThemeIcon first: fromTheme on a missing name can return a
+            # non-null icon carrying nothing, which would end the search on
+            # the wrong candidate and hand a blank icon to a toolbar.
+            if not QIcon.hasThemeIcon(candidate):
+                continue
+            found = QIcon.fromTheme(candidate)
+        except Exception:  # pragma: no cover - defensive; fromTheme does not raise
+            applogger.exception("Failed to read theme icon %r", candidate)
+            continue
+        if not found.isNull():
+            icon = found
+            break
+
+    # Deliberately cached even when null. A missing name stays missing for
+    # the life of the process, and the alternative is asking the theme engine
+    # for it again on every button that names it.
+    _THEME_ICON_CACHE[token] = icon
+    return icon
+
+
+def theme_icon_is_available(name: str | None) -> bool:
+    """True when the running desktop can actually supply this icon."""
+    return not _create_theme_icon(name).isNull()
 
 
 def _create_fluent_icon(
@@ -867,18 +1012,30 @@ def _svg_icon_or_empty(icon_id: str | None) -> QIcon:
 def icon_from_action_spec(spec: "ActionSpec") -> QIcon:
     """Return the icon for an action using the catalogue priority order.
 
-    Priority is intentionally simple:
-    1. On macOS, use ``SFSymbol`` when configured.
-    2. On Windows, use ``SegoeFluent`` when configured.
-    3. Otherwise - or when the symbol or glyph could not be drawn - load the
-       configured SVG ``icon`` from the platform folder, then from ``common``.
-    4. If no configured source exists or the configured source cannot be loaded,
-       return an empty ``QIcon``.
+    One rule, applied in order, and every step falls through when it produces
+    nothing:
+
+    1. On macOS, ``SFSymbol`` - the system's own icon set, so the app looks
+       like a Mac app.
+    2. On Windows, ``SegoeFluent`` - likewise.
+    3. Anywhere, ``ThemeIcon`` through ``QIcon.fromTheme``. This is what
+       covers Linux, where neither of the above exists and where the desktop
+       already has an icon theme the user chose. It sits after the two
+       platform sets rather than before them because on a Mac or a Windows
+       machine there is no theme to read, so it would only ever be a wasted
+       lookup - and on the rare Linux-style desktop running under either, the
+       native set is still the more native answer.
+    4. The SVG shipped in ``app/icons``, from the platform folder and then
+       from ``common``.
+    5. An empty ``QIcon``.
+
+    Step 4 is the one this application is trying to stop needing. Every action
+    naming an SVG is what kept a Mac without pyobjc from showing a toolbar of
+    blank buttons, and it is still the answer on a desktop with no icon theme
+    installed - but it is a drawing made once, by hand, that matches no
+    system in particular. ``report_icon_sources`` says which actions still
+    reach it on this machine, which is what makes deleting any of them safe.
     """
-    # Each step falls through when it produces nothing, which is the whole
-    # reason every action also names an SVG. Returning the empty icon straight
-    # from the symbol path is why a Mac without pyobjc had a toolbar of blank
-    # buttons while the SVGs sat unused beside it.
     if _IS_MACOS and spec.sf_symbol:
         icon = _create_sf_symbol_icon(spec.sf_symbol)
         if not icon.isNull():
@@ -889,7 +1046,55 @@ def icon_from_action_spec(spec: "ActionSpec") -> QIcon:
         if not icon.isNull():
             return icon
 
+    if spec.theme_icon:
+        icon = _create_theme_icon(spec.theme_icon)
+        if not icon.isNull():
+            return icon
+
     return _svg_icon_or_empty(spec.icon)
+
+
+#: Which backend answered for an action, in the order they are tried.
+ICON_SOURCES: tuple[str, ...] = ("sf_symbol", "segoe_fluent", "theme", "svg", "none")
+
+
+def icon_source_for_action(spec: "ActionSpec") -> str:
+    """Return which backend :func:`icon_from_action_spec` would use.
+
+    The same chain, asked rather than drawn. Kept beside it deliberately: two
+    implementations of one priority order would drift, and the whole point of
+    this is to be able to trust the answer.
+    """
+    if _IS_MACOS and spec.sf_symbol and not _create_sf_symbol_icon(spec.sf_symbol).isNull():
+        return "sf_symbol"
+
+    if (
+        _IS_WINDOWS
+        and spec.segoe_fluent
+        and _is_fluent_glyph(spec.segoe_fluent)
+        and not _create_fluent_icon(spec.segoe_fluent, color=_symbol_tint()).isNull()
+    ):
+        return "segoe_fluent"
+
+    if spec.theme_icon and theme_icon_is_available(spec.theme_icon):
+        return "theme"
+
+    return "svg" if not _svg_icon_or_empty(spec.icon).isNull() else "none"
+
+
+def report_icon_sources() -> dict[str, list[str]]:
+    """Return the action ids each icon backend answers for, on this machine.
+
+    The tool for retiring the shipped SVGs: what is left under ``"svg"`` on a
+    desktop with a real icon theme is exactly the set of drawings still doing
+    work, and what is under ``"none"`` is a hole. Run it, do not guess - the
+    failure mode of a missing theme name is silent, because fromTheme returns
+    a null icon and the SVG takes over without complaint.
+    """
+    report: dict[str, list[str]] = {source: [] for source in ICON_SOURCES}
+    for action_id, spec in sorted(_catalog().items()):
+        report[icon_source_for_action(spec)].append(action_id)
+    return report
 
 
 def load_icon(icon: str | None) -> QIcon:
@@ -1658,6 +1863,7 @@ class ActionSpec:
     checkable: bool = False
     sf_symbol: str | None = None
     segoe_fluent: str | None = None
+    theme_icon: str | None = None
 
     @classmethod
     def from_config(cls, action_id: str, entry: dict[str, Any]) -> "ActionSpec":
@@ -1670,6 +1876,7 @@ class ActionSpec:
             sf_symbol=(entry.get("SFSymbol") or entry.get("sf_symbol") or None),
             checkable=bool(entry.get("checkable", False)),
             segoe_fluent=(entry.get("SegoeFluent") or entry.get("segoe_fluent") or None),
+            theme_icon=(entry.get("ThemeIcon") or entry.get("theme_icon") or None),
         )
 
     def translated_text(self) -> str:

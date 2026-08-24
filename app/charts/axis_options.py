@@ -59,16 +59,26 @@ TICK_CHOICES: tuple[tuple[str, str], ...] = (
 )
 
 #: The axes and tick classes every grid and tick setting is written for.
-#: Two, not three: a 3D axes does have a z grid, but the four-way control this
-#: drives is a 2D idea and the renderers that draw in 3D own their own
-#: appearance. See LIMIT_AXES for the settings that do extend to z.
-AXES: tuple[str, ...] = ("x", "y")
+#:
+#: Three, so a 3D chart can say where its depth ticks point and whether its
+#: box is gridded.  The two halves of that are not equally supported by
+#: Matplotlib, and the difference is worth knowing before reading
+#: render_figure's appliers:
+#:
+#: * ticks *are* per axis on a 3D axes - ``tick_params(axis="z")`` works;
+#: * the grid is *not*.  ``Axes3D.grid`` takes ``(visible, **kwargs)`` and
+#:   throws the rest away, so one switch draws or hides all three planes at
+#:   once.  The z column is still offered, because the alternative is a panel
+#:   that says nothing about the grid of a 3D chart at all, but the renderer
+#:   resolves the three settings into the one answer Matplotlib accepts and
+#:   says so in the log.
+AXES: tuple[str, ...] = ("x", "y", "z")
 WHICH: tuple[str, ...] = ("major", "minor")
 
-#: The axes a scale, a direction and a manual range can be set for.  Three,
-#: because those three settings mean exactly the same thing on the depth axis
-#: of a 3D projection as they do on x and y, and there was previously no way
-#: to say any of them: a surface plot's z range was whatever the data was.
+#: The axes a scale, a direction and a manual range can be set for.  The same
+#: three as AXES, and named separately because the two answer different
+#: questions - AXES is "what can be ticked and gridded", this is "what can be
+#: scaled and bounded" - and because they were not always the same list.
 #:
 #: A 2D axes simply has no z, and the renderer skips what it cannot set - so
 #: a z limit typed on a scatter plot is stored and ignored rather than

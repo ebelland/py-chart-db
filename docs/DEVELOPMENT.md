@@ -529,10 +529,42 @@ Tests: `app/tests/test_chart_panel_selection.py`,
   rule added to `macos_native.qss` explicitly, or it falls through to the
   unstyled native bevel. `zoom_fitButton` (the "Adatta"/fit-to-window
   button) is the worked example.
-- Icons: SVG file (`app/icons/{macOs,win11,common}/`), inline SVG source
-  (`icon_from_svg_source`, for plugin-carried artwork), an SF Symbol on
-  macOS, or a Segoe Fluent glyph on Windows — see
-  `icon_from_action_spec`'s docstring for the priority order.
+- Icons: four backends, tried in this order by `icon_from_action_spec` (read
+  its docstring for the reasoning):
+  1. `SFSymbol` on macOS — the system's own set;
+  2. `SegoeFluent` on Windows — likewise;
+  3. `ThemeIcon` anywhere, through `QIcon.fromTheme` — a freedesktop name,
+     which is what covers Linux: the desktop already has an icon theme the
+     user chose, and this makes the app's Open look like every other Open on
+     that machine;
+  4. the SVG in `app/icons/{macOs,win11,common}/`, as the last resort.
+
+  Inline SVG source (`icon_from_svg_source`) is separate and still the way
+  plugin-carried artwork arrives.
+
+  Adding an action means adding all four to its `config.json` entry. The
+  theme name must be one Qt standardises (`QIcon.ThemeIcon`, read at import
+  by `_standard_theme_icon_names`) or one listed in
+  `style.EXTRA_THEME_ICON_NAMES`; a test enforces it, because the failure
+  mode otherwise is silent — `fromTheme` returns a null icon on a typo and
+  the SVG quietly takes over, so the only symptom is one icon that never
+  looks like the rest.
+
+  Two theme quirks are handled and worth knowing. GNOME's Adwaita dropped the
+  full-colour action icons at version 45, so `document-open` is gone there
+  and `document-open-symbolic` is the icon; `_theme_icon_candidates` asks for
+  the plain name and then the symbolic one, which covers both Adwaita and
+  Breeze. And theme icons are *not* tinted, unlike the two glyph backends:
+  the theme already ships light and dark variants, and painting over one
+  would replace artwork the user chose with a flat silhouette.
+
+  The shipped SVGs are on their way out — they are drawings made once, by
+  hand, that match no system in particular. `style.report_icon_sources()`
+  returns the action ids each backend answers for *on the machine it runs
+  on*, which is how to find out which SVGs are still doing work before
+  deleting any. On a GNOME desktop it currently reports 49 of 51 from the
+  theme; the two left are the Plot button and the SQL filter, which have no
+  system equivalent.
 
 ## 9. Localization (`app/utils/i18n.py`)
 

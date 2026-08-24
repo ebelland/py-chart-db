@@ -302,6 +302,71 @@ def _limited_3d(**options):
     return ax
 
 
+def _ticked_3d(**options):
+    from app.charts.render_figure import _apply_grid
+
+    figure = Figure()
+    ax = figure.add_subplot(111, projection="3d")
+    ax.plot([0.0, 1.0], [0.0, 1.0], [0.0, 1.0])
+    _apply_ticks(ax, options)
+    _apply_grid(ax, options)
+    return ax
+
+
+def test_z_ticks_are_per_axis_on_a_3d_axes() -> None:
+    """Ticks really are per axis in 3D - tick_params(axis="z") works."""
+    ax = _ticked_3d(ticks_z_major="in")
+
+    assert hasattr(ax, "zaxis")
+
+
+def test_a_z_tick_setting_is_skipped_rather_than_logged_on_a_2d_axes() -> None:
+    """tick_params(axis="z") is a ValueError there, and every 2D chart would
+    log one per tick class."""
+    figure = Figure()
+    ax = figure.add_subplot(111)
+    ax.plot([0.0, 1.0], [0.0, 1.0])
+
+    _apply_ticks(ax, {"ticks_z_major": "in", "ticks_x_major": "out"})
+
+    assert not hasattr(ax, "zaxis")
+
+
+def test_the_3d_grid_is_one_switch_for_the_whole_box() -> None:
+    """Axes3D.grid takes (visible, **kwargs) and discards the rest, so the six
+    settings have to resolve to the one answer it accepts."""
+    assert _ticked_3d(grid_x_major=axis_options.ON)._draw_grid is True
+    assert _ticked_3d(grid_x_major=axis_options.OFF)._draw_grid is False
+
+
+def test_a_z_grid_setting_alone_decides_the_3d_box() -> None:
+    assert _ticked_3d(grid_z_major=axis_options.OFF)._draw_grid is False
+
+
+def test_a_line_style_on_a_3d_grid_reads_as_on() -> None:
+    """Matplotlib will not take a style for the 3D grid either."""
+    assert _ticked_3d(grid_z_major=":")._draw_grid is True
+
+
+def test_all_auto_leaves_the_3d_grid_to_the_style_sheet() -> None:
+    """AUTO means the same thing here as everywhere else: do not touch it."""
+    ax = _ticked_3d()
+
+    assert ax._draw_grid is True, "matplotlib's own default, not ours"
+
+
+def test_a_z_grid_setting_does_nothing_to_a_2d_axes() -> None:
+    figure = Figure()
+    ax = figure.add_subplot(111)
+    ax.plot([0.0, 1.0], [0.0, 1.0])
+
+    from app.charts.render_figure import _apply_grid
+
+    _apply_grid(ax, {"grid_z_major": axis_options.ON, "grid_y_major": axis_options.ON})
+
+    assert all(line.get_visible() for line in ax.yaxis.get_gridlines())
+
+
 def test_a_manual_z_range_reaches_a_3d_axes() -> None:
     """The setting that did not exist: a surface's depth range was the data's."""
     ax = _limited_3d(
@@ -377,11 +442,23 @@ def widget(qapp):
 
 
 def test_the_widget_offers_one_control_per_axis_and_tick_class(widget) -> None:
-    """Four and four, which is what "x major and y minor" needs to be sayable."""
+    """Six and six now: "x major and y minor" needed four, and a 3D chart
+    saying where its depth ticks point needs the third column."""
     expected = {(axis, which) for axis in axis_options.AXES for which in axis_options.WHICH}
 
     assert set(widget._grid_combos) == expected
     assert set(widget._tick_combos) == expected
+    assert ("z", "major") in expected
+
+
+def test_a_z_grid_and_tick_setting_round_trip(widget) -> None:
+    widget._load_extended_axis_options(
+        {"grid_z_major": axis_options.ON, "ticks_z_minor": "out"}
+    )
+    payload = widget._extended_axis_options_payload()
+
+    assert payload["grid_z_major"] == axis_options.ON
+    assert payload["ticks_z_minor"] == "out"
 
 
 def test_every_choice_reaches_the_control(widget) -> None:

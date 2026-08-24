@@ -1,9 +1,15 @@
 """Tests for icon resolution, the action catalogue, and translation.
 
 The catalogue lives in ``config.json`` and is the only copy: this module holds
-no defaults.  An action names up to three presentations - an SF Symbol for
-macOS, a Segoe Fluent glyph for Windows, and an SVG that works anywhere - and
-``load_icon`` picks per platform, falling back down the list.
+no defaults.  An action names up to four presentations - an SF Symbol for
+macOS, a Segoe Fluent glyph for Windows, a freedesktop theme name for
+everywhere else, and an SVG as the last resort - and ``load_icon`` picks per
+platform, falling back down the list.
+
+The theme name is the one that covers Linux, where neither of the platform
+glyph sets exists and where the desktop already has an icon theme the user
+chose.  Before it existed, every Linux install fell straight to the SVGs, and
+three actions that name no SVG at all showed as blank buttons.
 
 The tests below pin what cannot be seen by looking at the running app: that a
 named icon has a file, that no icon file is shipped for nobody, and that the
@@ -780,3 +786,131 @@ def test_the_helper_starts_transparent(qapp) -> None:
     pixmap = style.create_hidpi_pixmap(8, 8)
 
     assert pixmap.toImage().pixelColor(0, 0).alpha() == 0
+
+
+# ----------------------------------------------------------------------
+# Theme icons: the backend that covers Linux
+# ----------------------------------------------------------------------
+def test_every_action_names_a_theme_icon(actions) -> None:
+    """Without one, an action falls straight through to its SVG on Linux -
+    and three of them ship no SVG, so they were blank buttons."""
+    missing = sorted(
+        action_id for action_id, spec in actions.items() if not spec.theme_icon
+    )
+
+    assert missing == []
+
+
+def test_no_theme_name_is_invented(actions) -> None:
+    """A typo here is silent: fromTheme returns a null icon and the SVG takes
+    over, so the only symptom is one icon that never modernises.
+
+    Every name must be either one Qt standardises or one listed in
+    EXTRA_THEME_ICON_NAMES, which is the deliberate-decision list.
+    """
+    known = style.known_theme_icon_names()
+    unknown = sorted(
+        {
+            spec.theme_icon
+            for spec in actions.values()
+            if spec.theme_icon and spec.theme_icon not in known
+        }
+    )
+
+    assert unknown == []
+
+
+def test_the_standard_names_come_from_qt_rather_than_a_copy() -> None:
+    """The list grows with Qt; a hand-written one would not."""
+    names = style._standard_theme_icon_names()
+
+    assert "document-open" in names
+    assert "edit-copy" in names
+    assert "zoom-fit-best" in names
+    assert "n-theme-icons" not in names, "that member is a count, not an icon"
+
+
+def test_camel_case_becomes_the_freedesktop_spelling() -> None:
+    assert style._camel_to_kebab("DocumentOpen") == "document-open"
+    assert style._camel_to_kebab("ZoomFitBest") == "zoom-fit-best"
+    assert style._camel_to_kebab("Computer") == "computer"
+
+
+def test_every_extra_name_is_actually_used(actions) -> None:
+    """The list is deliberate decisions, not a graveyard."""
+    configured = {spec.theme_icon for spec in actions.values() if spec.theme_icon}
+    unused = sorted(style.EXTRA_THEME_ICON_NAMES - configured)
+
+    assert unused == []
+
+
+def test_a_symbolic_variant_is_tried_when_the_plain_name_is_missing() -> None:
+    """GNOME's Adwaita dropped the full-colour action icons at version 45, so
+    on a current GNOME desktop ``document-open`` does not exist and
+    ``document-open-symbolic`` is the icon.  Breeze still ships both."""
+    assert style._theme_icon_candidates("document-open") == (
+        "document-open",
+        "document-open-symbolic",
+    )
+
+
+def test_a_name_that_is_already_symbolic_is_not_doubled() -> None:
+    assert style._theme_icon_candidates("go-up-symbolic") == ("go-up-symbolic",)
+
+
+def test_the_plain_name_is_preferred_over_the_symbolic_one() -> None:
+    """Where a theme ships both, the plain one is its full-colour artwork."""
+    plain, symbolic = style._theme_icon_candidates("edit-copy")
+
+    assert plain == "edit-copy"
+    assert symbolic.endswith("-symbolic")
+
+
+def test_an_empty_name_asks_the_theme_for_nothing(qapp) -> None:
+    assert style._create_theme_icon("").isNull()
+    assert style._create_theme_icon(None).isNull()
+
+
+def test_a_missing_theme_icon_falls_through_to_the_svg(qapp) -> None:
+    """The whole reason the SVGs are still shipped."""
+    spec = ActionSpec(
+        action_id="probe",
+        icon="add",
+        text="Probe",
+        description="",
+        theme_icon="no-such-icon-anywhere",
+    )
+
+    assert not style.icon_from_action_spec(spec).isNull()
+    assert style.icon_source_for_action(spec) == "svg"
+
+
+def test_an_action_with_neither_a_theme_icon_nor_an_svg_reports_none(qapp) -> None:
+    spec = ActionSpec(
+        action_id="probe",
+        icon=None,
+        text="Probe",
+        description="",
+        theme_icon="no-such-icon-anywhere",
+    )
+
+    assert style.icon_source_for_action(spec) == "none"
+
+
+def test_the_report_accounts_for_every_action(qapp, actions) -> None:
+    """It is the tool for retiring the SVGs, so it has to be complete."""
+    report = style.report_icon_sources()
+    counted = sum(len(ids) for ids in report.values())
+
+    assert set(report) == set(style.ICON_SOURCES)
+    assert counted == len(actions)
+
+
+def test_the_report_agrees_with_what_is_actually_drawn(qapp, actions) -> None:
+    """Two implementations of one priority order would drift."""
+    for action_id, spec in actions.items():
+        source = style.icon_source_for_action(spec)
+        drawn = style.icon_from_action_spec(spec)
+
+        assert drawn.isNull() == (source == "none"), action_id
+
