@@ -23,7 +23,7 @@ from app import APP_NAME, APP_VERSION
 from app.data.sqlite_repo import SqliteRepo
 from app.dialogs.main_window import MainWindow
 
-from app.styles.style import apply_platform_style
+from app.styles.style import apply_platform_style, ensure_icon_theme
 from app.utils.config import get_language, set_last_database
 from app.utils.i18n import install_qt_translations, set_language
 from app.utils.startup import select_database
@@ -60,6 +60,11 @@ def run_app() -> int:
     install_qt_translations(app)
 
     apply_platform_style(app)
+
+    # Icons come from the desktop's own theme wherever there is one. GNOME and
+    # KDE name it themselves; a bare window manager does not, and without this
+    # that whole class of desktop silently falls back to the shipped SVGs.
+    applogger.info("Icon theme: %s", ensure_icon_theme() or "none installed")
 
     try:
         # Which database this run is about, and what to do when there is

@@ -366,6 +366,86 @@ _THEME_ICON_CACHE: dict[str, QIcon] = {}
 _THEME_ICON_SYMBOLIC_SUFFIX: str = "-symbolic"
 
 
+#: Themes to fall back to when the desktop names none, best first.
+#:
+#: Not a preference: these are the sets that are actually installed on the
+#: machines that need them.  Adwaita comes with GNOME and with GTK itself,
+#: Breeze with KDE, Papirus is the most widely installed third-party set, and
+#: hicolor is last because the specification guarantees it exists and it
+#: contains almost no action icons - it is the answer only when there is no
+#: other.
+_FALLBACK_ICON_THEMES: tuple[str, ...] = (
+    "Adwaita",
+    "breeze",
+    "Papirus",
+    "gnome",
+    "oxygen",
+    "hicolor",
+)
+
+#: What themeName() says when the desktop has not chosen one.  Qt returns the
+#: empty string; hicolor is treated the same way because a theme with no
+#: action icons in it is not a theme this application can draw from.
+_UNSET_ICON_THEMES: frozenset[str] = frozenset({"", "hicolor"})
+
+
+def _installed_icon_themes() -> list[str]:
+    """Return the theme names actually present in Qt's search paths."""
+    found: list[str] = []
+    for directory in QIcon.themeSearchPaths():
+        root = Path(str(directory))
+        if not root.is_dir():
+            continue
+        for name in _FALLBACK_ICON_THEMES:
+            if name in found:
+                continue
+            # index.theme is what makes a directory a theme rather than a
+            # folder of loose files; Qt will not read one without it.
+            if (root / name / "index.theme").is_file():
+                found.append(name)
+    return found
+
+
+def ensure_icon_theme() -> str:
+    """Give Qt an icon theme to read when the desktop has not named one.
+
+    The theme backend is what covers Linux, and it is silent when it fails:
+    ``fromTheme`` returns a null icon and the shipped SVG takes over, so a
+    machine with no theme set looks exactly like one from before theme icons
+    existed.  GNOME and KDE set the name through their platform integration,
+    but a bare window manager - i3, or XFCE without its settings daemon -
+    sets nothing, and that is a whole class of Linux desktop getting the old
+    hand-drawn icons for no reason.
+
+    A *fallback* theme is set in every case, which is Qt's own mechanism for
+    "look here for what the chosen theme is missing", and the theme name
+    itself only when nothing has claimed it.  Nothing is overridden: a user
+    who chose Papirus keeps Papirus.
+
+    Harmless where there are no themes at all, which is what Windows and
+    macOS look like: the probe finds nothing and nothing is set.  Returns the
+    theme in use afterwards, or "" when there is still none.
+    """
+    installed = _installed_icon_themes()
+    if not installed:
+        return str(QIcon.themeName() or "")
+
+    if str(QIcon.fallbackThemeName() or "") in _UNSET_ICON_THEMES:
+        QIcon.setFallbackThemeName(installed[0])
+
+    current = str(QIcon.themeName() or "")
+    if current in _UNSET_ICON_THEMES:
+        QIcon.setThemeName(installed[0])
+        applogger.info(
+            "No icon theme was set; using %r of %s.", installed[0], installed
+        )
+        # Anything asked for before now was answered against no theme at all.
+        _THEME_ICON_CACHE.clear()
+        current = installed[0]
+
+    return current
+
+
 def _theme_icon_candidates(token: str) -> tuple[str, ...]:
     """Return the names to try for one configured theme icon, best first."""
     if token.endswith(_THEME_ICON_SYMBOLIC_SUFFIX):

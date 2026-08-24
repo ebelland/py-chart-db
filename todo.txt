@@ -27,6 +27,19 @@ P0-10 global: locale must follow the platform locale. Add Auto to settings
 NEW - requested after the review
 ================================================================
 
+N-14  Auto locale picked the wrong one [DONE]
+      "Auto" read English on a Mac set to Italian. platform_language() asked
+      QLocale.system().name(), which is the *format* locale and follows the
+      region - an Italian in Ireland reads en_IE there. The interface
+      language is uiLanguages(), the ordered list the user actually chose to
+      read in, and macOS keeps the two settings apart. Now: uiLanguages()
+      first, in preference order, taking the first whose language has a
+      catalogue; then name(); then LANGUAGE/LC_ALL/LC_MESSAGES/LANG, which
+      are last because they are a Unix convention Windows and macOS ignore -
+      but which are the only thing that knows better when a Linux session
+      leaves Qt reporting the C locale. it-Latn-IT, it_IT.UTF-8 and it all
+      answer "it"; C and POSIX answer nothing.
+
 N-13  Four more from the field [DONE]
       Message boxes answered in English. QMessageBox builds Yes and No from
       Qt's own catalogue, not ours - the text never passes through tr(), so
@@ -160,11 +173,26 @@ N-6   icons: finish the SFSymbol / Segoe Fluent migration
       takes over. Adwaita 45 dropped the full-colour action icons, so the
       plain name is tried and then the -symbolic one; that covers Adwaita and
       Breeze together.]
-      What is left is the deleting: style.report_icon_sources() names the
-      SVGs still doing work on the machine it runs on, so run it on a GNOME
-      box, a KDE box, a Mac and a Windows machine and remove what nothing
-      reports. Plus the original scope - win11/macOs icons with no common
-      fallback, and icon files nothing asks for any more.
+      [ALSO DONE: ensure_icon_theme(). The theme backend is silent when it
+      fails - fromTheme returns null and the SVG takes over - so a desktop
+      that names no theme looked exactly like one from before theme icons
+      existed. GNOME and KDE set the name through their platform
+      integration; a bare window manager (i3, XFCE without its settings
+      daemon) sets nothing, which was a whole class of Linux desktop getting
+      the hand-drawn icons for no reason. main.py now probes Qt's search
+      paths for an installed theme and sets it, plus a fallback theme in
+      every case. Nothing is overridden: a user who chose Papirus keeps it.
+      hicolor counts as unset, because a theme with no action icons is not
+      one this application can draw from.
+      Also checked and clean: every macOs/win11 icon already has a common
+      fallback, and the four SVGs no action names are all in use - the QSS
+      chevrons (down_on_dark/up_on_dark, via _icon_url) and two table-preview
+      menu items (hide/invert). Nothing to delete.]
+      What is left is the deleting, and it needs machines rather than code:
+      style.report_icon_sources() names the SVGs still doing work where it
+      runs, so run it on a GNOME box, a KDE box, a Mac and a Windows machine
+      and remove what none of them reports. On GNOME/Adwaita it is down to
+      two - new_plot and sql_filter, neither of which has a system icon.
 
 N-8   ChartPanel: "Add vertical line" / "Add horizontal line"
       Same context menu, with a small dialog for the line style, persisted in
