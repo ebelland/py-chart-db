@@ -11,16 +11,6 @@ P0-6  style pickers: an "auto" option that defers to rcParams
      sheet says" rather than forcing a concrete value. Default to it, so a
      .mplstyle actually governs the look of a new series.
 
-P0-05  ChartPanel: selecting Axis:Kwargs while switching panels opens a modal
-       [DONE: the kwargs editor was detached with setParent(None), which does
-       not merely unparent a widget - it promotes it to a top-level window,
-       and Qt then showed it. Measured: 8 panel switches left 21 orphan
-       top-level DictEditorPanels alive. takeAt() has already removed the
-       widget from the layout, so the parent is now left alone and the
-       widget hidden + deleteLater()'d - 1 panel, 0 orphans after the same 8
-       switches. Same latent bug fixed in collapsible_panel.set_content_widget.
-       Regression test: app/tests/test_axis_kwargs_no_stray_window.py]
-
 P0-10 global: locale must follow the platform locale. Add Auto to settings
 
 ================================================================
@@ -43,34 +33,6 @@ N-4   Contour renderer, gridded and scattered
       also covers pcolormesh, imshow/matshow and streamplot/quiver-family
       plots on a regular grid - the same "is this actually a grid" decision
       this item is already about.
-
-N-11  Renderers: 3D surface, gridded and scattered [DONE:
-      app/charts/surface.py. SurfaceAxisRenderer (Axes.plot_surface) pivots
-      x/y/z rows into a regular grid; an incomplete grid is refused with a
-      message pointing at the scattered variant rather than silently
-      inventing the missing cells. TriSurfaceAxisRenderer
-      (Axes.plot_trisurf) skips the pivot and triangulates the raw points.
-      Both ask for a 3D axes via options["projection"]="3d", which
-      render_figure._subplot_kwargs_for_axis already read generically - the
-      only new wiring is create_chart_dialog's CHART_TYPES_NEEDING_3D_AXES.
-      The "round surface for silicon wafers" ask is the circular_mask
-      option on the gridded renderer: cells outside the radius become NaN,
-      which plot_surface simply does not draw - no separate renderer.
-      Demo project "3D surfaces - gridded and scattered" added (wafer
-      thickness map + scattered terrain survey), plus showcase figures.]
-
-N-10  Renderers: broken bar (horizontal and vertical), table, text [DONE:
-      app/charts/broken_bar.py (BrokenBarAxisRenderer +
-      BrokenBarVerticalAxisRenderer - the vertical one draws Rectangle
-      patches, since Matplotlib's broken_barh only ever draws horizontally),
-      app/charts/table.py (Axes.table; the series' own columns become the
-      table's, no x/y roles), app/charts/text.py (adjustText behind a
-      try/except - installed it spreads overlapping labels apart with a
-      leader line, missing it places them exactly and they may overlap,
-      never blank). adjustText declared optional in requirements.txt.
-      Showcase figures added for all four.]
-      Note: Timeline already exists (app/charts/timeline.py) - it is not
-      part of this item.
 
 N-5   sqlite_repo: 3013 lines in one module
       Split by subject rather than by size - connection and pragmas, tables
