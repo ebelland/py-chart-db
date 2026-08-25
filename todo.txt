@@ -6,6 +6,26 @@ Ranked by priority. P0 = wrong results or blocked work, P3 = nice to have.
 P0 - BUGS: wrong output, or work that cannot proceed
 ================================================================
 
+P0-11 renderer: la mappatura colori e' un ciclo Python punto per punto
+      base.py map_continuous_colors_to_cmap chiama cmap(valore) una volta per
+      punto e costruisce una lista Python di tuple RGBA. cmap(array) fa la
+      stessa cosa in C, in una riga. Stesso difetto in
+      map_integer_colors_to_palette.
+      Misurato: 100k punti 1025ms -> 3ms (322x); 300k 3054ms -> 39ms (78x).
+      Mezza giornata, nessun cambio di comportamento visibile.
+
+P0-12 scatter: colori/dimensioni per punto fanno crollare il disegno di Agg
+      Quando s o c variano per punto, matplotlib disegna ogni marcatore
+      singolarmente invece di ripetere un path. Misurato a 300k punti:
+      colore e dimensione unici 316ms, dimensione per punto 3496ms, colore
+      per punto 3430ms - 11x.
+      Meta' si recupera subito passando c=valori, cmap="viridis" invece di
+      una lista di colori gia' calcolata: matplotlib mappa internamente e
+      vettorizzato. Misurato a 100k: 2141ms -> 1144ms, 2x, ~1 secondo per
+      redraw. L'altra meta' e' P2-5.
+      Va fatto insieme a P0-11: sono lo stesso percorso.
+
+
 P0-6  style pickers: an "auto" option that defers to rcParams
      Line style and marker style should be able to say "whatever the style
      sheet says" rather than forcing a concrete value. Default to it, so a
@@ -152,7 +172,13 @@ N-4   Gridded-data renderers
       a grid" decision, which now has one implementation to call.
       Pairs with the heatmap/imshow line under P2-1.
 
-N-5   sqlite_repo: 3013 lines in one module
+N-5   sqlite_repo: 3048 lines in one module
+      Contesto misurato 2026-08: 50.837 righe di codice applicativo, e i
+      cinque file sopra le 1.500 righe sono sqlite_repo 3.048, chart_panel
+      2.214, style 1.939, fit_dialog 1.760, cluster_dialog 1.722. Le
+      series_operations da sole sono 14.121 righe su 15 file. Questo item
+      resta il piu' grosso, ma P2-14 e' quello che rende piu' corto il
+      codice che si scrive dopo.
       Split by subject rather than by size - connection and pragmas, tables
       and import links, descriptors, saved queries, maintenance - and keep
       SqliteRepo as the one class the application talks to, so no call site
@@ -217,6 +243,23 @@ P2-1  renderers that pair with infrastructure already built
                         declared dependency
         contour       - DONE, see N-4
 
+P2-14 renderer: il boilerplate duplicato appartiene a BaseAxisRenderer
+      Misurato: _merge_options esiste in 5 copie byte-identiche (broken_bar,
+      surface x2, table, text - piu' due varianti in bar e contour), e il
+      filtro "serie visibile, ruoli presenti, non vuota" e' riscritto in 15
+      renderer su 23. Sono ~55 righe che vanno sulla base come
+      merge_options() e valid_series(), lasciando a ogni renderer solo cio'
+      che disegna davvero. Due ore, e ogni renderer nuovo parte piu' corto.
+
+P2-15 avvio: gli scanner importano scipy al primo click, non all'avvio
+      La prima apertura del dialogo Fit costa ~900ms perche'
+      FunctionScanner().catalog() importa allora tutti i moduli funzione, e
+      con loro scipy. Le chiamate successive sono 20ms, quindi e' un costo
+      una tantum speso nel momento peggiore. Precaricarlo in background
+      dopo che la finestra e' su, o all'avvio dietro lo splash.
+      Nota: import di app.dialogs.main_window = 1.2s, di cui pandas 301ms e
+      matplotlib ~200ms - quelli sono incomprimibili.
+
 P2-3  series operation: baseline correction (ALS or rubber-band)
       Pure numpy/scipy. Prerequisite for meaningful peak areas.
 
@@ -225,6 +268,15 @@ P2-4  ChartPanel: rubber-band region selection (RectangleSelector)
       on screen, hand its limits to the integrator.
 
 P2-5  ChartPanel: downsample large series for display (LTTB) above ~50k points
+      MISURATO 2026-08: e' il collo di bottiglia vero, non la pipeline.
+        punti     reload()   canvas.draw()
+         20.000     19 ms        327 ms
+        100.000     29 ms      1.131 ms
+        300.000     58 ms      3.785 ms
+      reload() - descrittori, SQL, cache serie - e' gia' veloce: series_df e
+      load_figure_descriptor costano 0.0ms perche' sono in cache. Il costo e'
+      tutto nel ripaint. Da fare dopo P0-11/P0-12, che tolgono la meta' del
+      problema a costo quasi nullo.
       Preserves visual shape at a fraction of the draw cost.
       PROMOTED IN VALUE by the P1-2 measurements: with blitting in place the
       repaint is flat at ~2.55ms, so the hover hit test is now the dominant
