@@ -47,12 +47,16 @@ app/
                       shared by all of them (see §7.2).
   scanners/           AST-based plugin discovery for renderers and series
                       operations (see §4).
+  functions/          The fit/plot function library: functions.py (Y=f(X)
+                      curves), functions_3d.py (Z=f(X,Y) surfaces),
+                      user_functions.py (drop-in additions), plus
+                      starting_point.py, optimizers.py, monte_carlo.py.
   styles/             style.py (the shared widget/action/icon factory),
                       macos_native.qss, fluent_win11.qss, palettes.py.
   utils/              config.json access, i18n, coercion, messages, dialog
                       state persistence, DPI handling, LaTeX detection,
                       figure_metrics.py (§5.2), series_validation.py (§7.2).
-  locales/            gettext-style .po catalogues (see §8).
+  locales/            gettext-style .po catalogues (see §9).
 mplstyles/            The bundled Matplotlib style library (see §7.3).
 _make_demo_project.py Builds "Demo Project.dhub" through SqliteRepo - the
                       same code path the app uses, so the demo cannot drift
@@ -433,7 +437,26 @@ registration. Its range controls are declared in `PARAMS`; the function's own
 parameters are a table, because their number and names change with the
 selection and a declaration cannot express that.
 
-Tests for all four: `app/tests/test_new_operations.py`.
+A function is either a **curve**, `Y = f(X)`, or a **surface**, `Z = f(X, Y)`,
+and `FitFunctionSpec.input_dimensions` is what says which. A class may declare
+it outright (`input_dimensions = 2`, or the `dimensions` alias); otherwise
+`FunctionScanner._class_input_dimensions` infers it — a category beginning
+"3D " or a path under `functions_3d.py` is a surface, everything else a curve.
+Inference rather than a required declaration keeps `user_functions.py` a file
+you can drop a plain function into.
+
+The distinction reaches the callable through `make_model`. A curve is handed
+the X vector; a surface is handed an `(N, 2)` array of X/Y pairs and raises
+`ValueError` on anything else, rather than letting a 1-D input broadcast into
+a shape nobody asked for. `SeriesFunctionDialog` builds that array by meshing
+two ranges — `_build_range(start, stop, count, spacing, axis_name)` per axis,
+where `axis_name` is only there so the error names the axis that was wrong —
+and writes the result as `x, y, z` with a Surface Plot descriptor; a curve
+takes the `x, y` Scatter Plot path instead.
+
+Tests for all four: `app/tests/test_new_operations.py`. The library itself is
+covered by `app/tests/test_fit_starting_point.py`, which calls every
+discovered function with the input shape its declaration asks for.
 
 ### 7.3 The `.mplstyle` library
 
@@ -529,42 +552,64 @@ Tests: `app/tests/test_chart_panel_selection.py`,
   rule added to `macos_native.qss` explicitly, or it falls through to the
   unstyled native bevel. `zoom_fitButton` (the "Adatta"/fit-to-window
   button) is the worked example.
-- Icons: four backends, tried in this order by `icon_from_action_spec` (read
+- Icons: three backends, tried in this order by `icon_from_action_spec` (read
   its docstring for the reasoning):
   1. `SFSymbol` on macOS — the system's own set;
   2. `SegoeFluent` on Windows — likewise;
   3. `ThemeIcon` anywhere, through `QIcon.fromTheme` — a freedesktop name,
      which is what covers Linux: the desktop already has an icon theme the
      user chose, and this makes the app's Open look like every other Open on
-     that machine;
-  4. the SVG in `app/icons/{macOs,win11,common}/`, as the last resort.
+     that machine.
 
-  Inline SVG source (`icon_from_svg_source`) is separate and still the way
-  plugin-carried artwork arrives.
+  There is **no fourth step**. `app/icons/` and its 67 SVGs are gone — they
+  were drawings made once, by hand, matching no system in particular, and
+  reached only by a Mac with no pyobjc, a PC with no Fluent font or a Linux
+  box with no icon theme. Those three cases now show no icon, deliberately: a
+  fallback almost nobody sees is a set of files everybody maintains.
 
-  Adding an action means adding all four to its `config.json` entry. The
-  theme name must be one Qt standardises (`QIcon.ThemeIcon`, read at import
-  by `_standard_theme_icon_names`) or one listed in
-  `style.EXTRA_THEME_ICON_NAMES`; a test enforces it, because the failure
-  mode otherwise is silent — `fromTheme` returns a null icon on a typo and
-  the SVG quietly takes over, so the only symptom is one icon that never
-  looks like the rest.
+  So **every action must name all three**, and a test enforces it — a missing
+  `SFSymbol` is a blank button on macOS, a missing `ThemeIcon` is a blank
+  button everywhere else, and nothing hides the gap any more.
 
-  Two theme quirks are handled and worth knowing. GNOME's Adwaita dropped the
-  full-colour action icons at version 45, so `document-open` is gone there
-  and `document-open-symbolic` is the icon; `_theme_icon_candidates` asks for
-  the plain name and then the symbolic one, which covers both Adwaita and
-  Breeze. And theme icons are *not* tinted, unlike the two glyph backends:
-  the theme already ships light and dark variants, and painting over one
-  would replace artwork the user chose with a flat silhouette.
+  `ThemeIcon` may be a list, tried best-first: no single freedesktop name is
+  in every theme (`office-chart-line` is Breeze's and Papirus's; GNOME ships
+  no chart icon at all), so the Plot button names the chart first and a
+  spreadsheet second. Names are validated against `QIcon.ThemeIcon` — read
+  from Qt at import by `_standard_theme_icon_names`, so the list grows with
+  Qt — plus `style.EXTRA_THEME_ICON_NAMES`. Validation matters because the
+  failure is silent: `fromTheme` returns a null icon on a typo and says
+  nothing.
 
-  The shipped SVGs are on their way out — they are drawings made once, by
-  hand, that match no system in particular. `style.report_icon_sources()`
-  returns the action ids each backend answers for *on the machine it runs
-  on*, which is how to find out which SVGs are still doing work before
-  deleting any. On a GNOME desktop it currently reports 49 of 51 from the
-  theme; the two left are the Plot button and the SQL filter, which have no
-  system equivalent.
+  `ensure_icon_theme()` (called from `main.py`) makes step 3 work on a desktop
+  that names no theme. GNOME and KDE set one through their platform
+  integration; a bare window manager does not, and `fromTheme` then fails for
+  everything. It probes Qt's search paths, names an installed theme, and sets
+  a fallback theme in every case. Nothing is overridden: a user who chose
+  Papirus keeps Papirus. `hicolor` counts as unset, since it carries almost no
+  action icons.
+
+  Two theme quirks are handled. GNOME's Adwaita dropped the full-colour action
+  icons at version 45, so `document-open` is gone there and
+  `document-open-symbolic` is the icon; `_theme_icon_candidates` asks for the
+  plain name then the symbolic one, covering Adwaita and Breeze together. And
+  theme icons are *not* tinted, unlike the two glyph backends: the theme
+  already ships light and dark variants, and painting over one would replace
+  artwork the user chose with a flat silhouette.
+
+  A Qt stylesheet is the one place none of this reaches: it takes `url(file)`
+  and cannot be handed a `QIcon`. That is what kept four chevrons in the
+  repository after everything else had gone. The rules naming them were
+  removed, and Qt draws the platform's own arrow for a combo box and a spin
+  box when no `image` is given.
+
+  Inline SVG *source* (`icon_from_svg_source`) is unaffected and is still how
+  plugin-carried artwork arrives — a series operation carries its `Icon` as
+  path data on the class, not as a file.
+
+  `style.report_icon_sources()` returns the action ids each backend answers
+  for *on the machine it runs on*, and what lands under `"none"` is what that
+  machine cannot draw at all. On GNOME/Adwaita it reports 51 of 51 from the
+  theme.
 
 ## 9. Localization (`app/utils/i18n.py`)
 

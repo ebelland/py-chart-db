@@ -24,21 +24,21 @@ from typing import Any, ClassVar, List
 import numpy as np
 from scipy.signal import find_peaks
 
-def _safe_x(x: np.ndarray, eps: float = 1e-12) -> np.ndarray:
+def safe_x(x: np.ndarray, eps: float = 1e-12) -> np.ndarray:
     return np.where(np.abs(x) < eps, np.sign(x + eps) * eps, x)
 
-def _eps(value: float | np.ndarray, eps: float = 1e-12) -> np.ndarray:
+def eps(value: float | np.ndarray, eps: float = 1e-12) -> np.ndarray:
     arr = np.asarray(value, dtype=float)
     return np.where(np.abs(arr) < eps, eps, arr)
 
-def _pos(value: float | np.ndarray, eps: float = 1e-12) -> np.ndarray:
+def pos(value: float | np.ndarray, eps: float = 1e-12) -> np.ndarray:
     arr = np.asarray(value, dtype=float)
     return np.where(np.abs(arr) < eps, eps, np.abs(arr))
 
-def _positive_x(x: np.ndarray, eps: float = 1e-12) -> np.ndarray:
+def positive_x(x: np.ndarray, eps: float = 1e-12) -> np.ndarray:
     return np.maximum(x, eps)
 
-def _finite(x: Any, y: Any) -> tuple[np.ndarray, np.ndarray]:
+def finite(x: Any, y: Any) -> tuple[np.ndarray, np.ndarray]:
     """Return the pairs where both coordinates are finite."""
     x_array = np.asarray(x, dtype=float).ravel()
     y_array = np.asarray(y, dtype=float).ravel()
@@ -47,7 +47,7 @@ def _finite(x: Any, y: Any) -> tuple[np.ndarray, np.ndarray]:
     keep = np.isfinite(x_array) & np.isfinite(y_array)
     return x_array[keep], y_array[keep]
 
-def _peak_shape(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float, float] | None:
+def peak_shape(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float, float] | None:
     """Return (amplitude, centre, width, offset) for a peak-like series.
 
     The offset is the lower of the two ends rather than the minimum: a peak
@@ -90,7 +90,7 @@ def _peak_shape(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float, floa
     return amplitude, centre, width, offset
 
 
-def _baseline(y: np.ndarray) -> float:
+def baseline(y: np.ndarray) -> float:
     """Return the offset a decaying or saturating curve settles on.
 
     The smaller end rather than the global minimum: these curves approach
@@ -100,7 +100,7 @@ def _baseline(y: np.ndarray) -> float:
     edge = max(1, y.size // 10)
     return float(min(np.mean(y[:edge]), np.mean(y[-edge:])))
 
-def _measured_fwhm(
+def measured_fwhm(
     x: np.ndarray,
     y: np.ndarray,
     centre: float,
@@ -133,7 +133,7 @@ def _measured_fwhm(
     width = float(right.min() - left.max())
     return width if width > 0.0 else None
 
-def _periodic_guess(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float] | None:
+def periodic_guess(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float] | None:
     """Return (amplitude, angular frequency, offset) for an oscillating series.
 
     Amplitude is half the 5th-95th percentile spread rather than half of
@@ -174,7 +174,7 @@ def _periodic_guess(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float] 
     return amplitude, 2.0 * np.pi / period, offset
 
 
-def _exponential(x: np.ndarray, y: np.ndarray, growth:bool) ->  list[float]|None:
+def exponential(x: np.ndarray, y: np.ndarray, growth:bool) ->  list[float]|None:
     # Just under the minimum, not the average of an end. An exponential
     # approaches its offset asymptotically, so the offset is below every
     # observed value; taking an end average puts it *inside* the data and
@@ -197,7 +197,7 @@ def _exponential(x: np.ndarray, y: np.ndarray, growth:bool) ->  list[float]|None
     rate = float(slope) if growth else float(-slope)
     return [amplitude, rate, offset]
 
-def _polynomial_guess( x: np.ndarray,y: np.ndarray,degree) ->  List[float]|None:
+def polynomial_guess( x: np.ndarray,y: np.ndarray,degree) ->  List[float]|None:
     if x.size < degree + 1:
         return None
     try:

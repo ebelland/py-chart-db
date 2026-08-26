@@ -50,7 +50,7 @@ def repo(tmp_db_path: Path) -> SqliteRepo:
 
 
 @pytest.fixture
-def make_window(qapp, repo: SqliteRepo, tmp_db_path: Path):
+def make_window(qapp, repo: SqliteRepo):
     """Build a MainWindow, and guarantee applogger loses track of its status
     bar again afterwards.
 
@@ -65,7 +65,7 @@ def make_window(qapp, repo: SqliteRepo, tmp_db_path: Path):
     built_windows: list[MainWindow] = []
 
     def factory() -> MainWindow:
-        built = MainWindow(repo=repo, db_path=tmp_db_path)
+        built = MainWindow(repo=repo)
         built_windows.append(built)
         return built
 

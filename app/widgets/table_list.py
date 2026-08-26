@@ -19,7 +19,7 @@ from app.logs.logger import applogger
 from app.utils.messages import ask
 from app.utils.i18n import _
 from app.widgets.series_operation import SeriesOperationWidget
-
+from PySide6.QtCore import Qt
 
 
 # Tables written by a series operation are prefixed, so the list can hide the
@@ -118,7 +118,7 @@ class _TableListModel(QStandardItemModel):
         self,
         index: PySide6.QtCore.QModelIndex,
         value: object,
-        role: int = PySide6.QtCore.Qt.ItemDataRole.EditRole,
+        role: int = Qt.ItemDataRole.EditRole,
     ) -> bool:
         if not super().setData(index, value, role):
             return False

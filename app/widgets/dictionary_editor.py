@@ -9,16 +9,26 @@ them writing UI code.
 from __future__ import annotations
 
 import ast
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QHeaderView, QLineEdit, QSizePolicy, QSpinBox, QStyledItemDelegate, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+    QDoubleSpinBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget,
+    QListWidgetItem, QMessageBox, QSizePolicy, QSpinBox, QStyledItemDelegate,
+    QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
+)
 
 from app.widgets.color_combo import MatplotlibColorCombo
+import cycler as _cycler
 from app.widgets.line_combo import LineStyleCombo
 from app.widgets.marker_combo import MarkerStyleCombo
-from app.styles.style import mark_editor_panel, stdSizeAndlayout
+from app.styles.style import (
+    MARGIN_NESTED, SPACING_TIGHT, action_presentation, apply_dialog_shell,
+    configure_combo_width, create_action_button, create_section_title,
+    mark_editor_panel, stdSizeAndlayout,
+)
 from app.utils.i18n import _
 
 
@@ -61,6 +71,8 @@ _KIND_BY_EXACT_KEY: dict[str, str] = {
     "log": "bool",
     "joinstyle": "joinstyle",
     "capstyle": "capstyle",
+    "axes.prop_cycle": "cycler",
+    "prop_cycle": "cycler",
 }
 
 _SUFFIX_KIND_RULES: tuple[tuple[str, str], ...] = (
@@ -194,6 +206,224 @@ def _group_for_key(key: str, meta: Mapping[str, Any], kind: str) -> str:
     return "Other"
 
 
+_CYCLER_PRESETS: dict[str, dict[str, list[str]]] = {
+    "color": {
+        "Matplotlib default": ["1f77b4", "ff7f0e", "2ca02c", "d62728", "9467bd", "8c564b", "e377c2", "7f7f7f", "bcbd22", "17becf"],
+        "Colorblind friendly": ["0072b2", "e69f00", "009e73", "cc79a7", "56b4e9", "d55e00", "f0e442", "000000"],
+        "Classic": ["0000ff", "008000", "ff0000", "00bfbf", "bf00bf", "bfbf00", "000000"],
+    },
+    "linestyle": {
+        "Basic": ["-", "--", "-.", ":"],
+        "Solid and dashed": ["-", "--"],
+        "Dashed family": ["--", "-.", ":"],
+    },
+    "marker": {
+        "Common": ["o", "s", "^", "D", "v", "P", "X", "*"],
+        "Geometric": ["o", "s", "^", "v", "<", ">", "D", "d"],
+        "Points and lines": [".", ",", "o", "+", "x", "|", "_"],
+    },
+}
+_CYCLER_CHOICES: dict[str, list[str]] = {
+    "color": ["1f77b4", "ff7f0e", "2ca02c", "d62728", "9467bd", "8c564b", "e377c2", "7f7f7f", "bcbd22", "17becf"],
+    "linestyle": ["-", "--", "-.", ":"],
+    "marker": ["o", "s", "^", "v", "<", ">", "D", "d", "p", "h", "8", "P", "X", "*", "+", "x", ".", ",", "|", "_"],
+}
+_CYCLER_LABELS = {"color": "Colors", "linestyle": "Line styles", "marker": "Marker styles"}
+
+
+def _strip_color_hash(value: object) -> str:
+    text = str(value).strip()
+    return text[1:] if text.startswith("#") else text
+
+
+def _cycler_property(value: object, meta: Mapping[str, Any]) -> str:
+    """Resolve the one property edited by this cycler row."""
+    explicit = str(meta.get("cycler_property", meta.get("property", ""))).strip().lower()
+    aliases = {"colors": "color", "line": "linestyle", "line_style": "linestyle", "markers": "marker"}
+    explicit = aliases.get(explicit, explicit)
+    if explicit in _CYCLER_PRESETS:
+        return explicit
+    if isinstance(value, _cycler.Cycler):
+        keys = [str(key) for key in value.keys if str(key) in _CYCLER_PRESETS]
+        if keys:
+            return keys[0]
+    text = str(value or "")
+    for prop in ("color", "linestyle", "marker"):
+        if f"cycler('{prop}'" in text or f'cycler("{prop}"' in text:
+            return prop
+    return "color"
+
+
+def _cycler_values(value: object, prop: str) -> list[str]:
+    if isinstance(value, _cycler.Cycler):
+        values = [row[prop] for row in value if prop in row]
+    else:
+        import re
+        pattern = re.compile(rf"cycler\(\s*['\"]?{re.escape(prop)}['\"]?\s*,\s*(\[[^\]]*\])\s*\)")
+        match = pattern.search(str(value or ""))
+        if not match:
+            return []
+        try:
+            values = list(ast.literal_eval(match.group(1)))
+        except (SyntaxError, ValueError, TypeError):
+            return []
+    return [_strip_color_hash(item) if prop == "color" else str(item) for item in values]
+
+
+def _button(parent: QWidget, layout: QHBoxLayout, action_id: str, callback, label: str, tooltip: str):
+    """Create a catalogue-backed action button with context-specific wording."""
+    icon, _catalog_label, _catalog_tip = action_presentation(action_id)
+    return create_action_button(
+        parent=parent, action_id=action_id, action=callback, layout=layout,
+        presentation=(icon, _(label), _(tooltip)),
+    )
+
+
+class CyclerEditorDialog(QDialog):
+    """Edit exactly one Matplotlib cycler property."""
+
+    def __init__(self, prop: str, value: object = "", parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        if prop not in _CYCLER_PRESETS:
+            raise ValueError(f"Unsupported cycler property: {prop}")
+        self.prop = prop
+        self.setWindowTitle(_("{0} Cycler Editor").format(_CYCLER_LABELS[prop]))
+
+        root = QVBoxLayout(self)
+        apply_dialog_shell(self, root, size="small")
+
+        root.addWidget(create_section_title(_(_CYCLER_LABELS[prop]), self))
+
+        add_row = QHBoxLayout()
+        stdSizeAndlayout(add_row)
+        add_row.setSpacing(SPACING_TIGHT)
+        self.value_combo = QComboBox(self)
+        self.value_combo.setEditable(prop == "color")
+        self.value_combo.addItems(_CYCLER_CHOICES[prop])
+        configure_combo_width(self.value_combo)
+        add_row.addWidget(self.value_combo, 1)
+        _button(self, add_row, "add", self._add_current, "Add", "Add the selected value to the cycler")
+        root.addLayout(add_row)
+
+        self.values_list = QListWidget(self)
+        self.values_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        self.values_list.setMinimumHeight(150)
+        mark_editor_panel(self.values_list)
+        root.addWidget(self.values_list, 1)
+
+        list_actions = QHBoxLayout()
+        stdSizeAndlayout(list_actions)
+        list_actions.setSpacing(SPACING_TIGHT)
+        _button(self, list_actions, "up", lambda: self._move(-1), "Up", "Move the selected value up")
+        _button(self, list_actions, "down", lambda: self._move(1), "Down", "Move the selected value down")
+        _button(self, list_actions, "delete", self._remove, "Remove", "Remove the selected values")
+        list_actions.addStretch(1)
+        root.addLayout(list_actions)
+
+        preset_row = QHBoxLayout()
+        stdSizeAndlayout(preset_row)
+        preset_row.setSpacing(SPACING_TIGHT)
+        preset_row.addWidget(QLabel(_("Defaults:"), self))
+        self.preset_combo = QComboBox(self)
+        self.preset_combo.addItems(_CYCLER_PRESETS[prop])  # type: ignore
+        configure_combo_width(self.preset_combo)
+        preset_row.addWidget(self.preset_combo, 1)
+        _button(self, preset_row, "add", lambda: self._apply_preset(False), "Add", "Append the selected default cycler")
+        _button(self, preset_row, "commit", lambda: self._apply_preset(True), "Use", "Replace the current list with the selected default cycler")
+        root.addLayout(preset_row)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self)
+        buttons.accepted.connect(self._accept_valid)
+        buttons.rejected.connect(self.reject)
+        root.addWidget(buttons)
+        self.set_values(_cycler_values(value, prop))
+
+    def values(self) -> list[str]:
+        return [str(self.values_list.item(i).data(Qt.ItemDataRole.UserRole)) for i in range(self.values_list.count())]
+
+    def set_values(self, values: Iterable[object]) -> None:
+        self.values_list.clear()
+        for value in values:
+            self._append(str(value))
+
+    def _append(self, value: str) -> None:
+        value = value.strip()
+        if not value:
+            return
+        if self.prop == "color":
+            value = _strip_color_hash(value)
+        item = QListWidgetItem(value)
+        item.setData(Qt.ItemDataRole.UserRole, value)
+        self.values_list.addItem(item)
+
+    def _add_current(self) -> None:
+        self._append(self.value_combo.currentText())
+
+    def _remove(self) -> None:
+        for item in reversed(self.values_list.selectedItems()):
+            self.values_list.takeItem(self.values_list.row(item))
+
+    def _move(self, delta: int) -> None:
+        row = self.values_list.currentRow()
+        target = row + delta
+        if row < 0 or target < 0 or target >= self.values_list.count():
+            return
+        item = self.values_list.takeItem(row)
+        self.values_list.insertItem(target, item)
+        self.values_list.setCurrentRow(target)
+
+    def _apply_preset(self, replace: bool) -> None:
+        if replace:
+            self.values_list.clear()
+        for value in _CYCLER_PRESETS[self.prop][self.preset_combo.currentText()]:
+            self._append(value)
+
+    def _accept_valid(self) -> None:
+        if not self.values():
+            QMessageBox.warning(self, _("Empty cycler"), _("Add at least one value."))
+            return
+        self.accept()
+
+    def cycler_value(self) -> _cycler.Cycler:
+        values = self.values()
+        if self.prop == "color":
+            values = [value if value.startswith("#") else f"#{value}" for value in values]
+        return _cycler.cycler(self.prop, values)
+
+
+class CyclerValueEditor(QWidget):
+    """Inline delegate control for one cycler property."""
+
+    editingFinished = Signal()
+
+    def __init__(self, prop: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.prop = prop
+        self._value: object = ""
+        layout = QHBoxLayout(self)
+        stdSizeAndlayout(layout)
+        layout.setContentsMargins(*MARGIN_NESTED)
+        layout.setSpacing(SPACING_TIGHT)
+        self.preview = QLineEdit(self)
+        self.preview.setReadOnly(True)
+        layout.addWidget(self.preview, 1)
+        _button(self, layout, "edit", self._open, "Edit", "Edit this cycler")
+
+    def set_value(self, value: object) -> None:
+        self._value = value
+        self.preview.setText(_value_to_text(value))
+
+    def value(self) -> object:
+        return self._value
+
+    def _open(self) -> None:
+        dialog = CyclerEditorDialog(self.prop, self._value, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._value = dialog.cycler_value()
+            self.preview.setText(_value_to_text(self._value))
+            self.editingFinished.emit()
+
+
 class DictValueDelegate(QStyledItemDelegate):
     """Value delegate with matplotlib-style custom editors."""
 
@@ -230,6 +460,10 @@ class DictValueDelegate(QStyledItemDelegate):
             editor = LineStyleCombo(parent)
         elif kind == "marker":
             editor = MarkerStyleCombo(parent)
+        elif kind == "cycler":
+            prop = _cycler_property(self._panel.value_for_key(key), meta)
+            editor = CyclerValueEditor(prop, parent)
+            editor.editingFinished.connect(lambda: self.commitData.emit(editor))
         elif kind == "bool":
             editor = QCheckBox(parent)
         elif kind == "number":
@@ -271,6 +505,9 @@ class DictValueDelegate(QStyledItemDelegate):
         value = self._panel.value_for_key(key)
         text = _value_to_text(value)
 
+        if isinstance(editor, CyclerValueEditor):
+            editor.set_value(value)
+            return
         if isinstance(editor, MatplotlibColorCombo):
             if text == "":
                 editor.setCurrentIndex(0)
@@ -314,8 +551,10 @@ class DictValueDelegate(QStyledItemDelegate):
         if key is None:
             return
 
-        if isinstance(editor, MatplotlibColorCombo):
-            value: object = editor.current_hex() or None
+        if isinstance(editor, CyclerValueEditor):
+            value: object = editor.value()
+        elif isinstance(editor, MatplotlibColorCombo):
+            value = editor.current_hex() or None
         elif isinstance(editor, LineStyleCombo):
             value = editor.current_linestyle()
         elif isinstance(editor, MarkerStyleCombo):

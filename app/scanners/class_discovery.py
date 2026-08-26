@@ -6,7 +6,7 @@ series operation dialogs, or any other plugin-like class family.
 
 It provides:
 - AST-based discovery of classes that directly inherit from a named base class.
-- Static extraction of literal class attributes.
+- Static extraction of literal class attributes.a
 - Cached dynamic class loading from disk.
 """
 

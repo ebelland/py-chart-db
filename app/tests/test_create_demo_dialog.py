@@ -81,11 +81,11 @@ def repo(tmp_db_path: Path):
 
 
 @pytest.fixture
-def window(qapp, repo, tmp_db_path: Path):
+def window(qapp, repo):
     from app.logs.logger import applogger
     from app.dialogs.main_window import MainWindow
 
-    built = MainWindow(repo=repo, db_path=tmp_db_path)
+    built = MainWindow(repo=repo)
     yield built
     built.close()
     applogger.set_status_bar(None)
@@ -111,7 +111,7 @@ def test_choosing_a_demo_builds_it_and_opens_it(
     window._on_create_demo()
 
     assert target.exists()
-    assert window._db_path == target
+    assert window._repo.db_path == target
 
 
 def test_declining_the_save_dialog_builds_nothing(
@@ -126,10 +126,10 @@ def test_declining_the_save_dialog_builds_nothing(
         QFileDialog, "getSaveFileName", staticmethod(lambda *_a, **_k: ("", ""))
     )
 
-    original_db_path = window._db_path
+    original_db_path = window._repo.db_path
     window._on_create_demo()
 
-    assert window._db_path == original_db_path
+    assert window._repo.db_path == original_db_path
 
 
 def test_cancelling_the_picker_never_opens_a_save_dialog(

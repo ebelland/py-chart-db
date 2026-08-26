@@ -73,7 +73,7 @@ def run_app() -> int:
         repo = SqliteRepo(db_path=db_path)
         set_last_database(db_path)
 
-        window = MainWindow(repo=repo, db_path=db_path)
+        window = MainWindow(repo=repo)
         window.show()
 
         return app.exec()

@@ -180,20 +180,22 @@ class FitResult:
     output_name: str
     x_eval: np.ndarray
     y_eval: np.ndarray
+    z_eval: np.ndarray | None
     params: dict[str, float]
     metrics: dict[str, float]
     message: str
 
     def to_frame(self) -> pd.DataFrame:
-        return pd.DataFrame(
-            {
-                "source_series_id": self.source.series_id,
-                "source_series_name": self.source.name,
-                "model": self.model,
-                "x": self.x_eval,
-                "y": self.y_eval,
-            }
-        )
+        data: dict[str, object] = {
+            "source_series_id": self.source.series_id,
+            "source_series_name": self.source.name,
+            "model": self.model,
+            "x": self.x_eval,
+            "y": self.y_eval,
+        }
+        if self.z_eval is not None:
+            data["z"] = self.z_eval
+        return pd.DataFrame(data)
 
 
 class SeriesInterpolateDialog(SeriesOperationDialogBase):
@@ -561,31 +563,48 @@ class SeriesInterpolateDialog(SeriesOperationDialogBase):
 
     def _interpolate_one_series(self, series: SeriesChoice) -> FitResult:
         df = self._repo.query_df(series.sql_query)
-        x_col, y_col = self._xy_columns(df, series.roles)
+        x_col, y_col, z_col = self._series_columns(df, series.roles)
 
-        # prepare_input_xy replaces the old _clean_xy/_sort_unique_xy pair. It
-        # does the same three things - drop non-finite, sort, average duplicate
-        # x - but says so. The old pair repaired silently, so a series with two
-        # readings at one x was interpolated through neither and nothing in the
-        # interface ever mentioned it.
-        x_data, y_data = self.prepare_input_xy(
-            pd.to_numeric(df[x_col], errors="coerce").to_numpy(dtype=float),
-            pd.to_numeric(df[y_col], errors="coerce").to_numpy(dtype=float),
-            label=series.name,
+        x_raw = pd.to_numeric(df[x_col], errors="coerce").to_numpy(dtype=float)
+        y_raw = pd.to_numeric(df[y_col], errors="coerce").to_numpy(dtype=float)
+        z_raw = (
+            pd.to_numeric(df[z_col], errors="coerce").to_numpy(dtype=float)
+            if z_col is not None else None
         )
+        if z_raw is None:
+            x_data, y_data = self.prepare_input_xy(x_raw, y_raw, label=series.name)
+            z_data = None
+        else:
+            x_data, y_data, z_data = self._prepare_input_xyz(
+                x_raw, y_raw, z_raw, label=series.name
+            )
 
         x_eval = self._x_eval(x_data)
         model = self._model_name()
 
+        start_params = self._start_params()
         y_eval, params, message = self._evaluate_model(
             model=model,
             x_data=x_data,
             y_data=y_data,
             x_eval=x_eval,
-            start_params=self._start_params(),
+            start_params=start_params,
         )
 
         metrics = self._metrics(x_data, y_data, model, params)
+        z_eval: np.ndarray | None = None
+        if z_data is not None:
+            z_eval, z_params, z_message = self._evaluate_model(
+                model=model,
+                x_data=x_data,
+                y_data=z_data,
+                x_eval=x_eval,
+                start_params=start_params,
+            )
+            z_metrics = self._metrics(x_data, z_data, model, z_params)
+            metrics.update({f"z_{key}": value for key, value in z_metrics.items()})
+            params.update({f"z_{key}": value for key, value in z_params.items()})
+            message = f"Y: {message}; Z: {z_message}"
 
         safe_model_name = _TABLE_SAFE_RE.sub(
             "_",
@@ -605,33 +624,69 @@ class SeriesInterpolateDialog(SeriesOperationDialogBase):
             output_name=f"Interpolate: {series.name} [{model}]",
             x_eval=x_eval,
             y_eval=y_eval,
+            z_eval=z_eval,
             params=params,
             metrics=metrics,
             message=message,
         )
 
     @staticmethod
-    def _xy_columns(df: pd.DataFrame, roles: Mapping[str, Any]) -> tuple[str, str]:
+    def _series_columns(
+        df: pd.DataFrame,
+        roles: Mapping[str, Any],
+    ) -> tuple[str, str, str | None]:
+        """Resolve X/Y and the optional Z role for 2D or 3D series."""
         if df.empty:
-            applogger.error("Series query returned no rows.")
+            raise ValueError("Series query returned no rows.")
 
         columns = [str(col) for col in df.columns]
         x_name = str(roles.get("x", ""))
         y_name = str(roles.get("y", ""))
+        z_name = str(roles.get("z", ""))
 
         if x_name in columns and y_name in columns:
-            return x_name, y_name
+            return x_name, y_name, z_name if z_name in columns else None
 
         numeric = [
             str(col)
             for col in df.columns
             if pd.api.types.is_numeric_dtype(df[col])
         ]
-
         if len(numeric) < 2:
-            applogger.error("Series query must expose at least two numeric columns.")
+            raise ValueError("Series query must expose at least two numeric columns.")
+        fallback_z = numeric[2] if len(numeric) >= 3 and z_name else None
+        return numeric[0], numeric[1], fallback_z
 
-        return numeric[0], numeric[1]
+    @staticmethod
+    def _xy_columns(df: pd.DataFrame, roles: Mapping[str, Any]) -> tuple[str, str]:
+        """Backward-compatible 2D column resolver."""
+        x_name, y_name, _z_name = SeriesInterpolateDialog._series_columns(df, roles)
+        return x_name, y_name
+
+    def _prepare_input_xyz(
+        self,
+        x: np.ndarray,
+        y: np.ndarray,
+        z: np.ndarray,
+        *,
+        label: str,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Clean a 3D line series while preserving aligned X/Y/Z rows."""
+        if not (x.size == y.size == z.size):
+            raise ValueError(f"{label}: X, Y and Z must have equal lengths.")
+        frame = pd.DataFrame({"x": x, "y": y, "z": z}).replace(
+            [np.inf, -np.inf], np.nan
+        ).dropna()
+        if frame.empty:
+            raise ValueError(f"{label}: no finite X/Y/Z points are available.")
+        frame = frame.groupby("x", as_index=False, sort=True)[["y", "z"]].mean()
+        if len(frame) < 2:
+            raise ValueError(f"{label}: at least two distinct X values are required.")
+        return (
+            frame["x"].to_numpy(dtype=float),
+            frame["y"].to_numpy(dtype=float),
+            frame["z"].to_numpy(dtype=float),
+        )
 
     def _x_eval(self, x_data: np.ndarray) -> np.ndarray:
         spacing = self._spacing_combo.currentText()
@@ -936,7 +991,13 @@ class SeriesInterpolateDialog(SeriesOperationDialogBase):
                 if r2 is not None and np.isfinite(r2):
                     lines.append(f"R² = {r2:.5g}")
                 if rmse is not None and np.isfinite(rmse):
-                    lines.append(f"RMSE = {rmse:.5g}")
+                    lines.append(f"Y RMSE = {rmse:.5g}" if result.z_eval is not None else f"RMSE = {rmse:.5g}")
+                z_r2 = result.metrics.get("z_r2")
+                z_rmse = result.metrics.get("z_rmse")
+                if z_r2 is not None and np.isfinite(z_r2):
+                    lines.append(f"Z R² = {z_r2:.5g}")
+                if z_rmse is not None and np.isfinite(z_rmse):
+                    lines.append(f"Z RMSE = {z_rmse:.5g}")
             else:
                 lines.append(f"Generated {len(result.x_eval)} points")
             lines.append("")
@@ -958,10 +1019,13 @@ class SeriesInterpolateDialog(SeriesOperationDialogBase):
         return result.table_name
 
     def result_series_spec(self, axis_id: int, table_name: str, result: FitResult) -> ResultSeriesSpec:
+        is_3d = result.z_eval is not None
+        columns = "x, y, z" if is_3d else "x, y"
+        roles = {"x": "x", "y": "y", "z": "z"} if is_3d else {"x": "x", "y": "y"}
         return ResultSeriesSpec(
             name=result.output_name,
-            sql_query=f'SELECT x, y FROM "{table_name}" ORDER BY x',
-            roles={"x": "x", "y": "y"},
+            sql_query=f'SELECT {columns} FROM "{table_name}" ORDER BY x',
+            roles=roles,
             style={
                 "linestyle": "--",
                 "linewidth": 2.0,

@@ -70,8 +70,8 @@ def repo(tmp_db_path: Path) -> SqliteRepo:
 
 
 @pytest.fixture
-def window(qapp, repo: SqliteRepo, tmp_db_path: Path):
-    built = MainWindow(repo=repo, db_path=tmp_db_path)
+def window(qapp, repo: SqliteRepo):
+    built = MainWindow(repo=repo)
     yield built
     built.close()
     applogger.set_status_bar(None)

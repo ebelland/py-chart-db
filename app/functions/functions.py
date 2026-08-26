@@ -3,16 +3,16 @@ from __future__ import annotations
 import numpy as np
 import scipy.special as spsp
 from app.functions.base import (
-    _baseline,
-    _eps,
-    _exponential,
-    _measured_fwhm,
-    _peak_shape,
-    _periodic_guess,
-    _polynomial_guess,
-    _pos,
-    _positive_x,
-    _safe_x,
+    baseline,
+    eps,
+    exponential,
+    measured_fwhm,
+    peak_shape,
+    periodic_guess,
+    polynomial_guess,
+    pos,
+    positive_x,
+    safe_x,
     base_function,
 )
 
@@ -51,7 +51,7 @@ class linear(base_function):
 
     @staticmethod
     def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
-        return _polynomial_guess(x, y, 1)
+        return polynomial_guess(x, y, 1)
 
 class quadratic(base_function):
     name = "Quadratic"
@@ -67,7 +67,7 @@ class quadratic(base_function):
 
     @staticmethod
     def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
-        return _polynomial_guess(x, y, 2)
+        return polynomial_guess(x, y, 2)
 
 class cubic(base_function):
     name = "Cubic"
@@ -83,7 +83,7 @@ class cubic(base_function):
 
     @staticmethod
     def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
-        return _polynomial_guess(x, y, 3)
+        return polynomial_guess(x, y, 3)
 
 class reciprocal(base_function):
     name = "Reciprocal"
@@ -95,7 +95,7 @@ class reciprocal(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        return p[0] / _safe_x(x) + p[1]
+        return p[0] / safe_x(x) + p[1]
 
 class logarithmic(base_function):
     name = "Logarithmic"
@@ -107,7 +107,7 @@ class logarithmic(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        return p[0] * np.log(_positive_x(x - p[1])) + p[2]
+        return p[0] * np.log(positive_x(x - p[1])) + p[2]
 
 class power_law(base_function):
     name = "Power law"
@@ -119,7 +119,7 @@ class power_law(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        return p[0] * np.power(_positive_x(x), p[1]) + p[2]
+        return p[0] * np.power(positive_x(x), p[1]) + p[2]
 
     @staticmethod
     def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
@@ -134,7 +134,7 @@ class power_law(base_function):
         rule of thumb can decide in advance.
         """
         candidates: list[list[float]] = []
-        for offset in (_baseline(y), 0.0):
+        for offset in (baseline(y), 0.0):
             above = y - offset
             usable = (x > 0.0) & (above > 0.0)
             if int(np.count_nonzero(usable)) < 2:
@@ -168,7 +168,7 @@ class rational_21(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        return (p[0] + p[1] * x + p[2] * x**2) / _eps(1.0 + p[3] * x)
+        return (p[0] + p[1] * x + p[2] * x**2) / eps(1.0 + p[3] * x)
 
 # ---------------------------------------------------------------------------
 # Growth and saturation
@@ -188,7 +188,7 @@ class exponential_growth(base_function):
 
     @staticmethod
     def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
-        return _exponential(x, y, True)
+        return exponential(x, y, True)
 
 class exponential_decay(base_function):
     name = "Exponential decay"
@@ -204,7 +204,7 @@ class exponential_decay(base_function):
 
     @staticmethod
     def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
-        return _exponential(x, y, False)
+        return exponential(x, y, False)
 
 class double_exponential_decay(base_function):
     name = "Double exponential decay"
@@ -240,7 +240,7 @@ class michaelis_menten(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        return p[2] + p[0] * x / _eps(p[1] + x)
+        return p[2] + p[0] * x / eps(p[1] + x)
 
     @staticmethod
     def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
@@ -282,9 +282,9 @@ class hill(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        xp = _positive_x(x)
-        n = _pos(p[2])
-        return p[3] + p[0] * xp**n / _eps(_positive_x(p[1])**n + xp**n)
+        xp = positive_x(x)
+        n = pos(p[2])
+        return p[3] + p[0] * xp**n / eps(positive_x(p[1])**n + xp**n)
 
 # ---------------------------------------------------------------------------
 # Sigmoidal curves
@@ -333,7 +333,7 @@ class logistic5(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        return p[0] + p[1] / np.power(1.0 + np.exp(-p[2] * (x - p[3])), _pos(p[4]))
+        return p[0] + p[1] / np.power(1.0 + np.exp(-p[2] * (x - p[3])), pos(p[4]))
 
 class richards(base_function):
     name = "Richards generalized logistic"
@@ -345,7 +345,7 @@ class richards(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        nu = _pos(p[4])
+        nu = pos(p[4])
         return p[0] + p[1] / np.power(1.0 + nu * np.exp(-p[2] * (x - p[3])), 1.0 / nu)
 
 class gompertz_growth(base_function):
@@ -370,7 +370,7 @@ class erf_sigmoid(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        sigma = _pos(p[2])
+        sigma = pos(p[2])
         return p[3] + 0.5 * p[0] * (1.0 + spsp.erf((x - p[1]) / (np.sqrt(2.0) * sigma)))
 
 class tanh_sigmoid(base_function):
@@ -424,12 +424,12 @@ class gaussian_peak(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        sigma = _pos(p[2])
+        sigma = pos(p[2])
         return p[0] * np.exp(-((x - p[1]) ** 2) / (2.0 * sigma**2)) + p[3]
 
     @staticmethod
     def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
-        shape = _peak_shape(x, y)
+        shape = peak_shape(x, y)
         if shape is None:
             return None
         amplitude, centre, width, offset = shape
@@ -445,17 +445,17 @@ class lorentzian_peak(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        g2 = (0.5 * _pos(p[2])) ** 2
+        g2 = (0.5 * pos(p[2])) ** 2
         return p[0] * g2 / (((x - p[1]) ** 2) + g2) + p[3]
 
     @staticmethod
     def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
-        shape = _peak_shape(x, y)
+        shape = peak_shape(x, y)
         if shape is None:
             return None
         amplitude, centre, moment_width, offset = shape
 
-        width = _measured_fwhm(x, y, centre, amplitude, offset)
+        width = measured_fwhm(x, y, centre, amplitude, offset)
         if width is None:
             # Falling back to the moment is wrong by a factor for a Lorentzian,
             # but a too-wide peak in the right place still converges; no guess at
@@ -473,7 +473,7 @@ class pseudo_voigt_peak(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        width = _pos(p[2])
+        width = pos(p[2])
         eta = np.clip(p[3], 0.0, 1.0)
         g = np.exp(-((x - p[1]) ** 2) / (2.0 * width**2))
         l = (0.5 * width) ** 2 / (((x - p[1]) ** 2) + (0.5 * width) ** 2)
@@ -481,11 +481,11 @@ class pseudo_voigt_peak(base_function):
 
     @staticmethod
     def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
-        shape = _peak_shape(x, y)
+        shape = peak_shape(x, y)
         if shape is None:
             return None
         amplitude, centre, moment_width, offset = shape
-        width = _measured_fwhm(x, y, centre, amplitude, offset) or (2.355 * moment_width)
+        width = measured_fwhm(x, y, centre, amplitude, offset) or (2.355 * moment_width)
         # eta 0.5: an even mix is the honest starting point, since nothing in the
         # data says how Gaussian or Lorentzian the peak is.
         return [amplitude, centre, max(width, 1e-9), 0.5, offset]
@@ -501,8 +501,8 @@ class voigt_peak(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        sigma = _pos(p[2])
-        gamma = _pos(p[3])
+        sigma = pos(p[2])
+        gamma = pos(p[3])
         z = ((x - p[1]) + 1j * gamma) / (sigma * np.sqrt(2.0))
         v = np.real(spsp.wofz(z)) / (sigma * np.sqrt(2.0 * np.pi))
         return p[0] * v + p[4]
@@ -518,7 +518,7 @@ class asymmetric_gaussian_peak(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        sigma = np.where(x < p[1], _pos(p[2]), _pos(p[3]))
+        sigma = np.where(x < p[1], pos(p[2]), pos(p[3]))
         return p[0] * np.exp(-((x - p[1]) ** 2) / (2.0 * sigma**2)) + p[4]
 
 
@@ -532,8 +532,8 @@ class pearson_vii_peak(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        w = _pos(p[2])
-        m = _pos(p[3])
+        w = pos(p[2])
+        m = pos(p[3])
         return p[0] * np.power(1.0 + ((x - p[1]) / w) ** 2 / m, -m) + p[4]
 
 
@@ -555,7 +555,7 @@ class sine(base_function):
 
     @staticmethod
     def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
-        guess = _periodic_guess(x, y)
+        guess = periodic_guess(x, y)
         if guess is None:
             return None
         amplitude, omega, offset = guess
@@ -576,7 +576,7 @@ class cosine(base_function):
 
     @staticmethod
     def initial_guess(x: np.ndarray, y: np.ndarray) -> list[float] | None:
-        guess = _periodic_guess(x, y)
+        guess = periodic_guess(x, y)
         if guess is None:
             return None
         amplitude, omega, offset = guess
@@ -623,7 +623,7 @@ class normal_pdf(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        sigma = _pos(p[2])
+        sigma = pos(p[2])
         z = (x - p[1]) / sigma
         return p[0] * np.exp(-0.5 * z * z) / (sigma * np.sqrt(2.0 * np.pi)) + p[3]
 
@@ -638,7 +638,7 @@ class normal_cdf(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        sigma = _pos(p[2])
+        sigma = pos(p[2])
         return p[0] * 0.5 * (1.0 + spsp.erf((x - p[1]) / (sigma * np.sqrt(2.0)))) + p[3]
 
 
@@ -652,8 +652,8 @@ class lognormal_pdf(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        sigma = _pos(p[2])
-        xp = _positive_x(x - p[3])
+        sigma = pos(p[2])
+        xp = positive_x(x - p[3])
         z = (np.log(xp) - p[1]) / sigma
         return p[0] * np.exp(-0.5 * z * z) / (xp * sigma * np.sqrt(2.0 * np.pi)) + p[4]
 
@@ -668,8 +668,8 @@ class lognormal_cdf(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        sigma = _pos(p[2])
-        xp = _positive_x(x - p[3])
+        sigma = pos(p[2])
+        xp = positive_x(x - p[3])
         return p[0] * 0.5 * (1.0 + spsp.erf((np.log(xp) - p[1]) / (sigma * np.sqrt(2.0)))) + p[4]
 
 
@@ -683,7 +683,7 @@ class weibull_pdf(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        k = _pos(p[1]); lam = _pos(p[2]); xp = np.maximum(x - p[3], 0.0)
+        k = pos(p[1]); lam = pos(p[2]); xp = np.maximum(x - p[3], 0.0)
         y = (k / lam) * np.power(xp / lam, k - 1.0) * np.exp(-np.power(xp / lam, k))
         return p[0] * np.nan_to_num(y, nan=0.0, posinf=0.0, neginf=0.0) + p[4]
 
@@ -698,7 +698,7 @@ class weibull_cdf(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        k = _pos(p[1]); lam = _pos(p[2]); xp = np.maximum(x - p[3], 0.0)
+        k = pos(p[1]); lam = pos(p[2]); xp = np.maximum(x - p[3], 0.0)
         return p[0] * (1.0 - np.exp(-np.power(xp / lam, k))) + p[4]
 
 
@@ -712,7 +712,7 @@ class gamma_pdf(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        a = _pos(p[1]); scale = _pos(p[2]); xp = _positive_x(x - p[3])
+        a = pos(p[1]); scale = pos(p[2]); xp = positive_x(x - p[3])
         log_pdf = (a - 1.0) * np.log(xp) - xp / scale - spsp.gammaln(a) - a * np.log(scale)
         return p[0] * np.exp(log_pdf) + p[4]
 
@@ -727,7 +727,7 @@ class gamma_cdf(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        a = _pos(p[1]); scale = _pos(p[2]); xp = np.maximum((x - p[3]) / scale, 0.0)
+        a = pos(p[1]); scale = pos(p[2]); xp = np.maximum((x - p[3]) / scale, 0.0)
         return p[0] * spsp.gammainc(a, xp) + p[4]
 
 
@@ -741,7 +741,7 @@ class beta_pdf(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        a = _pos(p[1]); b = _pos(p[2]); lo = p[3]; width = _pos(p[4])
+        a = pos(p[1]); b = pos(p[2]); lo = p[3]; width = pos(p[4])
         t = np.clip((x - lo) / width, 1e-12, 1.0 - 1e-12)
         log_beta = spsp.gammaln(a) + spsp.gammaln(b) - spsp.gammaln(a + b)
         y = np.exp((a - 1.0) * np.log(t) + (b - 1.0) * np.log1p(-t) - log_beta) / width
@@ -759,7 +759,7 @@ class beta_cdf(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        a = _pos(p[1]); b = _pos(p[2]); lo = p[3]; width = _pos(p[4])
+        a = pos(p[1]); b = pos(p[2]); lo = p[3]; width = pos(p[4])
         t = np.clip((x - lo) / width, 0.0, 1.0)
         return p[0] * spsp.betainc(a, b, t) + p[5]
 
@@ -774,7 +774,7 @@ class cauchy_pdf(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        gamma = _pos(p[2]); z = (x - p[1]) / gamma
+        gamma = pos(p[2]); z = (x - p[1]) / gamma
         return p[0] / (np.pi * gamma * (1.0 + z * z)) + p[3]
 
 
@@ -788,7 +788,7 @@ class cauchy_cdf(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        gamma = _pos(p[2])
+        gamma = pos(p[2])
         return p[0] * (0.5 + np.arctan((x - p[1]) / gamma) / np.pi) + p[3]
 
 
@@ -806,7 +806,7 @@ class exponential_survival(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        return p[2] + p[0] * np.exp(-_pos(p[1]) * np.maximum(x, 0.0))
+        return p[2] + p[0] * np.exp(-pos(p[1]) * np.maximum(x, 0.0))
 
 
 class weibull_survival(base_function):
@@ -819,7 +819,7 @@ class weibull_survival(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        beta = _pos(p[1]); eta = _pos(p[2]); xp = np.maximum(x, 0.0)
+        beta = pos(p[1]); eta = pos(p[2]); xp = np.maximum(x, 0.0)
         return p[3] + p[0] * np.exp(-np.power(xp / eta, beta))
 
 
@@ -833,7 +833,7 @@ class weibull_hazard(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        beta = _pos(p[1]); eta = _pos(p[2]); xp = np.maximum(x, 1e-12)
+        beta = pos(p[1]); eta = pos(p[2]); xp = np.maximum(x, 1e-12)
         return p[3] + p[0] * (beta / eta) * np.power(xp / eta, beta - 1.0)
 
 
@@ -852,7 +852,7 @@ class arrhenius_kelvin(base_function):
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
         kb_ev = 8.617333262145e-5
-        return p[2] + p[0] * np.exp(-p[1] / (kb_ev * _positive_x(x)))
+        return p[2] + p[0] * np.exp(-p[1] / (kb_ev * positive_x(x)))
 
 
 class inverse_temperature_linear(base_function):
@@ -865,7 +865,7 @@ class inverse_temperature_linear(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        return p[1] + p[0] / _positive_x(x)
+        return p[1] + p[0] / positive_x(x)
 
 
 class gaussian_process_window(base_function):
@@ -878,7 +878,7 @@ class gaussian_process_window(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        return p[3] + p[0] * np.exp(-0.5 * ((x - p[1]) / _pos(p[2])) ** 2)
+        return p[3] + p[0] * np.exp(-0.5 * ((x - p[1]) / pos(p[2])) ** 2)
 
 
 class dose_response_power(base_function):
@@ -891,7 +891,7 @@ class dose_response_power(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        return p[3] + p[0] * np.power(_positive_x(x - p[1]), p[2])
+        return p[3] + p[0] * np.power(positive_x(x - p[1]), p[2])
 
 
 class poisson_yield(base_function):
@@ -904,7 +904,7 @@ class poisson_yield(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        return p[2] + p[0] * np.exp(-_pos(p[1]) * np.maximum(x, 0.0))
+        return p[2] + p[0] * np.exp(-pos(p[1]) * np.maximum(x, 0.0))
 
 
 # ---------------------------------------------------------------------------
@@ -921,7 +921,7 @@ class langmuir(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        kx = _pos(p[1]) * _positive_x(x)
+        kx = pos(p[1]) * positive_x(x)
         return p[2] + p[0] * kx / (1.0 + kx)
 
 
@@ -935,7 +935,7 @@ class freundlich(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        return p[2] + p[0] * np.power(_positive_x(x), 1.0 / _pos(p[1]))
+        return p[2] + p[0] * np.power(positive_x(x), 1.0 / pos(p[1]))
 
 
 class temkin(base_function):
@@ -948,4 +948,4 @@ class temkin(base_function):
 
     @staticmethod
     def execute(x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        return p[2] + p[0] * np.log(_positive_x(_pos(p[1]) * x))
+        return p[2] + p[0] * np.log(positive_x(pos(p[1]) * x))

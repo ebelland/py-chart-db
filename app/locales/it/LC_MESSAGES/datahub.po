@@ -4034,3 +4034,193 @@ msgstr "Automatico y, manuale x e z"
 
 msgid "Manual (all axes)"
 msgstr "Manuale (tutti gli assi)"
+
+
+# ---------------------------------------------------------------
+# Function plotting: 2D curves and 3D surfaces
+# ---------------------------------------------------------------
+
+msgid "2D curve"
+msgstr "Curva 2D"
+
+msgid "3D surface"
+msgstr "Superficie 3D"
+
+msgid "Add at least one value."
+msgstr "Aggiungi almeno un valore."
+
+msgid "Defaults:"
+msgstr "Valori predefiniti:"
+
+msgid "Empty cycler"
+msgstr "Cycler vuoto"
+
+msgid "Plot type"
+msgstr "Tipo di grafico"
+
+msgid "{0} Cycler Editor"
+msgstr "Editor cycler {0}"
+
+msgid "Choose where the generated curve or surface is drawn."
+msgstr "Scegli dove viene disegnata la curva o la superficie generata."
+
+msgid "End of the X range."
+msgstr "Fine dell'intervallo X."
+
+msgid "End of the Y range for a surface."
+msgstr "Fine dell'intervallo Y per una superficie."
+
+msgid "From y:"
+msgstr "Da y:"
+
+msgid "Linear or logarithmic spacing for both generated axes."
+msgstr "Spaziatura lineare o logaritmica per entrambi gli assi generati."
+
+msgid "Number of X samples."
+msgstr "Numero di campioni X."
+
+msgid "Number of Y samples for a surface."
+msgstr "Numero di campioni Y per una superficie."
+
+msgid "Start of the X range."
+msgstr "Inizio dell'intervallo X."
+
+msgid "Start of the Y range for a surface."
+msgstr "Inizio dell'intervallo Y per una superficie."
+
+msgid "To y:"
+msgstr "A y:"
+
+msgid "X points:"
+msgstr "Punti X:"
+
+msgid "Y points:"
+msgstr "Punti Y:"
+
+msgid "3D basic surfaces"
+msgstr "Superfici 3D di base"
+
+msgid "3D peak surfaces"
+msgstr "Superfici 3D a picco"
+
+msgid "3D periodic surfaces"
+msgstr "Superfici 3D periodiche"
+
+msgid "3D polynomial surfaces"
+msgstr "Superfici 3D polinomiali"
+
+msgid "3D radial surfaces"
+msgstr "Superfici 3D radiali"
+
+msgid "3D rational surfaces"
+msgstr "Superfici 3D razionali"
+
+msgid "Constant surface"
+msgstr "Superficie costante"
+
+msgid "Egg-crate surface"
+msgstr "Superficie a cartone per uova"
+
+msgid "Elliptic cone"
+msgstr "Cono ellittico"
+
+msgid "Elliptic paraboloid"
+msgstr "Paraboloide ellittico"
+
+msgid "Gaussian surface"
+msgstr "Superficie gaussiana"
+
+msgid "Hyperbolic surface"
+msgstr "Superficie iperbolica"
+
+msgid "Lorentzian surface"
+msgstr "Superficie lorentziana"
+
+msgid "Plane"
+msgstr "Piano"
+
+msgid "Plane wave"
+msgstr "Onda piana"
+
+msgid "Quadratic surface"
+msgstr "Superficie quadratica"
+
+msgid "Radial exponential surface"
+msgstr "Superficie esponenziale radiale"
+
+msgid "Radial ripple"
+msgstr "Increspatura radiale"
+
+msgid "Radial sinc surface"
+msgstr "Superficie sinc radiale"
+
+msgid "Saddle"
+msgstr "Sella"
+
+msgid "Sombrero surface"
+msgstr "Superficie a sombrero"
+
+msgid "Axis-aligned bowl or dome with movable center."
+msgstr "Scodella o cupola allineata agli assi con centro spostabile."
+
+msgid "Constant Z plane."
+msgstr "Piano Z costante."
+
+msgid "Cosine rings with optional exponential damping."
+msgstr "Anelli cosinusoidali con smorzamento esponenziale opzionale."
+
+msgid "Exponential decay from a movable center with elliptical scaling."
+msgstr "Decadimento esponenziale da un centro spostabile con scalatura ellittica."
+
+msgid "General second-order polynomial surface."
+msgstr "Superficie polinomiale generale del secondo ordine."
+
+msgid "Hyperbolic paraboloid."
+msgstr "Paraboloide iperbolico."
+
+msgid "Linear radial rise or fall from a movable center."
+msgstr "Crescita o decrescita radiale lineare da un centro spostabile."
+
+msgid "Mexican-hat or Ricker-like radial peak."
+msgstr "Picco radiale a cappello messicano o di tipo Ricker."
+
+msgid "Oscillating radial sinc profile."
+msgstr "Profilo sinc radiale oscillante."
+
+msgid "Plane with independent X and Y slopes."
+msgstr "Piano con pendenze X e Y indipendenti."
+
+msgid "Product of orthogonal cosine waves."
+msgstr "Prodotto di onde cosinusoidali ortogonali."
+
+msgid "Reciprocal quadratic surface with offset."
+msgstr "Superficie quadratica reciproca con offset."
+
+msgid "Rotated anisotropic Gaussian peak with offset."
+msgstr "Picco gaussiano anisotropo ruotato con offset."
+
+msgid "Rotated anisotropic Lorentzian peak with offset."
+msgstr "Picco lorentziano anisotropo ruotato con offset."
+
+msgid "Sinusoidal plane wave with independent X and Y wave numbers."
+msgstr "Onda piana sinusoidale con numeri d'onda X e Y indipendenti."
+
+
+# ---------------------------------------------------------------
+# Style stack actions
+# ---------------------------------------------------------------
+
+msgid "Add selected built-in style to stack"
+msgstr "Aggiungi lo stile integrato selezionato alla pila"
+
+msgid "Commit"
+msgstr "Conferma"
+
+msgid "Compute stack diff and load into parameter editor"
+msgstr "Calcola le differenze della pila e caricale nell'editor dei parametri"
+
+msgid "Add .mplstyle file(s) to stack"
+msgstr "Aggiungi file .mplstyle alla pila"
+
+msgid "Load"
+msgstr "Carica"

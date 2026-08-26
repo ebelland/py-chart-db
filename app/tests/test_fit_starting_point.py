@@ -484,12 +484,19 @@ def test_every_discovered_function_evaluates() -> None:
     scanner = FunctionScanner()
     broken: list[str] = []
 
+    # A Z=f(X,Y) surface is called with an (N, 2) array of coordinates, an
+    # ordinary Y=f(X) curve with a plain X. Feeding every model the 1-D X made
+    # each surface raise, so the shape of the input follows the declaration.
+    surface_inputs = np.column_stack((X, X))
+
     for payloads in scanner.catalog().values():
         for payload in payloads:
             model = scanner.make_model(payload)
             p0 = np.asarray(payload.get("p0") or [1.0], dtype=float)
+            is_surface = int(payload.get("input_dimensions", 1) or 1) >= 2
+            inputs = surface_inputs if is_surface else X
             try:
-                values = np.asarray(model(X, p0), dtype=float)
+                values = np.asarray(model(inputs, p0), dtype=float)
             except Exception as exc:  # noqa: BLE001
                 broken.append(f"{payload['name']}: {type(exc).__name__}: {exc}")
                 continue
@@ -497,3 +504,26 @@ def test_every_discovered_function_evaluates() -> None:
                 broken.append(f"{payload['name']}: returned {values.shape}, not {X.shape}")
 
     assert broken == []
+
+
+def test_a_surface_refuses_a_one_dimensional_input() -> None:
+    """The (N, 2) requirement has to fail loudly, not broadcast into nonsense."""
+    from app.scanners.functions_scanner import FunctionScanner
+
+    scanner = FunctionScanner()
+    surface = next(
+        (
+            payload
+            for payloads in scanner.catalog().values()
+            for payload in payloads
+            if int(payload.get("input_dimensions", 1) or 1) >= 2
+        ),
+        None,
+    )
+    if surface is None:
+        pytest.skip("no 3D surface functions are installed")
+
+    model = scanner.make_model(surface)
+    p0 = np.asarray(surface.get("p0") or [1.0], dtype=float)
+    with pytest.raises(ValueError, match=r"\(N, 2\)"):
+        model(X, p0)

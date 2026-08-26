@@ -631,10 +631,10 @@ class SeriesFitDialog(SeriesOperationDialogBase):
         return widget
 
     @staticmethod
-    def _unmatched_bracket_positions(expr: str) -> list[tuple[int, str, str]]:
+    def _unmatched_bracketpositions(expr: str) -> list[tuple[int, str, str]]:
         """Return unmatched bracket positions while ignoring strings and comments.
 
-        The returned tuples are (absolute_position, character, reason).
+        The returned tuples are (absoluteposition, character, reason).
         Brackets covered: (), [], {}. The UI message says parentheses because
         that is the most common user-facing case, but highlighting covers all
         expression grouping delimiters.
@@ -692,14 +692,14 @@ class SeriesFitDialog(SeriesOperationDialogBase):
                 if not stack:
                     errors.append((index, ch, f"unmatched closing '{ch}'"))
                 else:
-                    open_ch, open_pos = stack.pop()
+                    open_ch, openpos = stack.pop()
                     if open_ch != closes[ch]:
-                        errors.append((open_pos, open_ch, f"expected '{opens[open_ch]}' before '{ch}'"))
+                        errors.append((openpos, open_ch, f"expected '{opens[open_ch]}' before '{ch}'"))
                         errors.append((index, ch, f"unmatched closing '{ch}'"))
             index += 1
 
-        for open_ch, open_pos in stack:
-            errors.append((open_pos, open_ch, f"unmatched opening '{open_ch}'"))
+        for open_ch, openpos in stack:
+            errors.append((openpos, open_ch, f"unmatched opening '{open_ch}'"))
         return sorted(errors, key=lambda item: item[0])
 
 

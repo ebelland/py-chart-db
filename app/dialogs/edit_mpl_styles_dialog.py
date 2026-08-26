@@ -393,9 +393,15 @@ class MplStyleEditorDialog(QDialog):
         # Root layout: splitter + status bar + Apply.
         root = QVBoxLayout(self)
         apply_dialog_shell(self, root, size="large")
+        # Keep the editor comfortably usable while avoiding oversized shell
+        # padding and unnecessary gaps.
+        root.setContentsMargins(8, 8, 8, 8)
+        root.setSpacing(6)
+        self.resize(960, 620)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setChildrenCollapsible(False)
+        splitter.setHandleWidth(4)
         root.addWidget(splitter, 1)
 
         # Status + action row.
@@ -436,8 +442,14 @@ class MplStyleEditorDialog(QDialog):
         card_lay.setContentsMargins(*MARGIN_CARD)
         card_lay.setSpacing(0)
         card_lay.addWidget(self.canvas, 1)
-        pg.addWidget(self.preview_card, 0, Qt.AlignmentFlag.AlignTop)
+        self.preview_card.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding,
+        )
+        pg.addWidget(self.preview_card, 1)
         ll.addWidget(preview_panel, 1)
+        ll.setStretch(0, 0)
+        ll.setStretch(1, 1)
 
         # Right: parameters editor.
         right: QWidget = self._build_table_group()
@@ -495,8 +507,11 @@ class MplStyleEditorDialog(QDialog):
         panel: QWidget = create_card_widget(self, f"mplStyle{title.replace(' ', '')}Card")
         layout: QVBoxLayout = QVBoxLayout(panel)
         stdSizeAndlayout(layout)
-        layout.setContentsMargins(*MARGIN_CARD)
-        layout.setSpacing(8)
+        # Slightly tighter than the general-purpose card defaults: this
+        # dialog contains two nested, control-heavy editor panels.
+        compact_margin = tuple(min(int(value), 8) for value in MARGIN_CARD)
+        layout.setContentsMargins(*compact_margin)
+        layout.setSpacing(5)
 
         title_label: QLabel = create_section_title(title, panel)
         layout.addWidget(title_label, 0)
@@ -523,30 +538,60 @@ class MplStyleEditorDialog(QDialog):
         stdSizeAndlayout(row)
         row.setSpacing(4)
         row.addWidget(self.builtin, 1, Qt.AlignmentFlag.AlignVCenter)
-
-        self._add_button_actions(row, [
-            ("add", "Add selected built-in style to stack",
-             self._stack_add_builtin),
-            ("open", "Add .mplstyle file(s) to stack",
-             self._stack_add_files),
-            (None, None, None),
-            ("up", "Move selected entry up", self._stack_move_up),
-            ("down", "Move selected entry down", self._stack_move_down),
-            ("delete", "Remove selected entries", self._stack_remove_selected),
-            (None, None, None),
-            ("table",
-             "Compute stack diff and load into parameter editor",
-             self._stack_result_to_table),
-        ])
+    
+        create_action_button(
+            parent=self,
+            action_id="add_to_stack",
+            action=self._stack_add_builtin,
+            layout=row)
+        create_action_button(
+            parent=self,
+            action_id="load_stack",
+            action=self._stack_add_files,
+            layout=row)
+        create_action_button(
+            parent=self,
+            action_id="commit_stack",
+            action=self._stack_result_to_table,
+            layout=row)
 
         self.stack = QListWidget()
         self.stack.setSelectionMode(
             QAbstractItemView.SelectionMode.ExtendedSelection)
-        self.stack.setFixedHeight(140)
+        self.stack.setMinimumHeight(90)
+        self.stack.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Preferred,
+        )
         mark_editor_panel(self.stack)
+
+        # Reordering and deletion belong to the list, so keep them directly
+        # below it instead of crowding the style-selection row.
+        list_actions = QHBoxLayout()
+        stdSizeAndlayout(list_actions)
+        list_actions.setSpacing(4)
+       
+        create_action_button(
+            parent=self,
+            action_id="up",
+            action=self._stack_move_up,
+            layout=list_actions)
+        create_action_button(
+            parent=self,
+            action_id="down",
+            action=self._stack_move_down,
+            layout=list_actions)
+        create_action_button(
+            parent=self,
+            action_id="delete",
+            action=self._stack_remove_selected,
+            layout=list_actions)
+
+        list_actions.addStretch(1)
 
         lay.addLayout(row)
         lay.addWidget(self.stack)
+        lay.addLayout(list_actions)
         return group
 
     def _build_table_group(self) -> QWidget:
@@ -571,15 +616,41 @@ class MplStyleEditorDialog(QDialog):
         # is why these are rcparam_* rather than the generic add/open/save -
         # "Add" on this row means "insert the selected rcParam", and the button
         # should say so.
-        self._add_button_actions(row, [
-            ("rcparam_add", self._add_param_from_picker),
-            ("rcparam_open", self._load_from_file),
-            (None, None),
-            ("rcparam_reset", self._reset_selected_to_defaults),
-            ("rcparam_delete", self._remove_selected_rows),
-            (None, None),
-            ("rcparam_save", self._save_file),
-        ])
+        # Keep the picker and Add action on one dedicated, full-width line.
+        create_action_button(
+            parent=self,
+            action_id="add",
+            action=self._add_param_from_picker,
+            layout=row)
+        
+        # File/default actions sit in a compact secondary row.  Remove is
+        # deliberately pushed to the far right, where destructive actions are
+        # easier to distinguish from the parameter-add workflow.
+        table_actions = QHBoxLayout()
+        stdSizeAndlayout(table_actions)
+        table_actions.setSpacing(4)
+        create_action_button(
+            parent=self,
+            action_id="rcparam_open",
+            action=self._load_from_file,
+            layout=table_actions)
+        create_action_button(
+            parent=self,
+            action_id="rcparam_reset",
+            action=self._reset_selected_to_defaults,
+            layout=table_actions)
+        create_action_button(
+            parent=self,
+            action_id="rcparam_save",
+            action=self._save_file,
+            layout=table_actions)
+        table_actions.addStretch(1)
+
+        create_action_button(
+            parent=self,
+            action_id="delete",
+            action=self._remove_selected_rows,
+            layout=table_actions)
 
         self._param_schema: dict[str, object] = {}
         self.editor = DictEditorPanel({}, self)
@@ -594,57 +665,8 @@ class MplStyleEditorDialog(QDialog):
 
         lay.addLayout(row)
         lay.addWidget(self.editor, 1)
+        lay.addLayout(table_actions)
         return group
-
-    def _add_button_actions(
-        self,
-        layout: QHBoxLayout,
-        actions: Iterable[ButtonAction],
-    ) -> None:
-        """Add compact action buttons to *layout*.
-
-        Accepts both button descriptors used in this dialog:
-
-        * ``(action_id, callback)``
-          Use the shared action catalogue from ``style.py`` for icon, label and
-          tooltip.
-        * ``(action_id, tooltip, callback)``
-          Legacy form used by the style-stack row.  The button is still created
-          through ``create_action_button``.  Only the tooltip is overridden, so
-          icon/label remain catalogue-driven wherever the action exists.
-
-        ``action_id is None`` inserts a small spacer.
-        """
-        if actions is None:
-            return
-
-        for descriptor in actions:
-            action_id: str | None
-            tooltip: str | None
-            callback: Callable[[], None] | None
-
-            if len(descriptor) == 2:
-                action_id, callback = descriptor
-                tooltip = None
-            else:
-                action_id, tooltip, callback = descriptor
-
-            if action_id is None:
-                layout.addSpacing(6)
-                continue
-
-            presentation = None
-            if tooltip:
-                icon, label, _catalog_tooltip = action_presentation(action_id)
-                presentation = (icon, label, tooltip)
-
-            create_action_button(
-                parent=self,
-                action_id=action_id,
-                action=callback,
-                layout=layout,
-                presentation=presentation,
-            )
 
     # ======================================================================
     # Canvas helpers
@@ -657,10 +679,10 @@ class MplStyleEditorDialog(QDialog):
             facecolor="none",
         )
         canvas: FigureCanvas = FigureCanvas(fig)
-        canvas.setFixedSize(320, 220)
+        canvas.setMinimumSize(280, 180)
         canvas.setSizePolicy(
-            QSizePolicy.Policy.Fixed,
-            QSizePolicy.Policy.Fixed,
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding,
         )
         canvas.setProperty("previewCanvas", True)
         return canvas

@@ -30,6 +30,7 @@ class FitFunctionSpec:
     p0: tuple[float, ...]
     params: tuple[str, ...]
     discovery_entry: dict[str, Any]
+    input_dimensions: int = 1
 
     @property
     def class_name(self) -> str:
@@ -52,6 +53,8 @@ class FitFunctionSpec:
             "discovery_entry": dict(self.discovery_entry),
             "function_class": self.class_name,
             "path": self.path,
+            "input_dimensions": self.input_dimensions,
+            "dimensions": self.input_dimensions,
         }
 
 
@@ -123,10 +126,18 @@ class FunctionScanner:
         if not callable(execute):
             raise TypeError(f"Discovered function {cls!r} has no callable execute(x, p).")
 
+        input_dimensions = self._payload_input_dimensions(payload, cls)
+
         def model(x_or_xy: np.ndarray, p: np.ndarray) -> np.ndarray:
-            x = self._primary_x(np.asarray(x_or_xy, dtype=float))
+            inputs = np.asarray(x_or_xy, dtype=float)
+            if input_dimensions < 2:
+                inputs = self._primary_x(inputs)
+            elif inputs.ndim != 2 or inputs.shape[1] < 2:
+                raise ValueError(
+                    "3D surface functions require an (N, 2) array of X/Y coordinates."
+                )
             params = np.asarray(p, dtype=float).reshape(-1)
-            return np.asarray(execute(x, params), dtype=float)
+            return np.asarray(execute(inputs, params), dtype=float)
 
         return model
 
@@ -167,6 +178,7 @@ class FunctionScanner:
             expression = str(entry.get("expression") or getattr(cls, "expression", "") or "")
             params = self._string_tuple(entry.get("params") or getattr(cls, "params", []))
             p0 = self._float_tuple(getattr(cls, "p0", []), fallback_length=len(params))
+            input_dimensions = self._class_input_dimensions(cls, category, path)
 
             if params and len(params) != len(p0):
                 applogger.warning(
@@ -185,11 +197,39 @@ class FunctionScanner:
                     p0=p0,
                     params=params,
                     discovery_entry=dict(entry),
+                    input_dimensions=input_dimensions,
                 )
             )
 
         specs.sort(key=lambda item: (item.category.lower(), item.name.lower()))
         return specs
+
+    @staticmethod
+    def _class_input_dimensions(cls: Any, category: str, path: str) -> int:
+        """Return 2 for Z=f(X,Y) surfaces and 1 for ordinary Y=f(X) curves."""
+        declared = getattr(cls, "input_dimensions", getattr(cls, "dimensions", None))
+        try:
+            if declared is not None:
+                return max(1, int(declared))
+        except (TypeError, ValueError):
+            pass
+        if category.strip().lower().startswith("3d ") or "functions_3d" in path.lower():
+            return 2
+        return 1
+
+    @classmethod
+    def _payload_input_dimensions(cls, payload: dict[str, Any], function_class: Any) -> int:
+        declared = payload.get("input_dimensions", payload.get("dimensions"))
+        try:
+            if declared is not None:
+                return max(1, int(declared))
+        except (TypeError, ValueError):
+            pass
+        return cls._class_input_dimensions(
+            function_class,
+            str(payload.get("category", "")),
+            str(payload.get("path", "")),
+        )
 
     @staticmethod
     def _primary_x(value: np.ndarray) -> np.ndarray:

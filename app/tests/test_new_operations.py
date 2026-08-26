@@ -464,31 +464,37 @@ def test_constants_outside_the_table_fall_back_and_say_so() -> None:
 # ======================================================================
 
 def test_a_linear_range_spans_the_requested_endpoints() -> None:
-    values = SeriesFunctionDialog._build_range(
-        {"start": 0.0, "stop": 10.0, "points": 5, "spacing": SPACING_LINEAR}
-    )
+    values = SeriesFunctionDialog._build_range(0.0, 10.0, 5, SPACING_LINEAR, "X")
     assert values.tolist() == [0.0, 2.5, 5.0, 7.5, 10.0]
 
 
 def test_a_log_range_is_evenly_spaced_in_decades() -> None:
-    values = SeriesFunctionDialog._build_range(
-        {"start": 1.0, "stop": 1000.0, "points": 4, "spacing": SPACING_LOG}
-    )
+    values = SeriesFunctionDialog._build_range(1.0, 1000.0, 4, SPACING_LOG, "X")
     assert values.tolist() == pytest.approx([1.0, 10.0, 100.0, 1000.0])
 
 
 def test_a_log_range_through_zero_is_refused() -> None:
-    with pytest.raises(ValueError, match="above zero"):
-        SeriesFunctionDialog._build_range(
-            {"start": -1.0, "stop": 10.0, "points": 10, "spacing": SPACING_LOG}
-        )
+    with pytest.raises(ValueError, match="positive limits"):
+        SeriesFunctionDialog._build_range(-1.0, 10.0, 10, SPACING_LOG, "X")
 
 
 def test_an_empty_range_is_refused() -> None:
     with pytest.raises(ValueError, match="empty"):
-        SeriesFunctionDialog._build_range(
-            {"start": 5.0, "stop": 5.0, "points": 10, "spacing": SPACING_LINEAR}
-        )
+        SeriesFunctionDialog._build_range(5.0, 5.0, 10, SPACING_LINEAR, "X")
+
+
+def test_a_refused_range_names_the_axis_that_was_wrong() -> None:
+    """The surface builds an X and a Y range; the message has to say which."""
+    with pytest.raises(ValueError, match="the Y range is empty"):
+        SeriesFunctionDialog._build_range(5.0, 5.0, 10, SPACING_LINEAR, "Y")
+    with pytest.raises(ValueError, match="logarithmic Y spacing"):
+        SeriesFunctionDialog._build_range(-1.0, 10.0, 10, SPACING_LOG, "Y")
+
+
+def test_a_range_always_has_at_least_two_points() -> None:
+    """A single-point range would collapse the plot, so count is floored at 2."""
+    assert SeriesFunctionDialog._build_range(0.0, 1.0, 1, SPACING_LINEAR, "X").size == 2
+    assert SeriesFunctionDialog._build_range(1.0, 10.0, 0, SPACING_LOG, "X").size == 2
 
 
 def test_the_scanner_finds_both_builtin_and_user_functions() -> None:
@@ -511,9 +517,7 @@ def test_a_discovered_function_evaluates_over_a_range() -> None:
         if payload.get("discovery_entry", {}).get("name") == "linear"
     )
     model = scanner.make_model(dict(payload))
-    x = SeriesFunctionDialog._build_range(
-        {"start": 1.0, "stop": 10.0, "points": 7, "spacing": SPACING_LINEAR}
-    )
+    x = SeriesFunctionDialog._build_range(1.0, 10.0, 7, SPACING_LINEAR, "X")
     y = np.asarray(model(x, np.asarray([0.0, 1.0])), dtype=float)
 
     assert y == pytest.approx(x), "intercept 0, slope 1 is the identity"

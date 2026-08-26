@@ -92,12 +92,11 @@ class MainWindow(QMainWindow):
     #: the screen.
     MAX_PROBLEMS_SHOWN: int = 20
 
-    def __init__(self, repo: SqliteRepo, db_path: Path) -> None:
+    def __init__(self, repo: SqliteRepo) -> None:
         super().__init__()
         self._repo = repo
-        self._db_path = db_path
         applogger.set_status_bar(self.statusBar())
-        applogger.debug(f"Initializing main window for database: {db_path}")
+        applogger.debug(f"Initializing main window for database: {self._repo.db_path}")
 
         self.setWindowTitle(_("Data Hub"))
         self.setWindowIcon(load_icon("new_plot"))
@@ -544,7 +543,11 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            app_menu = AppKit.NSApp.mainMenu().itemAtIndex_(0).submenu()
+            # PyObjC exposes this class dynamically, so static analyzers may
+            # not find it on the AppKit module even though it exists at runtime.
+            ns_application = getattr(AppKit, "NSApplication")
+            app = ns_application.sharedApplication()
+            app_menu = app.mainMenu().itemAtIndex_(0).submenu()
             if app_menu is None or app_menu.numberOfItems() == 0:
                 return
 
@@ -732,9 +735,8 @@ class MainWindow(QMainWindow):
             QApplication.processEvents()
 
             self._repo = SqliteRepo(db_path=db_path)
-            self._db_path = db_path
             self._table_panel.set_repo(self._repo)
-            self.setWindowTitle(f"Data hub: {self._db_path}")
+            self.setWindowTitle(f"Data hub: {self._repo.db_path}")
             set_last_database(db_path)
 
             self._table_panel.reload()
@@ -1186,7 +1188,7 @@ class MainWindow(QMainWindow):
         
     def _on_new_file(self) -> None:
         """Create a new database, safely replacing an existing file if possible."""
-        base_dir = str(self._db_path.parent) if self._db_path else ""
+        base_dir = str(self._repo.db_path.parent) if self._repo.db_path else ""
         file_path, _unused = QFileDialog.getSaveFileName(
             self,
             _("New database"),
@@ -1214,9 +1216,8 @@ class MainWindow(QMainWindow):
                 db_path.unlink()
 
             self._repo = SqliteRepo(db_path=db_path)
-            self._db_path = db_path
             self._table_panel.set_repo(self._repo)
-            self.setWindowTitle(f"Data hub: {self._db_path}")
+            self.setWindowTitle(f"Data hub: {self._repo.db_path}")
             set_last_database(db_path)
             self._table_panel.reload()
             self._reload_tabs()
@@ -1237,7 +1238,7 @@ class MainWindow(QMainWindow):
             return
         demo = picker.chosen
 
-        base_dir = str(self._db_path.parent) if self._db_path else str(Path.home())
+        base_dir = str(self._repo.db_path.parent) if self._repo.db_path else str(Path.home())
         file_path, _unused = QFileDialog.getSaveFileName(
             self,
             _("Save demo project"),
@@ -1260,7 +1261,7 @@ class MainWindow(QMainWindow):
 
     def _on_open_database(self) -> None:
         """Open an existing database and switch the current UI."""
-        base_dir = str(self._db_path.parent) if self._db_path else ""
+        base_dir = str(self._repo.db_path.parent) if self._repo.db_path else ""
         file_path, _unused = QFileDialog.getOpenFileName(
             self,
             _("Open database"),
