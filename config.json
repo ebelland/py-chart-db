@@ -697,14 +697,14 @@
     "figure_height_cm": 120.19,
     "figure_dpi": 122.0
   },
-  "last_database": "/tmp/pytest-of-root/pytest-46/test_choosing_a_demo_builds_it0/peak scan demo.dhub",
+  "last_database": "/Users/ebelland/Downloads/3D surfaces - gridded and scattered.dhub",
   "window_geometry": {
     "main_window": {
-      "x": 360,
-      "y": 798,
+      "x": 140,
+      "y": 72,
       "width": 1920,
       "height": 959,
-      "maximized": true
+      "maximized": false
     },
     "SeriesInterpolateDialog": {
       "x": 310,
@@ -743,7 +743,7 @@
     },
     "log_viewer": {
       "x": 563,
-      "y": 201,
+      "y": 297,
       "width": 900,
       "height": 640,
       "maximized": false
@@ -804,8 +804,8 @@
       1313
     ],
     "data_page": [
-      309,
-      622
+      307,
+      618
     ]
   },
   "dialog_state": {

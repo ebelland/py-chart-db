@@ -6,22 +6,10 @@ Ranked by priority. P0 = wrong results or blocked work, P3 = nice to have.
 P0 - BUGS: wrong output, or work that cannot proceed
 ================================================================
 
-P0-6  style pickers: an "auto" option that defers to rcParams
+N-6  style pickers: an "auto" option that defers to rcParams
      Line style and marker style should be able to say "whatever the style
      sheet says" rather than forcing a concrete value. Default to it, so a
      .mplstyle actually governs the look of a new series.
-
-P0-10 global: locale must follow the platform locale. Add Auto to settings
-      [DONE: i18n.AUTO_LANGUAGE is the stored sentinel and
-      i18n.platform_language() resolves it through QLocale.system() - not
-      locale.getlocale(), which reports the C locale until someone calls
-      setlocale, and not $LANG, which is a Unix convention Windows and macOS
-      do not follow. Only the language half of it_CH is kept, so a regional
-      variant finds its catalogue. Settings lists Auto first, labelled with
-      the language it currently resolves to, and stores the sentinel rather
-      than the resolved code so a machine that changes its locale follows it.
-      config.get_language() now defaults to auto for a config.json with no
-      language key, which is what a fresh installation has.]
 
 ================================================================
 NEW - requested after the review
