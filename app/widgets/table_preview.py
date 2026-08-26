@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from PySide6.QtCore import QAbstractTableModel, QEvent, QModelIndex, QObject, QPoint, Qt, Signal
-from PySide6.QtWidgets import QWidget, QFrame, QTableView, QHeaderView, QInputDialog, QVBoxLayout, QLineEdit
+from PySide6.QtWidgets import QMenu, QWidget, QFrame, QTableView, QHeaderView, QInputDialog, QVBoxLayout, QLineEdit
 from app.data.data_source import quote_identifier as _quote_table
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
@@ -212,7 +212,7 @@ class TablePreviewPanel(QWidget):
             return
         menu.exec(self.view.viewport().mapToGlobal(pos))
 
-    def _build_context_menu(self, pos: QPoint) -> "QMenu | None":
+    def _build_context_menu(self, pos: QPoint) -> QMenu | None:
         """Build the right-click menu for *pos*, or None to show nothing.
 
         Split out from _show_context_menu so a test can inspect the built

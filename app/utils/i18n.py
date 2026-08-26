@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import array
 import gettext
+import os
 import struct
 from functools import lru_cache
 from pathlib import Path
@@ -219,39 +220,84 @@ def language() -> str:
 def platform_language() -> str:
     """Return the language this machine is set to, as a bare code.
 
-    Qt is asked rather than the standard library: ``locale.getlocale`` reports
-    the C locale until someone calls ``setlocale``, and the ``LANG``
-    environment variable it falls back to is a Unix convention that Windows
-    and macOS do not follow - which is where an "Auto" that reads the
-    environment would quietly always mean English.  ``QLocale.system()`` reads
-    the real user setting on all three, and needs no QApplication.
+    ``QLocale.system().uiLanguages()`` is the question to ask, and asking the
+    wrong one is what made "Auto" read English on an Italian Mac.  macOS keeps
+    two settings that Qt reports separately: the *format* locale, which
+    ``QLocale.system().name()`` gives and which follows the region - an
+    Italian in Ireland has ``en_IE`` there - and the *preferred UI languages*,
+    which is the ordered list the user actually chose to read the interface
+    in.  Only the second is the one this setting means.  Windows draws the
+    same distinction; Linux mostly does not, but answers the same way.
 
-    Only the language half is kept: the catalogues are named ``it``, not
-    ``it_IT``, and a regional variant should still find the language's
-    catalogue.  A machine set to something nothing is translated into falls
-    back to English, which is what the untranslated source strings are.
+    The list arrives most specific first (``it-Latn-IT``, ``it-IT``,
+    ``it-Latn``, ``it``) and in preference order when several are configured,
+    so the first entry whose language has a catalogue wins - a Mac set to
+    Italian then English gets Italian, and one set to a language nothing is
+    translated into falls through to English rather than to the first entry.
+
+    The environment variables come last and only as a rescue: Qt reports the C
+    locale when a Linux session sets none, and ``LANG`` is then the only thing
+    that knows better.  They are a Unix convention that Windows and macOS do
+    not follow, which is why they cannot be asked first.
     """
+    for candidate in _platform_language_candidates():
+        code = _language_subtag(candidate)
+        if code and code in available_languages():
+            return code
+
+    applogger.info(
+        "No catalogue for anything this machine is set to; using %s.",
+        DEFAULT_LANGUAGE,
+    )
+    return DEFAULT_LANGUAGE
+
+
+def _platform_language_candidates() -> list[str]:
+    """Return every locale name this machine offers, best answer first."""
+    candidates: list[str] = []
+
     try:
         from PySide6.QtCore import QLocale
 
-        name = str(QLocale.system().name() or "")
+        system = QLocale.system()
+        candidates.extend(str(name) for name in system.uiLanguages())
+        candidates.append(str(system.name()))
     except Exception:  # pragma: no cover - depends on the Qt build
         applogger.warning(
-            "Could not read the platform locale; using %s.",
-            DEFAULT_LANGUAGE,
+            "Could not read the platform locale from Qt.",
             show_dialog=False,
             raise_error=False,
         )
-        return DEFAULT_LANGUAGE
 
-    code = name.split("_", 1)[0].split("-", 1)[0].strip().lower()
-    if code and code in available_languages():
-        return code
+    # Only useful where Qt came back with nothing usable, which in practice
+    # means a Linux session that sets LANG and no desktop locale.
+    for variable in ("LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"):
+        value = os.environ.get(variable, "")
+        # LANGUAGE is a colon-separated preference list; the rest are single
+        # locales, and splitting one of those on ":" simply yields itself.
+        candidates.extend(part for part in value.split(":") if part)
 
-    applogger.info(
-        "Platform locale %r has no catalogue; using %s.", name, DEFAULT_LANGUAGE
-    )
-    return DEFAULT_LANGUAGE
+    return candidates
+
+
+def _language_subtag(name: str) -> str:
+    """Return the language half of a locale name, lowercased.
+
+    ``it-Latn-IT``, ``it_IT.UTF-8`` and ``it`` all answer ``it``: the
+    catalogues are named for the language, so a script, a region and an
+    encoding are all noise here.  ``C`` and ``POSIX`` answer nothing, because
+    they are Qt's and libc's way of saying no locale is set rather than the
+    names of languages.
+    """
+    text = str(name or "").strip()
+    if not text:
+        return ""
+
+    for separator in ("-", "_", "."):
+        text = text.split(separator, 1)[0]
+
+    code = text.lower()
+    return "" if code in ("c", "posix") else code
 
 
 def set_language(code: str) -> str:
