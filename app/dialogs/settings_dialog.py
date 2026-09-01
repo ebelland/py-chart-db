@@ -26,6 +26,9 @@ whatever is constructed next and leaves the rest in the old language.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -40,7 +43,8 @@ from PySide6.QtWidgets import (
 from app.logs.logger import applogger
 from app.styles.style import (
     CONFIG_APP_STYLE,
-    PlatformStyle,
+    FILE_STYLE_PREFIX,
+    STYLES_DIR,
     available_app_styles,
     apply_card_layout,
     apply_dialog_shell,
@@ -50,6 +54,7 @@ from app.styles.style import (
     create_section_title,
     load_icon,
     resolve_app_style,
+    style_file_path,
     stdSizeAndlayout,
 )
 from app.utils.config import get_language, get_value, set_value
@@ -116,6 +121,11 @@ def normalized_save_format(value: object) -> str:
     return clean if clean in SAVE_FORMATS else DEFAULT_SAVE_FORMAT
 
 
+#: Item data for the row that opens a file picker. Not a style key: it is
+#: never stored, and _on_style_activated swaps it for the chosen file.
+_BROWSE_STYLE: str = "__browse__"
+
+
 class SettingsDialog(QDialog):
     """Read and write the machine-level preferences in config.json.
 
@@ -158,9 +168,13 @@ class SettingsDialog(QDialog):
         # that does not, rather than being listed and doing nothing.
         self._style_combo = self._combo(
             card,
-            [(key, tr(label)) for key, label in available_app_styles()],
+            self._style_choices(),
             self._entry_style,
         )
+        # The index to fall back to when Browse is cancelled: selecting the
+        # row already moved the combo off whatever was chosen before.
+        self._last_style_index = self._style_combo.currentIndex()
+        self._style_combo.activated.connect(self._on_style_activated)
         form.addRow(tr("App style"), self._style_combo)
 
         self._language_combo = self._combo(
@@ -203,14 +217,73 @@ class SettingsDialog(QDialog):
         )
         root.addLayout(action_row, 0)
 
-    def schoose(self, style_key:str|None):
+    # ------------------------------------------------------------------
+    # Choosing a stylesheet off disk
+    # ------------------------------------------------------------------
+    def _style_choices(self) -> list[tuple[str, str]]:
+        """Return every row of the style combo, Browse last.
 
-        if style_key=="browse":
-            file_path, _=QFileDialog.getOpenFileName(None,"Style sheet","","Qt style sheet (*.qss)")
-            if file_path:
-                applogger.debug(f"Selected path: {file_path}")
+        A sheet chosen earlier is listed too, and has to be: the combo carries
+        the stored key as item data, so a ``file:`` preference with no row of
+        its own would find no match and silently reselect Automatic - losing
+        the setting for anyone who merely opened this dialog and pressed Save.
+        """
+        choices = [(key, tr(label)) for key, label in available_app_styles()]
 
-        
+        if self._entry_style.startswith(FILE_STYLE_PREFIX):
+            choices.append((self._entry_style, self._file_style_label(self._entry_style)))
+
+        choices.append((_BROWSE_STYLE, tr("From file…")))
+        return choices
+
+    @staticmethod
+    def _file_style_label(style_key: str) -> str:
+        """Return the label for a chosen sheet: its file name, not its path.
+
+        The full path is the tooltip instead - it is what tells two files of
+        the same name apart, and it is far too long to size a combo by.
+        """
+        path = style_file_path(style_key)
+        return f"File: {path.name}" if path is not None else "File"
+
+    def _on_style_activated(self, index: int) -> None:
+        """Open the file picker when the Browse row is chosen, else remember."""
+        if self._style_combo.itemData(index) != _BROWSE_STYLE:
+            self._last_style_index = index
+            return
+
+        start_dir = str(STYLES_DIR) if STYLES_DIR.is_dir() else ""
+        path_str, _unused = QFileDialog.getOpenFileName(
+            self,
+            tr("Select a stylesheet"),
+            start_dir,
+            tr("Qt stylesheet (*.qss);;All files (*)"),
+        )
+        if not path_str:
+            # Cancelling leaves "From file…" selected otherwise, which reads
+            # as a style and would be saved as one.
+            self._style_combo.setCurrentIndex(self._last_style_index)
+            return
+
+        self._select_style_file(Path(path_str))
+
+    def _select_style_file(self, path: Path) -> None:
+        """Put *path* in the combo as the current style, replacing any earlier one."""
+        key = f"{FILE_STYLE_PREFIX}{path.expanduser().resolve()}"
+
+        existing = self._style_combo.findData(key)
+        if existing < 0:
+            # Before the Browse row, which stays last.
+            existing = self._style_combo.count() - 1
+            self._style_combo.insertItem(existing, self._file_style_label(key), key)
+        self._style_combo.setItemData(
+            existing, str(path), Qt.ItemDataRole.ToolTipRole
+        )
+
+        self._style_combo.setCurrentIndex(existing)
+        self._last_style_index = existing
+        applogger.debug("Stylesheet chosen: %s", path)
+
     # ------------------------------------------------------------------
     # Construction helpers
     # ------------------------------------------------------------------

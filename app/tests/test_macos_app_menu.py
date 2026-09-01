@@ -120,9 +120,16 @@ def test_the_menu_holds_every_item_the_popup_has(window: MainWindow) -> None:
     ]
 
 
-def test_settings_carries_the_preferences_role(window: MainWindow) -> None:
-    """This, not the menu it sits in, is what actually moves it next to the
-    apple - Cocoa relocates a role-marked action wherever it was declared."""
+def test_settings_stays_in_the_file_menu(window: MainWindow) -> None:
+    """It used to carry PreferencesRole, and that is what broke it.
+
+    Cocoa relocates a role-marked action into the application menu next to
+    the apple, wherever it was declared. _build_app_menu rebuilds the whole
+    bar - after Settings closes, among other times - and menuBar().clear()
+    then leaves that native item referring to no live QAction, so choosing
+    Preferences did nothing at all. Without the role it stays in the menu
+    that is rebuilt with it.
+    """
     menu_bar = window.menuBar()
     top_actions = menu_bar.actions()
     top_action = top_actions[0]
@@ -130,7 +137,8 @@ def test_settings_carries_the_preferences_role(window: MainWindow) -> None:
     items = menu.actions()
 
     settings_action = next(action for action in items if action.data() == "settings")
-    assert settings_action.menuRole() == QAction.MenuRole.PreferencesRole
+    assert settings_action.menuRole() == QAction.MenuRole.NoRole
+    assert settings_action.isEnabled()
 
 
 def test_credits_carries_the_about_role(window: MainWindow) -> None:
@@ -145,7 +153,7 @@ def test_credits_carries_the_about_role(window: MainWindow) -> None:
 
 
 def test_nothing_else_is_given_a_role_it_did_not_ask_for(window: MainWindow) -> None:
-    """Only Settings and Credits are meant to be pulled out of this menu."""
+    """Only Credits is meant to be pulled out of this menu."""
     menu_bar = window.menuBar()
     top_actions = menu_bar.actions()
     top_action = top_actions[0]

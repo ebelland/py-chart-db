@@ -51,7 +51,8 @@ from app.utils.i18n import tr
 
 _UI_DIR = Path(__file__).resolve().parent
 _APP_DIR = _UI_DIR.parent
-_STYLES_DIR = _APP_DIR / "styles"
+#: Where the shipped stylesheets live, and where the file picker opens.
+STYLES_DIR = _APP_DIR / "styles"
 _IS_MACOS = platform.system().lower() == "darwin"
 _IS_WINDOWS = platform.system().lower().startswith("win")
 
@@ -1125,7 +1126,7 @@ def load_icon(icon: str | None) -> QIcon:
 # ----------------------------------------------------------------------
 def _load_qss(name: str) -> tuple[str | None, Path | None]:
     """Load a QSS file by name from the app styles directory."""
-    path = _STYLES_DIR / name
+    path = STYLES_DIR / name
     if not path.exists():
         applogger.warning("QSS not found: %s", path)
         return None, None
@@ -1159,6 +1160,11 @@ APP_STYLE_QSS: dict[str, tuple[str, str]] = {
 
 #: Prefix marking a Qt style plugin rather than one of our themes.
 QT_STYLE_PREFIX: str = "qt:"
+
+#: Prefix marking a stylesheet the user picked off disk. The rest of the key
+#: is the path, stored absolute: a relative one would resolve against whatever
+#: directory the app happened to start in.
+FILE_STYLE_PREFIX: str = "file:"
 
 CONFIG_APP_STYLE: str = "app_style"
 
@@ -1203,6 +1209,104 @@ def _automatic_qss_name() -> str | None:
     return None
 
 
+#: The first colour a sheet paints a background with, which is what decides
+#: the palette to pair it with. Covers the three spellings the sheets in the
+#: wild actually use; a gradient or a named colour is left to the fallback.
+_BACKGROUND_COLOR_RE = re.compile(
+    r"background(?:-color)?\s*:\s*"
+    r"(?:#(?P<hex>[0-9a-fA-F]{3,8})|rgba?\(\s*(?P<rgb>\d+\s*,\s*\d+\s*,\s*\d+))",
+)
+
+
+#: A rule, crudely: everything up to a brace, then the body. Good enough to
+#: find which selector a declaration belongs to, which is all this needs.
+_QSS_RULE_RE = re.compile(r"(?P<selectors>[^{}]*)\{(?P<body>[^{}]*)\}", re.S)
+
+#: The selectors that set the colour of the window as a whole. A plain one:
+#: ``QWidget[acrylicDark="true"]`` is a variant rule and says nothing about
+#: what the sheet looks like by default.
+_BROAD_SELECTOR_RE = re.compile(
+    r"(?:^|,)\s*(?:\*|QWidget|QMainWindow|QDialog)\s*(?:,|$)"
+)
+
+#: QSS comments, stripped before the sheet is picked apart.
+_QSS_COMMENT_RE = re.compile(r"/\*.*?\*/", re.S)
+
+
+def _rgb_from_match(match: "re.Match[str]") -> tuple[int, int, int] | None:
+    """Return the RGB in a ``_BACKGROUND_COLOR_RE`` match, or None."""
+    digits = match.group("hex")
+    if digits:
+        if len(digits) == 3:
+            digits = "".join(pair * 2 for pair in digits)
+        if len(digits) < 6:
+            return None
+        return (
+            int(digits[0:2], 16),
+            int(digits[2:4], 16),
+            int(digits[4:6], 16),
+        )
+
+    red, green, blue = (int(part.strip()) for part in match.group("rgb").split(","))
+    return (min(red, 255), min(green, 255), min(blue, 255))
+
+
+def _first_background_rgb(qss: str) -> tuple[int, int, int] | None:
+    """Return the background the sheet paints the window with, as 0-255 RGB.
+
+    Only a rule on a broad selector counts. Taking the first background
+    declaration anywhere read our own Fluent sheet as dark, off a
+    ``QFrame[acrylicDark="true"]`` variant several hundred lines in - a real
+    rule, but not one that says what the sheet looks like.
+
+    None means the sheet never sets a window background, which is a real
+    answer rather than a failure: NeonButtons styles buttons and nothing else,
+    and both of our own sheets colour themselves from palette tokens.
+    """
+    body_text = _QSS_COMMENT_RE.sub(" ", qss)
+
+    for rule in _QSS_RULE_RE.finditer(body_text):
+        if not _BROAD_SELECTOR_RE.search(rule.group("selectors")):
+            continue
+        match = _BACKGROUND_COLOR_RE.search(rule.group("body"))
+        if match is not None and (rgb := _rgb_from_match(match)) is not None:
+            return rgb
+    return None
+
+
+def sheet_palette_key(qss: str) -> str:
+    """Return the palette to pair with a stylesheet we did not write.
+
+    Our own themes name their palette in ``APP_STYLE_QSS``; a file the user
+    chose cannot, and pairing a dark sheet with the light palette is the
+    "window belonging to neither theme" that ``themed_qss`` warns about - the
+    widgets the sheet does not cover stay light, and the icon tinting reads
+    the wrong way round.
+
+    So the sheet is asked what it paints the window itself: the background on
+    ``QMainWindow``, ``QWidget``, ``QDialog`` or ``*``, classified by
+    luminance. That separates the shipped sheets cleanly - AMOLED opens on
+    #000000 and ElegantDark on rgb(82,82,82), Aqua on #ececec and Ubuntu on
+    #f0f0f0 - and a sheet that sets no window background at all reads as
+    light, which is what an unstyled application already looks like.
+    """
+    rgb = _first_background_rgb(qss)
+    if rgb is None:
+        return "light"
+    red, green, blue = rgb
+    # Rec. 709 luma: green carries most of perceived brightness, blue least.
+    luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+    return "dark" if luminance < 128.0 else "light"
+
+
+def style_file_path(style_key: str) -> Path | None:
+    """Return the path in a ``file:`` style key, or None for any other key."""
+    if not style_key.startswith(FILE_STYLE_PREFIX):
+        return None
+    raw = style_key[len(FILE_STYLE_PREFIX) :].strip()
+    return Path(raw).expanduser() if raw else None
+
+
 def resolve_app_style(preference: str | None = None) -> str:
     """Return a valid app-style key, falling back to automatic.
 
@@ -1210,10 +1314,24 @@ def resolve_app_style(preference: str | None = None) -> str:
     in config.json, or a Qt plugin that was uninstalled since it was chosen,
     should leave the app looking normal rather than unstyled.
     """
-
     clean = str(preference or "").strip()
     if not clean:
         clean = str(get_value(CONFIG_APP_STYLE, "") or "").strip()
+
+    if clean.startswith(FILE_STYLE_PREFIX):
+        path = style_file_path(clean)
+        if path is not None and path.is_file():
+            return f"{FILE_STYLE_PREFIX}{path}"
+        # A sheet that was moved or deleted since it was chosen, or a drive
+        # that is not mounted on this machine - the same class of thing as an
+        # uninstalled Qt plugin, and answered the same way.
+        applogger.warning(
+            "The stylesheet %s is missing; using the automatic style.",
+            path or "(unset)",
+            show_dialog=False,
+            raise_error=False,
+        )
+        return APP_STYLE_AUTOMATIC
 
     if clean.startswith(QT_STYLE_PREFIX):
         name = clean[len(QT_STYLE_PREFIX) :]
@@ -1250,7 +1368,9 @@ def apply_platform_style(
 
     global _ACTIVE_THEME_IS_DARK
 
-        
+    if style_key.startswith(FILE_STYLE_PREFIX):
+        return _apply_file_style(app, style_key, system)
+
     if style_key.startswith(QT_STYLE_PREFIX):
         name = style_key[len(QT_STYLE_PREFIX) :]
         # A Qt style draws itself; none of ours is a dark theme, so the glyphs
@@ -1283,6 +1403,44 @@ def apply_platform_style(
         return PlatformStyle(system, None)
 
     app.setStyleSheet(themed)
+    return PlatformStyle(system, path)
+
+
+def _apply_file_style(
+    app: QApplication, style_key: str, system: str
+) -> PlatformStyle:
+    """Install a stylesheet the user picked off disk.
+
+    Split out rather than inlined because it is the one branch that can fail
+    at *apply* time: resolve_app_style checked the file was there, and it can
+    still be unreadable a moment later. That falls back to the automatic style
+    rather than leaving the application unstyled, which is the same bargain
+    every other unusable preference here gets.
+    """
+    global _ACTIVE_THEME_IS_DARK
+
+    path = style_file_path(style_key)
+    try:
+        qss = path.read_text(encoding="utf-8") if path is not None else ""
+    except OSError as error:
+        applogger.warning(
+            "Could not read the stylesheet %s (%s); using the automatic style.",
+            path,
+            error,
+            show_dialog=False,
+            raise_error=False,
+        )
+        return apply_platform_style(app, APP_STYLE_AUTOMATIC)
+
+    themed, palette = themed_qss(qss, sheet_palette_key(qss))
+    _ACTIVE_THEME_IS_DARK = palette.dark
+    app.setPalette(palette.qpalette())
+    app.setStyleSheet(themed)
+    applogger.info(
+        "Applied the stylesheet %s with the %s palette.",
+        path,
+        "dark" if palette.dark else "light",
+    )
     return PlatformStyle(system, path)
 
 # ----------------------------------------------------------------------

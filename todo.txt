@@ -1,6 +1,20 @@
 py-chart-db TODO
 Ranked by priority. P0 = wrong results or blocked work, P3 = nice to have.
 
+Closed in the stylesheet/surface pass:
+  - App style can be a .qss file chosen from disk (Settings -> App style ->
+    "From file..."). The sheet is asked which palette to pair with it, so a
+    dark sheet no longer gets the light palette under it.
+  - Settings stayed unreachable from the macOS menu bar: it carried
+    PreferencesRole, Cocoa moved it into the application menu, and the
+    menu-bar rebuild left that native item pointing at a dead QAction. It is
+    pinned into the File menu with NoRole now - the explicit role matters,
+    since the default TextHeuristicRole relocates it by reading its text.
+  - Fit accepts 3D functions: Z = f(X, Y) against a series' x/y/z roles.
+  - Renderer options are converted to the type they declare, which is what
+    stopped a typed-in rstride or linewidth from raising inside Matplotlib.
+  - Six surface/contour demos: wave interference, membrane mode, Rosenbrock.
+
 
 ================================================================
 P0 - BUGS: wrong output, or work that cannot proceed
@@ -8,7 +22,16 @@ P0 - BUGS: wrong output, or work that cannot proceed
 P0-1: 3d interpolation-> every time a preview is chosen, an axis is drawn and not removed
 
 P0-2: grafico proporzionale da aggiungere ai kwargs
-  
+      Half-done already, and the missing half is discoverability: render_figure
+      ._apply_aspect_options applies "aspect" and "adjustable" to every axis
+      today, so {"aspect": "equal"} in the axis options gives an equal x/y step
+      right now - the contour demos use it. What is missing is that neither is
+      declared in any renderer's Kwargs, so nothing offers them in the options
+      editor and you have to know the name to type it. Declaring "aspect" on
+      the base (choices: auto / equal, plus a number) would put it in every
+      chart's editor without touching a renderer.
+
+
 P0-3: Salva database come...
 
 P0-4: proprietà della figura + compatta
@@ -18,6 +41,11 @@ N-6  style pickers: an "auto" option that defers to rcParams
      Line style and marker style should be able to say "whatever the style
      sheet says" rather than forcing a concrete value. Default to it, so a
      .mplstyle actually governs the look of a new series.
+     Colour belongs in the same change: series_properties should offer
+     "Default (from rcParams)" for line, marker *and* colour, and the
+     renderers should then simply leave the key out of the Matplotlib call
+     rather than passing a concrete value - get_kwargs already drops a key
+     whose value is None, so "default" has somewhere to land.
 
 N0-24: Enumeratore per contour algorithm
 ================================================================
@@ -25,145 +53,12 @@ NEW - requested after the review
 ================================================================
 N-01 Rotazione delle matrici (come parametro).
 
-
-N-13  Four more from the field [DONE]
-      Message boxes answered in English. QMessageBox builds Yes and No from
-      Qt's own catalogue, not ours - the text never passes through tr(), so
-      no amount of translating this application reached it. i18n
-      .install_qt_translations loads qtbase_<lang>.qm at startup, which fixes
-      every standard button (Save, Cancel, Open) rather than just those two.
-      The QTranslator objects are kept in a module list: installTranslator
-      does not take ownership, and a collected one reverts silently.
-
-      "Contour plot rallenta il sistema", and it was not the contour.
-      pivot_to_grid called pivot_table before knowing anything about the
-      shape, so scattered x/y/z - every coordinate distinct - built an NxN
-      frame and then found holes in it: 10 000 points took 3.5 seconds and a
-      gigabyte, 30 000 took the machine. A complete Cartesian product needs
-      one row per cell, so counting refuses it in O(n): 10 000 points now
-      cost 2.3ms and 94MB, 200 000 cost 33ms. MAX_GRID_CELLS additionally
-      refuses a grid too large to draw, with a message naming the way out.
-      Measured, both before and after - see test_contour_axis.py.
-
-      Table was dangerous on a big table, and it was: Matplotlib lays out one
-      Text artist per cell in Python, so 5 000 rows was 15 000 artists and
-      over a second on every redraw, and an imported file was a hung window.
-      MAX_TABLE_ROWS draws the first 200 and logs what it cut; the cap is an
-      option, and the log names LIMIT in the series SQL as the real answer
-      for a big source. 100 000 rows: ~24s -> 42ms.
-
-      Booleans in the kwargs grid were text until clicked, and on macOS the
-      editor's checkbox was placed by the delegate rather than by the row, so
-      clicks missed it and the setting looked broken. They are check items
-      now - drawn by the view, present whether or not anything is being
-      edited, one click to toggle - and the delegate builds no editor for
-      them at all.
-
-
-N-12  Six reported bugs, and the Table renderer's roles [DONE]
-      Axis properties had no Z anything. The manual range, the scale and the
-      direction are now per axis for x, y AND z (axis_options.LIMIT_AXES,
-      separate from AXES, which stays 2D because it drives the grid and tick
-      controls). A 2D axes has no set_zlim, so the renderer skips what it
-      cannot set and keeps the value: switching the projection to 3d later
-      finds the range still there. The limit modes are relabelled - "Manual
-      (all axes)" - and z is manual in every mode but Automatic, because a
-      mode per combination of three axes is eight entries in a combo and buys
-      nothing over an empty box already meaning "leave this end alone".
-
-      Query builder: New query asked for a name, and asked whether to replace
-      an existing query of that name, before there was any statement to store
-      - and then Save could still refuse it. New query now makes an empty
-      draft and asks nothing; the name is asked for once, at Save, after the
-      statement validates. Nothing was ever written early (new_query returns
-      an unstored descriptor), so this is about the order of the questions,
-      not about stray rows.
-
-      Optimize Database showed its findings as extra lines of the message
-      box's main text, cut off at twenty. Now: the problems inline, the whole
-      grouped report - unreferenced tables included - behind Show Details,
-      where it scrolls and can be copied, and nothing truncated.
-      show_message grew a details= parameter for it, and both it and ask()
-      now set Qt.PlainText: AutoText guesses at rich text, and one table
-      named <old> would have collapsed every newline in a report to a space.
-
-      Import dialog: pasting after opening a file put the file's rows back
-      under the clipboard's table name. The paste handler's last line called
-      _refresh_preview, which read self.file_name and nothing else. The
-      preview now dispatches on the source mode, pasting clears the file
-      source, and the clipboard text is kept - so header, delimiter and the
-      skip counts re-apply to pasted data, which they never did.
-
-      Startup no longer offers to build the demo set on a first run and then
-      fall back to an open dialog with nothing in it to open. It creates (or
-      reopens) "Data Hub.dhub" in the home directory and says nothing. The
-      demo is still File, Create demo. startup.offer_demo/demo_failed are
-      gone from the catalogue; startup.default_database_failed replaces them
-      for the one case a file cannot solve, an unwritable home.
-
-      Table renderer: the chart picker's role panel said "No renderer roles
-      declared." It now declares column_1..column_8 as optional slots. The
-      headers stay the source columns' own names, which is why SeriesData
-      carries the series' role map - the SQL aliases region AS column_1, so
-      the frame no longer knows what the column was called. Mapping none of
-      them still draws every column, which is what SELECT * produces and what
-      every Table figure already saved carries.
-
-
-N-4   Gridded-data renderers
-      [CONTOUR half is DONE: app/charts/contour.py. ContourAxisRenderer
-      (contourf/contour) pivots x/y/z rows into a grid;
-      ContourScatteredAxisRenderer (tricontourf/tricontour) triangulates the
-      raw points, so the map covers the hull of what was measured and stops
-      there - griddata was the other option and was not taken, because a grid
-      fills the corners with numbers that look like measurements.
-      The grid check itself moved to app/charts/grids.pivot_to_grid and is
-      now shared with the surface renderers rather than duplicated;
-      finite_xyz is the scattered half, shared the same way. The two new
-      categories put "Gridded data" and "Irregularly gridded data" in the
-      chart picker for the first time. Demo project "Contour maps - the same
-      fields drawn flat" reuses the wafer and survey tables, so the surface
-      and contour readings of one dataset sit side by side.
-      Found on the way: a colorbar built while the layout engine is still
-      "none" - which is when every renderer draws - makes a gridspec with
-      zero-height rows, and a constrained engine applied afterwards divides
-      by it and the figure will not draw at all. contour.py's _colorbar
-      passes use_gridspec=False for that reason; regression test in
-      test_contour_axis.py. Any future renderer that adds a colorbar needs
-      the same, or the pipeline needs to set the layout engine before the
-      renderers run instead of after.]
-      What is left is the rest of the "Gridded data" family, per
-      matplotlib.org/stable/plot_types: pcolormesh, imshow/matshow and the
-      streamplot/quiver family on a regular grid - the same "is this actually
-      a grid" decision, which now has one implementation to call.
-      Pairs with the heatmap/imshow line under P2-1.
-
 N-5   sqlite_repo: 3013 lines in one module
       Split by subject rather than by size - connection and pragmas, tables
       and import links, descriptors, saved queries, maintenance - and keep
       SqliteRepo as the one class the application talks to, so no call site
       changes. The dataclass with a mutable OrderedDict field and the series
       cache belong with the connection, not with the descriptors.
-
-N-6   icons: finish the SFSymbol / Segoe Fluent migration
-      [THEME BACKEND DONE. The migration had a hole the size of Linux: SF
-      Symbols are macOS's and Segoe Fluent is Windows's, so every other
-      desktop fell straight through to the SVGs in app/icons - and three
-      actions (edit, nav_series_operations, run) name no SVG at all, so they
-      were blank buttons. QIcon.fromTheme is now the third step, from a
-      ThemeIcon field on all 51 actions, and on a GNOME/Adwaita desktop it
-      answers for 49 of them: 0 blanks, 2 left on SVG (the Plot button and
-      the SQL filter, neither of which has a system equivalent).
-      Names are validated against QIcon.ThemeIcon plus an explicit extras
-      list, because a typo is silent - fromTheme returns null and the SVG
-      takes over. Adwaita 45 dropped the full-colour action icons, so the
-      plain name is tried and then the -symbolic one; that covers Adwaita and
-      Breeze together.]
-      What is left is the deleting: style.report_icon_sources() names the
-      SVGs still doing work on the machine it runs on, so run it on a GNOME
-      box, a KDE box, a Mac and a Windows machine and remove what nothing
-      reports. Plus the original scope - win11/macOs icons with no common
-      fallback, and icon files nothing asks for any more.
 
 N-8   ChartPanel: "Add vertical line" / "Add horizontal line"
       Same context menu, with a small dialog for the line style, persisted in

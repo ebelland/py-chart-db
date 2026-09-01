@@ -583,6 +583,37 @@ Tests: `app/tests/test_chart_panel_selection.py`,
   rule added to `macos_native.qss` explicitly, or it falls through to the
   unstyled native bevel. `zoom_fitButton` (the "Adatta"/fit-to-window
   button) is the worked example.
+- The app style is one setting, `app_style` in config.json, in one of four
+  forms: `automatic`, one of the named themes in `APP_STYLE_QSS`,
+  `qt:<PluginName>` for a Qt style plugin, or `file:<absolute path>` for a
+  `.qss` the user picked through Settings → App style → "From file…". Any of
+  them that cannot be honoured — a plugin uninstalled since it was chosen, a
+  sheet since moved or deleted — resolves back to `automatic` with a warning
+  rather than leaving the application unstyled; this is read at startup,
+  before there is a window to report an error in.
+
+  A chosen file has no palette to go with it. Our own themes name one (the
+  "dark" theme is the Fluent sheet paired with the dark palette), and getting
+  it wrong is not cosmetic: every widget the sheet does not cover keeps the
+  other palette's colours, and `is_dark_theme_active` drives the icon
+  tinting. So `sheet_palette_key` asks the sheet what it paints the window —
+  the background on `QMainWindow` / `QWidget` / `QDialog` / `*`, classified
+  by luminance. A rule on a *broad* selector only: taking the first
+  background declaration anywhere read our own Fluent sheet as dark, off a
+  `QFrame[acrylicDark="true"]` variant several hundred lines in. A sheet that
+  sets no window background at all (NeonButtons styles buttons and nothing
+  else) reads as light, which is what an unstyled application looks like.
+- macOS menu roles are set explicitly in `MainWindow._MACOS_MENU_ROLES`, and
+  `settings` is in there as `NoRole` on purpose. A `QAction` defaults to
+  `TextHeuristicRole`, under which Qt reads the action's *text* and relocates
+  anything it recognises as Preferences into the application menu by itself —
+  so leaving it unlisted is not the same as leaving it in the File menu. That
+  relocation is what made Settings unreachable: `_build_app_menu` rebuilds the
+  whole bar (after Settings closes, among other times) and `menuBar().clear()`
+  left the native application menu holding an item that no longer referred to
+  a live QAction, so choosing Preferences did nothing at all. `credits` keeps
+  `AboutRole`, which has no such problem — About is rebuilt from position by
+  `_rename_macos_native_app_menu_items`.
 - Icons: three backends, tried in this order by `icon_from_action_spec` (read
   its docstring for the reasoning):
   1. `SFSymbol` on macOS — the system's own set;

@@ -673,18 +673,18 @@
     "figure_height_cm": 120.19,
     "figure_dpi": 122.0
   },
-  "last_database": "/private/var/folders/fr/9hqwrv154hv1bvl4chqm36c00000gn/T/pytest-of-ebelland/pytest-4/test_choosing_a_demo_builds_it0/peak scan demo.dhub",
+  "last_database": "/private/var/folders/fr/9hqwrv154hv1bvl4chqm36c00000gn/T/pytest-of-ebelland/pytest-10/test_choosing_a_demo_builds_it0/peak scan demo.dhub",
   "window_geometry": {
     "main_window": {
       "x": 360,
       "y": 382,
-      "width": 1200,
+      "width": 1920,
       "height": 959,
       "maximized": true
     },
     "SeriesInterpolateDialog": {
       "x": 94,
-      "y": 182,
+      "y": 278,
       "width": 731,
       "height": 640,
       "maximized": false
@@ -704,8 +704,8 @@
       "maximized": false
     },
     "SeriesStatisticsDialog": {
-      "x": 412,
-      "y": 290,
+      "x": 256,
+      "y": 62,
       "width": 1060,
       "height": 720,
       "maximized": false
@@ -780,8 +780,8 @@
       1165
     ],
     "data_page": [
-      465,
-      465
+      466,
+      464
     ]
   },
   "dialog_state": {
@@ -888,16 +888,16 @@
       "close_button": false
     },
     "SeriesStatisticsDialog": {
-      "model_combo": "All statistics",
+      "model_combo": "Tutte le statistiche",
       "create_chart_check": true,
       "chart_type_combo": "",
       "distribution_combo": "",
-      "rank_combo": "AIC (penalises free parameters)",
+      "rank_combo": "AIC (penalizza i parametri liberi)",
       "exhaustive_check": false,
       "popmean_spin": 0.0,
-      "alternative_combo": "Two-sided",
+      "alternative_combo": "Bilaterale",
       "trim_percent_spin": 10,
-      "anderson_method_combo": "Anderson p-value: interpolated",
+      "anderson_method_combo": "p-value di Anderson: interpolato",
       "monte_carlo_resamples_spin": 9999,
       "monte_carlo_batch_spin": 0,
       "preview_button": false,

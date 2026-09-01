@@ -397,12 +397,23 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     # Activity rail
     # ------------------------------------------------------------------
-    #: Actions moved into the real macOS menu bar via QAction.MenuRole -
-    #: Preferences and About are relocated by Cocoa itself into the
-    #: application menu next to the apple, wherever they were declared, so
-    #: they read here exactly the way they read in the rail's popup menu.
+    #: Actions moved into the real macOS menu bar via QAction.MenuRole:
+    #: Cocoa relocates them into the application menu next to the apple,
+    #: wherever in the menu bar they were declared.
+    #:
+    #: Settings is held in the File menu with NoRole, and the explicit role is
+    #: the whole point: a QAction defaults to TextHeuristicRole, under which Qt
+    #: reads the *text* and relocates anything it recognises as Preferences by
+    #: itself. Simply not naming a role here would leave "Settings" moving to
+    #: the application menu anyway.
+    #:
+    #: Relocation is what made it unreachable. _build_app_menu rebuilds the
+    #: whole bar - after Settings closes, among other times - and
+    #: menuBar().clear() then leaves the native application menu holding an
+    #: item that no longer refers to a live QAction, so choosing Preferences
+    #: did nothing at all. In the File menu it is rebuilt along with it.
     _MACOS_MENU_ROLES: dict[str, QAction.MenuRole] = {
-        "settings": QAction.MenuRole.PreferencesRole,
+        "settings": QAction.MenuRole.NoRole,
         "credits": QAction.MenuRole.AboutRole,
     }
 
@@ -461,12 +472,12 @@ class MainWindow(QMainWindow):
     def _build_macos_menu_bar(self, items: list) -> None:
         """Populate the real menu bar from the same items as the popup.
 
-        Settings and Credits do not stay in the menu this builds: Cocoa pulls
-        any action carrying MenuRole.PreferencesRole/AboutRole out into the
-        native application menu - the one already showing next to the apple -
-        wherever in the menu bar it was declared. Nothing else has a role a
-        Mac user would expect, so the rest stay together in one ordinary
-        top-level menu, named "File".
+        Credits does not stay in the menu this builds: Cocoa pulls any action
+        carrying MenuRole.AboutRole out into the native application menu - the
+        one already showing next to the apple - wherever in the menu bar it
+        was declared. Everything else, Settings included, stays together in
+        one ordinary top-level menu, named "File"; see _MACOS_MENU_ROLES for
+        why Preferences is not relocated with it.
         """
         menu_bar = self.menuBar()
         menu_bar.clear()
@@ -499,9 +510,9 @@ class MainWindow(QMainWindow):
     #: title, since neither is backed by a QAction of ours and both keep
     #: these selectors on every Mac, in every language.  About is *not* in
     #: here: it is backed by our own "credits" QAction, so Qt dispatches it
-    #: through the same generic "qt_itemFired:" selector as Preferences,
-    #: indistinguishable from it by selector alone.  It is matched by
-    #: position instead - see _rename_macos_native_app_menu_items.
+    #: through the generic "qt_itemFired:" selector that every relocated
+    #: QAction shares.  It is matched by position instead - see
+    #: _rename_macos_native_app_menu_items.
     _MACOS_APP_MENU_SELECTORS: dict[str, str] = {
         "hide:": "Hide",
         "terminate:": "Close",
