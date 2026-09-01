@@ -194,6 +194,7 @@ class SeriesFitDialog(SeriesOperationDialogBase):
         self._source_name = "Selected series"
         self._source_x_col = "x"
         self._source_y_col = "y"
+        self._source_z_col = "z"
 
         self._model_search = QLineEdit(self)
         self._models_tree = QTreeWidget(self)
@@ -535,11 +536,27 @@ class SeriesFitDialog(SeriesOperationDialogBase):
         return self._initial_table or self._source_name or "selected_series"
 
     def _is_2d_fit(self) -> bool:
-        """The scanned function dialog currently fits 1D target = f(x)."""
-        return False
+        """True when the selected function is a surface, Z = f(X, Y).
+
+        Read from the function rather than from the data: the same series can
+        be the source for either kind, and it is the model that decides how
+        many inputs it takes. ``input_dimensions`` is set by FunctionScanner,
+        from the class when it declares one and from its category or file
+        otherwise (see app/scanners/functions_scanner.py).
+        """
+        try:
+            return int(self._selected_model.get("input_dimensions", 1) or 1) >= 2
+        except (TypeError, ValueError):
+            return False
 
     def _selected_column_names(self) -> tuple[str, str | None, str]:
         """Return source X, optional X2, and target column names."""
+        if self._is_2d_fit():
+            return (
+                self._source_x_col or "x",
+                self._source_y_col or "y",
+                self._source_z_col or "z",
+            )
         return self._source_x_col or "x", None, self._source_y_col or "target"
 
     def _apply_model_choice_from_payload(self, payload: dict[str, Any]) -> None:
@@ -759,6 +776,22 @@ class SeriesFitDialog(SeriesOperationDialogBase):
         self._refresh_default_output_name(force=True)
 
 
+    @staticmethod
+    def _column_names(frame: pd.DataFrame) -> tuple[list[str], list[str]]:
+        """Return every column name, and the numeric ones, in order.
+
+        The second list is what a role that names no real column falls back
+        to: x is the first numeric column, y the second, z the third.
+        """
+        return (
+            [str(column) for column in frame.columns],
+            [
+                str(column)
+                for column in frame.columns
+                if pd.api.types.is_numeric_dtype(frame[column])
+            ],
+        )
+
     def _load_fit_data(self) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
         row = self._selected_series_row()
         source_name = str(parse_roles(row["roles"]).get("name", "Series"))
@@ -771,8 +804,7 @@ class SeriesFitDialog(SeriesOperationDialogBase):
             applogger.error("Selected series query returned no rows.")
 
         roles = parse_roles(row_value(row, "roles", default={}))
-        columns = [str(column) for column in frame.columns]
-        numeric = [str(column) for column in frame.columns if pd.api.types.is_numeric_dtype(frame[column])]
+        columns, numeric = self._column_names(frame)
 
         x_col = str(roles.get("x", ""))
         y_col = str(roles.get("y", ""))
@@ -780,6 +812,9 @@ class SeriesFitDialog(SeriesOperationDialogBase):
             x_col = numeric[0] if numeric else ""
         if y_col not in columns:
             y_col = numeric[1] if len(numeric) > 1 else ""
+
+        if self._is_2d_fit():
+            return self._load_surface_fit_data(frame, roles, x_col, y_col, source_name)
 
         if not x_col or not y_col:
             applogger.error("Selected series query must expose at least two numeric columns.")
@@ -807,6 +842,92 @@ class SeriesFitDialog(SeriesOperationDialogBase):
         x_data = clean_frame["x"].to_numpy(dtype=float)
         target_data = clean_frame["target"].to_numpy(dtype=float)
         return x_data, target_data, clean_frame
+
+    def _load_surface_fit_data(
+        self,
+        frame: pd.DataFrame,
+        roles: dict[str, Any],
+        x_col: str,
+        y_col: str,
+        source_name: str,
+    ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
+        """Load X, Y and Z for a surface fit, Z = f(X, Y).
+
+        Deliberately not routed through ``prepare_input_xy``: its repairs are
+        one-dimensional ideas. Sorting by x means nothing when the point is a
+        pair, and averaging repeated x would merge points that share an x but
+        sit at different y - which is most of a grid. Non-finite rows are
+        still dropped, because the optimiser cannot use them either, and the
+        count is reported rather than swallowed.
+
+        The three refusals raise rather than only logging: ``applogger.error``
+        does not raise by default, and every one of these leaves a column name
+        that is empty or wrong, so continuing would reach ``frame[""]`` and
+        report a KeyError instead of the thing that is actually wrong.
+        """
+        columns, numeric = self._column_names(frame)
+
+        z_col = str(roles.get("z", ""))
+        if z_col not in columns:
+            z_col = numeric[2] if len(numeric) > 2 else ""
+
+        if not x_col or not y_col or not z_col:
+            applogger.error(
+                "A surface fit needs three numeric columns: the series must "
+                "expose X, Y and Z. Pick a 2D function, or a series with a Z "
+                "role, and try again.",
+                raise_error=True,
+            )
+        if len({x_col, y_col, z_col}) < 3:
+            applogger.error(
+                "Selected series X, Y and Z columns must be different.",
+                raise_error=True,
+            )
+
+        x_values = pd.to_numeric(frame[x_col], errors="coerce").to_numpy(dtype=float)
+        y_values = pd.to_numeric(frame[y_col], errors="coerce").to_numpy(dtype=float)
+        z_values = pd.to_numeric(frame[z_col], errors="coerce").to_numpy(dtype=float)
+
+        keep = np.isfinite(x_values) & np.isfinite(y_values) & np.isfinite(z_values)
+        dropped = int(np.count_nonzero(~keep))
+        if dropped:
+            applogger.warning(
+                "%s: dropped %d of %d points with a non-finite X, Y or Z.",
+                source_name,
+                dropped,
+                keep.size,
+            )
+        if not np.any(keep):
+            applogger.error(
+                "Selected series has no finite X/Y/Z points to fit.",
+                raise_error=True,
+            )
+
+        clean_frame = cast(
+            pd.DataFrame,
+            pd.DataFrame(
+                {
+                    "x": x_values[keep],
+                    "y": y_values[keep],
+                    "target": z_values[keep],
+                }
+            ),
+        )
+
+        self._source_name = source_name
+        self._source_x_col = x_col
+        self._source_y_col = y_col
+        self._source_z_col = z_col
+        self._refresh_default_output_name(force=True)
+
+        # The (N, 2) array every surface model is called with.
+        inputs = np.column_stack(
+            (
+                clean_frame["x"].to_numpy(dtype=float),
+                clean_frame["y"].to_numpy(dtype=float),
+            )
+        )
+        return inputs, clean_frame["target"].to_numpy(dtype=float), clean_frame
 
     def _model_name(self) -> str:
         item = self._models_tree.currentItem()
@@ -1469,24 +1590,46 @@ class SeriesFitDialog(SeriesOperationDialogBase):
 
     def result_series_spec(self, axis_id: int, table_name: str, result: SeriesFitResult) -> ResultSeriesSpec:
         del axis_id
-        sql_query = f'SELECT x, y_fit AS y FROM "{table_name}" ORDER BY x'
-        roles = {"x": "x", "y": "y"}
+        style: dict[str, Any] = {
+            "source_series": result.source_table,
+            "source_x_col": result.x_col,
+            "fit_model": result.model_name,
+            "fit_mode": result.fit_mode,
+            "generated_fit": True,
+            "fit_dialog": "series_fit",
+        }
+
+        if result.fit_mode == "2D":
+            # A fitted surface is a surface: three roles, ordered by y then x
+            # so a gridded renderer gets its rows in the order it expects.
+            # The dashed-line styling below would mean nothing here.
+            sql_query = f'SELECT x, y, z_fit AS z FROM "{table_name}" ORDER BY y, x'
+            roles = {"x": "x", "y": "y", "z": "z"}
+            style.update(
+                {
+                    "surface": True,
+                    "cmap": "viridis",
+                    "source_y_col": result.x2_col or "",
+                    "source_z_col": result.target_col,
+                }
+            )
+        else:
+            sql_query = f'SELECT x, y_fit AS y FROM "{table_name}" ORDER BY x'
+            roles = {"x": "x", "y": "y"}
+            style.update(
+                {
+                    "linestyle": "--",
+                    "linewidth": 2.0,
+                    "marker": "",
+                    "source_y_col": result.target_col,
+                }
+            )
+
         return ResultSeriesSpec(
             name=f"Fit: {result.source_table} [{result.model_name}]",
             sql_query=sql_query,
             roles=roles,
-            style={
-                "linestyle": "--",
-                "linewidth": 2.0,
-                "marker": "",
-                "source_series": result.source_table,
-                "source_x_col": result.x_col,
-                "source_y_col": result.target_col,
-                "fit_model": result.model_name,
-                "fit_mode": "1D",
-                "generated_fit": True,
-                "fit_dialog": "series_fit",
-            },
+            style=style,
         )
 
     def format_results(self, results: Sequence[SeriesFitResult]) -> str:

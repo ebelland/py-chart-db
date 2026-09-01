@@ -43,7 +43,7 @@ from PySide6.QtGui import (
     QPixmap,
     QTextOption,
 )
-from PySide6.QtWidgets import QApplication, QBoxLayout, QCheckBox, QComboBox, QFormLayout, QFrame, QLineEdit, QMenu, QPlainTextEdit, QScrollArea, QSizePolicy, QToolButton, QWidget, QPushButton
+from PySide6.QtWidgets import QApplication, QBoxLayout, QCheckBox, QComboBox, QFileDialog, QFormLayout, QFrame, QLineEdit, QMenu, QPlainTextEdit, QScrollArea, QSizePolicy, QToolButton, QWidget, QPushButton
 from app.logs.logger import applogger
 from app.styles.palettes import themed_qss
 from app.utils.config import get_section, get_value
@@ -1210,6 +1210,7 @@ def resolve_app_style(preference: str | None = None) -> str:
     in config.json, or a Qt plugin that was uninstalled since it was chosen,
     should leave the app looking normal rather than unstyled.
     """
+
     clean = str(preference or "").strip()
     if not clean:
         clean = str(get_value(CONFIG_APP_STYLE, "") or "").strip()
@@ -1249,6 +1250,7 @@ def apply_platform_style(
 
     global _ACTIVE_THEME_IS_DARK
 
+        
     if style_key.startswith(QT_STYLE_PREFIX):
         name = style_key[len(QT_STYLE_PREFIX) :]
         # A Qt style draws itself; none of ours is a dark theme, so the glyphs

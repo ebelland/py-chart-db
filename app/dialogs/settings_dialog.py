@@ -29,6 +29,7 @@ from __future__ import annotations
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
+    QFileDialog,
     QFormLayout,
     QHBoxLayout,
     QLabel,
@@ -39,6 +40,7 @@ from PySide6.QtWidgets import (
 from app.logs.logger import applogger
 from app.styles.style import (
     CONFIG_APP_STYLE,
+    PlatformStyle,
     available_app_styles,
     apply_card_layout,
     apply_dialog_shell,
@@ -201,6 +203,14 @@ class SettingsDialog(QDialog):
         )
         root.addLayout(action_row, 0)
 
+    def schoose(self, style_key:str|None):
+
+        if style_key=="browse":
+            file_path, _=QFileDialog.getOpenFileName(None,"Style sheet","","Qt style sheet (*.qss)")
+            if file_path:
+                applogger.debug(f"Selected path: {file_path}")
+
+        
     # ------------------------------------------------------------------
     # Construction helpers
     # ------------------------------------------------------------------

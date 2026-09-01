@@ -297,6 +297,108 @@ def _terrain_survey(rng: np.random.Generator, points: int = 600) -> pd.DataFrame
     )
 
 
+def _wave_field(rng: np.random.Generator, side: int = 121) -> pd.DataFrame:
+    """Two coherent sources on a ripple tank, interfering.
+
+    A regular grid like _wafer_map, but the field it carries is the opposite
+    kind of thing: the wafer is smooth and the interesting part is a few
+    nanometres of ripple on a dome, while this is all ripple. It is here
+    because a surface and a contour map of the *same* field disagree about
+    which one is the better chart, and a fringe pattern is where the contour
+    map wins outright - the fringes are level sets, so drawing the levels is
+    drawing the physics.
+    """
+    axis_x = np.linspace(-50.0, 50.0, side)
+    axis_y = np.linspace(-35.0, 35.0, side)
+    x_grid, y_grid = np.meshgrid(axis_x, axis_y)
+
+    wavelength = 10.0
+    field = np.zeros_like(x_grid)
+    for source_x in (-16.0, 16.0):
+        distance = np.hypot(x_grid - source_x, y_grid)
+        # A circular wave spreading in two dimensions falls off as
+        # 1/sqrt(r). Clipped near the source, where a point-source model
+        # diverges and the arithmetic would carry that into the chart.
+        spread = 1.0 / np.sqrt(np.maximum(distance, 2.5))
+        field += spread * np.cos(2.0 * np.pi * distance / wavelength)
+
+    return pd.DataFrame(
+        {
+            "x_mm": x_grid.ravel(),
+            "y_mm": y_grid.ravel(),
+            "amplitude": (field + rng.normal(0.0, 0.004, x_grid.shape)).ravel(),
+        }
+    )
+
+
+def _membrane_mode(rng: np.random.Generator, side: int = 81) -> pd.DataFrame:
+    """One vibration mode of a round drum head, measured on a square grid.
+
+    The (2, 1) mode: two nodal diameters, so the displacement is positive on
+    two opposite quarters and negative on the other two. Signed data is the
+    point - it is what a diverging colormap is for, and what makes the zero
+    contour mean something (it is the nodal line, where the head does not
+    move at all). The grid is square and the drum is round, so this is the
+    second user of circular_mask.
+    """
+    from scipy.special import jn_zeros, jv
+
+    radius_mm = 100.0
+    axis = np.linspace(-radius_mm, radius_mm, side)
+    x_grid, y_grid = np.meshgrid(axis, axis)
+
+    radius = np.hypot(x_grid, y_grid) / radius_mm
+    angle = np.arctan2(y_grid, x_grid)
+
+    # The first zero of J2 is where the clamped rim sits, which is what makes
+    # the mode fit the drum instead of being cut off part-way through.
+    order = 2
+    rim = float(jn_zeros(order, 1)[0])
+    shape = jv(order, rim * radius) * np.cos(order * angle)
+
+    return pd.DataFrame(
+        {
+            "x_mm": x_grid.ravel(),
+            "y_mm": y_grid.ravel(),
+            "displacement_um": (40.0 * shape + rng.normal(0.0, 0.15, x_grid.shape)).ravel(),
+        }
+    )
+
+
+def _cost_landscape(rng: np.random.Generator, side: int = 81) -> pd.DataFrame:
+    """The Rosenbrock function: a curved valley with a very steep rim.
+
+    Noiseless on purpose - it is a formula, not a measurement, and the demo
+    is about what a chart does with a range this wide rather than about the
+    data. Both columns are stored because the two charts want different
+    ones: the surface reads log_cost, which is the same landscape with the
+    rim compressed enough to see the valley floor, and the contour map reads
+    the raw cost with levels named one at a time, which is the only way to
+    place lines sensibly across four decades.
+    """
+    del rng  # a formula, not a sample
+
+    # 81 rather than the wave field's 121: this surface is smooth everywhere,
+    # and at 121 the contour map is pixel-identical for 8080 more rows. The
+    # fringe pattern cannot be thinned the same way without aliasing the
+    # fringes, which is the whole subject there.
+
+    axis_1 = np.linspace(-2.0, 2.0, side)
+    axis_2 = np.linspace(-1.0, 3.0, side)
+    p1_grid, p2_grid = np.meshgrid(axis_1, axis_2)
+
+    cost = (1.0 - p1_grid) ** 2 + 100.0 * (p2_grid - p1_grid**2) ** 2
+
+    return pd.DataFrame(
+        {
+            "p1": p1_grid.ravel(),
+            "p2": p2_grid.ravel(),
+            "cost": cost.ravel(),
+            "log_cost": np.log10(cost + 1e-3).ravel(),
+        }
+    )
+
+
 def _figure_specs() -> list[FigureSpec]:
     """Return every demo figure, in the order they appear as tabs."""
     line = {"linestyle": "-", "marker": "", "show_in_legend": True}
@@ -647,6 +749,222 @@ def _figure_specs() -> list[FigureSpec]:
                 ),
             ],
         ),
+        FigureSpec(
+            name="15 \u00b7 Wave interference",
+            key="wave_surface",
+            tables=("wave_field",),
+            queries=(),
+            chart_type="Surface Plot",
+            title="Two coherent sources 32 mm apart, 10 mm wavelength",
+            x_label="x (mm)",
+            y_label="y (mm)",
+            axis_options={
+                "projection": "3d",
+                "cmap": "magma",
+                # The fringes are the whole subject, and a mesh line drawn on
+                # every row would beat against them. rstride/cstride thin the
+                # wireframe instead of the data.
+                "rstride": 2,
+                "cstride": 2,
+                "linewidth": 0.0,
+                "antialiased": True,
+                # Looking along the axis the sources sit on, which is the
+                # direction the fringes run away from.
+                "elev": 48,
+                "azim": -62,
+            },
+            series=[
+                SeriesSpec(
+                    name="Amplitude",
+                    sql=(
+                        "SELECT x_mm AS x, y_mm AS y, amplitude AS z "
+                        "FROM wave_field"
+                    ),
+                    roles={"x": "x", "y": "y", "z": "z"},
+                    style={},
+                ),
+            ],
+        ),
+        FigureSpec(
+            name="16 \u00b7 Interference fringes",
+            key="wave_contour",
+            tables=("wave_field",),
+            queries=(),
+            chart_type="Contour Plot",
+            title="Two coherent sources 32 mm apart, 10 mm wavelength",
+            x_label="x (mm)",
+            y_label="y (mm)",
+            axis_options={
+                # The case where the contour map beats the surface: a fringe
+                # *is* a level set, so filled bands draw the interference
+                # pattern directly rather than as a shape seen from an angle.
+                "levels": "24",
+                "filled": True,
+                "line_overlay": False,
+                "cmap": "magma",
+                "colorbar": True,
+                "colorbar_label": "amplitude (a.u.)",
+                # Fringe spacing is only readable if the two axes share a
+                # scale.
+                "aspect": "equal",
+            },
+            series=[
+                SeriesSpec(
+                    name="Amplitude",
+                    sql=(
+                        "SELECT x_mm AS x, y_mm AS y, amplitude AS z "
+                        "FROM wave_field"
+                    ),
+                    roles={"x": "x", "y": "y", "z": "z"},
+                    style={},
+                ),
+            ],
+        ),
+        FigureSpec(
+            name="17 \u00b7 Membrane mode",
+            key="membrane_surface",
+            tables=("membrane_mode",),
+            queries=(),
+            chart_type="Surface Plot",
+            title="Drum head, mode (2, 1)",
+            x_label="x (mm)",
+            y_label="y (mm)",
+            axis_options={
+                "projection": "3d",
+                # Signed data around zero: a diverging colormap puts white at
+                # the nodal lines, so the two positive quarters and the two
+                # negative ones read apart at a glance. A sequential map
+                # would make "not moving" look like an extreme.
+                "cmap": "RdBu_r",
+                "circular_mask": True,
+                "linewidth": 0.0,
+                "antialiased": True,
+                "elev": 38,
+                "azim": -58,
+            },
+            series=[
+                SeriesSpec(
+                    name="Displacement",
+                    sql=(
+                        "SELECT x_mm AS x, y_mm AS y, displacement_um AS z "
+                        "FROM membrane_mode"
+                    ),
+                    roles={"x": "x", "y": "y", "z": "z"},
+                    style={},
+                ),
+            ],
+        ),
+        FigureSpec(
+            name="18 \u00b7 Membrane nodal lines",
+            key="membrane_contour",
+            tables=("membrane_mode",),
+            queries=(),
+            chart_type="Contour Plot",
+            title="Drum head, mode (2, 1)",
+            x_label="x (mm)",
+            y_label="y (mm)",
+            axis_options={
+                # Lines over the bands rather than instead of them: the band
+                # that straddles zero is where the head does not move, and
+                # the overlaid lines are what let you find it exactly.
+                "levels": "16",
+                "filled": True,
+                "line_overlay": True,
+                "cmap": "RdBu_r",
+                "colorbar": True,
+                "colorbar_label": "displacement (\u00b5m)",
+                "aspect": "equal",
+                # No circular_mask here: it is a Surface Plot option, so the
+                # contour map shows the whole square grid. The corners are
+                # outside the rim - real arithmetic, but not a real drum.
+            },
+            series=[
+                SeriesSpec(
+                    name="Displacement",
+                    sql=(
+                        "SELECT x_mm AS x, y_mm AS y, displacement_um AS z "
+                        "FROM membrane_mode"
+                    ),
+                    roles={"x": "x", "y": "y", "z": "z"},
+                    style={},
+                ),
+            ],
+        ),
+        FigureSpec(
+            name="19 \u00b7 Cost landscape",
+            key="cost_surface",
+            tables=("cost_surface",),
+            queries=(),
+            chart_type="Surface Plot",
+            title="Rosenbrock function, log scale",
+            x_label="p1",
+            y_label="p2",
+            axis_options={
+                "projection": "3d",
+                "cmap": "viridis",
+                "linewidth": 0.0,
+                "antialiased": True,
+                "rstride": 2,
+                "cstride": 2,
+                "elev": 52,
+                "azim": -131,
+            },
+            series=[
+                SeriesSpec(
+                    name="log10 cost",
+                    # log_cost rather than cost: the rim is four decades above
+                    # the valley floor, and on a linear axis the surface is a
+                    # wall with a flat plain behind it.
+                    sql=(
+                        "SELECT p1 AS x, p2 AS y, log_cost AS z "
+                        "FROM cost_surface"
+                    ),
+                    roles={"x": "x", "y": "y", "z": "z"},
+                    style={},
+                ),
+            ],
+        ),
+        FigureSpec(
+            name="20 \u00b7 Cost landscape contours",
+            key="cost_contour",
+            tables=("cost_surface",),
+            queries=(),
+            chart_type="Contour Plot",
+            title="Rosenbrock function, levels chosen by hand",
+            x_label="p1",
+            y_label="p2",
+            axis_options={
+                # The other way to handle four decades, and the reason levels
+                # takes a list as well as a count: evenly spaced levels would
+                # put every line on the rim and none in the valley. These are
+                # roughly geometric, so each line means the same *ratio* as
+                # the last - the banana-shaped valley Rosenbrock is famous
+                # for is what falls out.
+                "levels": "0.5, 2, 5, 15, 40, 100, 250, 600, 1500, 3000",
+                "filled": True,
+                # Named levels cannot cover an open-ended range, so the band
+                # below the lowest one has to be told to fill; without this
+                # the valley floor - the part the chart is about - is blank.
+                "extend": "both",
+                "line_overlay": True,
+                "label_lines": True,
+                "label_format": "%g",
+                "cmap": "viridis",
+                "colorbar": True,
+                "colorbar_label": "cost",
+            },
+            series=[
+                SeriesSpec(
+                    name="Cost",
+                    sql=(
+                        "SELECT p1 AS x, p2 AS y, cost AS z "
+                        "FROM cost_surface"
+                    ),
+                    roles={"x": "x", "y": "y", "z": "z"},
+                    style={},
+                ),
+            ],
+        ),
     ]
 
 
@@ -667,6 +985,9 @@ TABLE_BUILDERS: dict[str, Any] = {
     "peak_scan": _peak_scan,
     "wafer_map": _wafer_map,
     "terrain_survey": _terrain_survey,
+    "wave_field": _wave_field,
+    "membrane_mode": _membrane_mode,
+    "cost_surface": _cost_landscape,
 }
 
 #: Saved query name -> its SQL, and the table it reads.
@@ -778,6 +1099,29 @@ DEMO_PROJECTS: tuple[DemoProject, ...] = (
         "scattered one stops at the hull of the points, which is as far as "
         "the survey actually went.",
         ("wafer_contour", "terrain_contour"),
+    ),
+    DemoProject(
+        "Wave interference - where the contour map wins",
+        "Two coherent sources on a ripple tank, drawn both ways. A fringe is "
+        "a level set, so the contour map draws the physics directly while "
+        "the surface shows the same field as a shape seen from an angle.",
+        ("wave_surface", "wave_contour"),
+    ),
+    DemoProject(
+        "Membrane mode - signed data and a diverging colormap",
+        "One vibration mode of a round drum head, positive on two quarters "
+        "and negative on the other two. A diverging colormap puts white on "
+        "the nodal lines, and circular_mask keeps the square grid off the "
+        "round drum.",
+        ("membrane_surface", "membrane_contour"),
+    ),
+    DemoProject(
+        "Cost landscape - four decades, two ways",
+        "The Rosenbrock function, whose rim is ten thousand times its valley "
+        "floor. The surface takes a log of it; the contour map keeps the raw "
+        "values and names the levels one at a time, which is what the levels "
+        "option takes a list for.",
+        ("cost_surface", "cost_contour"),
     ),
 )
 

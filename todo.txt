@@ -5,15 +5,26 @@ Ranked by priority. P0 = wrong results or blocked work, P3 = nice to have.
 ================================================================
 P0 - BUGS: wrong output, or work that cannot proceed
 ================================================================
+P0-1: 3d interpolation-> every time a preview is chosen, an axis is drawn and not removed
 
+P0-2: grafico proporzionale da aggiungere ai kwargs
+  
+P0-3: Salva database come...
+
+P0-4: proprietà della figura + compatta
+
+P0-5: surface --> aggiungi punti 
 N-6  style pickers: an "auto" option that defers to rcParams
      Line style and marker style should be able to say "whatever the style
      sheet says" rather than forcing a concrete value. Default to it, so a
      .mplstyle actually governs the look of a new series.
 
+N0-24: Enumeratore per contour algorithm
 ================================================================
 NEW - requested after the review
 ================================================================
+N-01 Rotazione delle matrici (come parametro).
+
 
 N-13  Four more from the field [DONE]
       Message boxes answered in English. QMessageBox builds Yes and No from

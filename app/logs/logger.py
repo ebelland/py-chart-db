@@ -118,8 +118,9 @@ class DataHubLogger(logging.Logger):
     Usage examples:
         applogger.warning("Recoverable issue")
         applogger.warning("Show this", show_dialog=True)
-        applogger.error("Fail this operation")  # default: dialog=True, raise=True
-        applogger.error("Log only", show_dialog=False, raise_error=False)
+        applogger.error("Fail this")  # default: dialog=True, raise=False
+        applogger.error("Log only", show_dialog=False)
+        applogger.error("Stop here", raise_error=True)  # raises LoggedError
     """
 
     # The six level methods below only exist to widen the standard signature

@@ -11,10 +11,18 @@ the columns it needs and the series SQL is responsible for aliasing to them.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, ClassVar, Protocol
 import numpy as np
 import pandas as pd
 from matplotlib import colormaps, rcParams
+
+from app.logs.logger import applogger
+
+
+#: What a checkbox, a config file and a hand-typed option may each call a
+#: boolean. Compared lowercased and stripped; anything else is not one.
+_TRUE_WORDS: frozenset[str] = frozenset({"1", "true", "yes", "on"})
+_FALSE_WORDS: frozenset[str] = frozenset({"0", "false", "no", "off"})
 
 
 @dataclass(slots=True)
@@ -182,6 +190,79 @@ class BaseAxisRenderer(Protocol):
                 return False
         return True
 
+    #: Returned by :meth:`_coerce_option` for a value that cannot be made into
+    #: the type the option declares, and so must not be forwarded.
+    _UNCONVERTIBLE: ClassVar[object] = object()
+
+    @classmethod
+    def _coerce_option(cls, value: Any, meta: dict) -> Any:
+        """Return *value* as the type the option declares.
+
+        Options reach a renderer as text far more often than not: the axis
+        options editor stores what was typed, and so does a saved descriptor,
+        so ``rstride`` arrives as ``"2"`` rather than ``2``. Matplotlib does
+        not coerce - ``plot_surface`` computes ``(rows - 1) % rstride`` and
+        raises *unsupported operand type(s) for %: 'int' and 'str'*, and a
+        string ``linewidth`` reaches the C++ layer and fails there instead,
+        with a message that names nothing the user typed.
+
+        Only int, float and bool are converted, and only here rather than in
+        :meth:`opt`: renderer-owned options are parsed by the renderer that
+        owns them, and contour ``levels`` is deliberately either a count or a
+        comma-separated list, which no scalar conversion could express.
+        """
+        declared = meta.get("type")
+        if declared not in (int, float, bool) or value is None:
+            return value
+
+        if declared is bool:
+            if isinstance(value, bool):
+                return value
+            text = str(value).strip().lower()
+            if text in _TRUE_WORDS:
+                return True
+            if text in _FALSE_WORDS:
+                return False
+            return cls._UNCONVERTIBLE
+
+        # A bool where a number was declared is left alone: it is almost
+        # certainly a mis-declared option rather than the number 0 or 1, and
+        # silently turning it into one would hide that.
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return declared(value)
+
+        text = str(value).strip()
+        if text == "":
+            # Empty means "not set" to every caller downstream, which drops it.
+            return value
+        try:
+            return int(float(text)) if declared is int else float(text)
+        except (TypeError, ValueError):
+            return cls._UNCONVERTIBLE
+
+    def opt_typed(self, name: str, options: dict) -> Any:
+        """Like :meth:`opt`, but converted to the type the option declares.
+
+        For a renderer-owned option that is still handed to Matplotlib.
+        :meth:`opt` stays raw because several of them are deliberately
+        free-form - contour ``levels`` is a count or a list, ``linestyles`` is
+        one of four words - but a numeric one has to arrive as a number:
+        ``linewidths="0.5"`` is a *string* to Matplotlib, which reads it as
+        the sequence of characters ``0``, ``.``, ``5`` and draws three lines
+        of nonsense widths.
+
+        Returns None when the value cannot be converted, which every caller
+        already treats as "not set".
+        """
+        meta = self.Kwargs.get(name, {})
+        value = self.opt(name, options)
+        if value is None:
+            return None
+        coerced = self._coerce_option(value, meta if isinstance(meta, dict) else {})
+        return None if coerced is self._UNCONVERTIBLE else coerced
+
     def get_kwargs(self, options: dict) -> dict:
         """Build the matplotlib keyword arguments for this renderer.
 
@@ -189,6 +270,11 @@ class BaseAxisRenderer(Protocol):
         Matplotlib "absent" and "None" are not the same thing — ``picker=None``
         reaches ``Line2D.set_pickradius(None)`` and raises *"pick radius should
         be a distance"*, while omitting the key simply uses the default.
+
+        Values are coerced to the type each option declares (see
+        :meth:`_coerce_option`); one that cannot be is dropped with a log
+        entry rather than forwarded, on the same principle as the rest of the
+        option handling - a typo should cost the option, not the chart.
         """
         kwargs = {}
         axis_kwargs = options.get("axis_kwargs", {})
@@ -196,13 +282,24 @@ class BaseAxisRenderer(Protocol):
             axis_kwargs = {}
 
         for name, meta in self.Kwargs.items():
+            spec = meta if isinstance(meta, dict) else {}
             if name in axis_kwargs:
                 value = axis_kwargs[name]
             else:
-                value = options.get(name, meta.get("default"))  # pyright: ignore[reportAttributeAccessIssue]
+                value = options.get(name, spec.get("default"))
             if value is None:
                 continue
-            kwargs[name] = value
+            coerced = self._coerce_option(value, spec)
+            if coerced is self._UNCONVERTIBLE:
+                applogger.debug(
+                    "%s: option %r=%r is not a %s; leaving it out of the chart.",
+                    type(self).__name__,
+                    name,
+                    value,
+                    getattr(spec.get("type"), "__name__", "value"),
+                )
+                continue
+            kwargs[name] = coerced
 
         return kwargs
 

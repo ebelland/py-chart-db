@@ -53,7 +53,11 @@ from scipy.interpolate import (
     PchipInterpolator,
     UnivariateSpline,
     make_interp_spline,
+    LinearNDInterpolator,
+    RBFInterpolator,
+    RegularGridInterpolator,
 )
+from scipy.spatial import Delaunay
 from scipy.optimize import curve_fit
 
 
@@ -69,6 +73,9 @@ MODEL_SCIPY_PCHIP: Final[str] = "SciPy PCHIP"
 MODEL_SCIPY_CUBIC: Final[str] = "SciPy CubicSpline"
 MODEL_SCIPY_SPLINE: Final[str] = "SciPy spline family"
 MODEL_SCIPY_AKIMA: Final[str] = "SciPy Akima"
+MODEL_3D_REGULAR: Final[str] = "3D regular grid"
+MODEL_3D_SCATTERED: Final[str] = "3D uneven/scattered"
+MODEL_3D_RBF: Final[str] = "3D RBF to grid"
 
 MODEL_NAMES: Final[tuple[str, ...]] = (
     MODEL_POLYNOMIAL,
@@ -83,6 +90,9 @@ MODEL_NAMES: Final[tuple[str, ...]] = (
     MODEL_SCIPY_AKIMA,
     MODEL_SCIPY_CUBIC,
     MODEL_SCIPY_SPLINE,
+    MODEL_3D_REGULAR,
+    MODEL_3D_SCATTERED,
+    MODEL_3D_RBF,
 )
 
 INTERPOLATION_MODELS: Final[set[str]] = {
@@ -91,6 +101,10 @@ INTERPOLATION_MODELS: Final[set[str]] = {
     MODEL_SCIPY_AKIMA,
     MODEL_SCIPY_CUBIC,
     MODEL_SCIPY_SPLINE,
+}
+
+SURFACE_MODELS: Final[set[str]] = {
+    MODEL_3D_REGULAR, MODEL_3D_SCATTERED, MODEL_3D_RBF,
 }
 
 CURVE_FIT_MODELS: Final[set[str]] = {
@@ -150,6 +164,9 @@ MODEL_DOCS: Final[dict[str, tuple[str, str]]] = {
         "SciPy curve_fit",
         "https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.curve_fit.html",
     ),
+    MODEL_3D_REGULAR: ("SciPy RegularGridInterpolator", "https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.RegularGridInterpolator.html"),
+    MODEL_3D_SCATTERED: ("SciPy LinearNDInterpolator", "https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.LinearNDInterpolator.html"),
+    MODEL_3D_RBF: ("SciPy RBFInterpolator", "https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.RBFInterpolator.html"),
 }
 
 _TABLE_SAFE_RE = re.compile(r"[^A-Za-z0-9_]+")
@@ -259,6 +276,11 @@ class SeriesInterpolateDialog(SeriesOperationDialogBase):
         self._spline_degree_spin = QSpinBox(self)
         self._cubic_bc_combo = QComboBox(self)
         self._smoothing_spin = QDoubleSpinBox(self)
+        self._grid_y_points_spin = QSpinBox(self)
+        self._y_range_edit = QLineEdit(self)
+        self._rbf_kernel_combo = QComboBox(self)
+        self._rbf_epsilon_spin = QDoubleSpinBox(self)
+        self._rbf_smoothing_spin = QDoubleSpinBox(self)
         self._guess_check = QCheckBox(_("Guess starting parameters"), self)
         self._params_label = QLabel(_("Start params:"), self)
         self._params_edit = QPlainTextEdit(self)
@@ -348,6 +370,28 @@ class SeriesInterpolateDialog(SeriesOperationDialogBase):
         self._smoothing_spin.setDecimals(3)
         form.addRow(_("Smooth s:"), self._smoothing_spin)
 
+        self._grid_y_points_spin.setRange(2, 2000)
+        self._grid_y_points_spin.setValue(100)
+        form.addRow(_("Grid Y points:"), self._grid_y_points_spin)
+
+        self._y_range_edit.setPlaceholderText(_("auto, or start, stop"))
+        form.addRow(_("Y range:"), self._y_range_edit)
+
+        self._rbf_kernel_combo.addItems([
+            "thin_plate_spline", "linear", "cubic", "quintic",
+            "multiquadric", "inverse_multiquadric", "inverse_quadratic", "gaussian",
+        ])
+        form.addRow(_("RBF kernel:"), self._rbf_kernel_combo)
+
+        self._rbf_epsilon_spin.setRange(1e-12, 1e12)
+        self._rbf_epsilon_spin.setDecimals(6)
+        self._rbf_epsilon_spin.setValue(1.0)
+        form.addRow(_("RBF epsilon:"), self._rbf_epsilon_spin)
+
+        self._rbf_smoothing_spin.setRange(0.0, 1e12)
+        self._rbf_smoothing_spin.setDecimals(6)
+        form.addRow(_("RBF smoothing:"), self._rbf_smoothing_spin)
+
         self._guess_check.setChecked(True)
         form.addRow("", self._guess_check)
 
@@ -362,6 +406,8 @@ class SeriesInterpolateDialog(SeriesOperationDialogBase):
             self._spline_type_combo,
             self._cubic_bc_combo,
             self._params_edit,
+            self._y_range_edit,
+            self._rbf_kernel_combo,
         ):
             widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
@@ -386,6 +432,11 @@ class SeriesInterpolateDialog(SeriesOperationDialogBase):
         self._spline_degree_spin.valueChanged.connect(self.refresh_results)
         self._cubic_bc_combo.currentIndexChanged.connect(self.refresh_results)
         self._smoothing_spin.valueChanged.connect(self.refresh_results)
+        self._grid_y_points_spin.valueChanged.connect(self.refresh_results)
+        self._y_range_edit.textChanged.connect(self.refresh_results)
+        self._rbf_kernel_combo.currentIndexChanged.connect(self._refresh_model_defaults)
+        self._rbf_epsilon_spin.valueChanged.connect(self.refresh_results)
+        self._rbf_smoothing_spin.valueChanged.connect(self.refresh_results)
         self._guess_check.stateChanged.connect(self._refresh_model_defaults)
         self._params_edit.textChanged.connect(self.refresh_results)
 
@@ -451,7 +502,9 @@ class SeriesInterpolateDialog(SeriesOperationDialogBase):
         spacing = self._spacing_combo.currentText()
         spline_type = self._spline_type_combo.currentText()
 
-        uses_interpolation = model in INTERPOLATION_MODELS
+        uses_surface = model in SURFACE_MODELS
+        uses_rbf = model == MODEL_3D_RBF
+        uses_interpolation = model in INTERPOLATION_MODELS or uses_surface
         uses_poly_degree = model == MODEL_POLYNOMIAL
         uses_spline_menu = model == MODEL_SCIPY_SPLINE
         uses_spline_k = uses_spline_menu and spline_type in {
@@ -466,12 +519,12 @@ class SeriesInterpolateDialog(SeriesOperationDialogBase):
         uses_custom_x = spacing == "custom X values"
         uses_original_x = spacing == "original data X"
         uses_step = spacing == "integer step"
-        uses_points = spacing not in {
+        uses_points = uses_surface or spacing not in {
             "custom X values",
             "original data X",
             "integer step",
         }
-        uses_range = spacing not in {"custom X values", "original data X"}
+        uses_range = uses_surface or spacing not in {"custom X values", "original data X"}
         uses_extrap = uses_range or model in {
             MODEL_SCIPY_PCHIP,
             MODEL_SCIPY_AKIMA,
@@ -490,6 +543,14 @@ class SeriesInterpolateDialog(SeriesOperationDialogBase):
         self._set_form_row_visible(self._spline_degree_spin, uses_spline_k)
         self._set_form_row_visible(self._cubic_bc_combo, uses_boundary)
         self._set_form_row_visible(self._smoothing_spin, uses_smoothing)
+        self._set_form_row_visible(self._grid_y_points_spin, uses_surface)
+        self._set_form_row_visible(self._y_range_edit, uses_surface)
+        self._set_form_row_visible(self._rbf_kernel_combo, uses_rbf)
+        self._set_form_row_visible(self._rbf_epsilon_spin, uses_rbf)
+        self._set_form_row_visible(self._rbf_smoothing_spin, uses_rbf)
+        self._set_form_row_visible(self._spacing_combo, not uses_surface)
+        self._set_form_row_visible(self._integer_step_spin, uses_step and not uses_surface)
+        self._set_form_row_visible(self._custom_x_edit, uses_custom_x and not uses_surface)
         self._set_form_row_visible(self._guess_check, uses_interpolation)
         self._set_form_row_visible(self._params_edit, uses_interpolation)
         self._params_label.setVisible(uses_interpolation)
@@ -559,7 +620,45 @@ class SeriesInterpolateDialog(SeriesOperationDialogBase):
         """Build interpolation results for selected SQLite series rows."""
         selected_rows = self.selected_series()
         choices = [self._series_choice_from_row(row) for row in selected_rows]
+        if self._model_name() in SURFACE_MODELS and len(choices) > 1:
+            raise ValueError(
+                "Select one source series for a 3D grid interpolation. "
+                "Preview or OK creates a dedicated Contour Plot axis."
+            )
         return [self._interpolate_one_series(choice) for choice in choices]
+
+    @staticmethod
+    def _has_grid_results(results: Sequence[FitResult]) -> bool:
+        return any(result.model in SURFACE_MODELS for result in results)
+
+    def _create_contour_axis(self, results: Sequence[FitResult]) -> int:
+        first = results[0]
+        return self.create_result_axis(
+            chart_type="Contour Plot",
+            title=f"Interpolation: {first.source.name}",
+            x_label="X",
+            y_label="Y",
+            options={"grid": True},
+        )
+
+    def preview_results_to_axis(
+        self, axis_id: int, results: Sequence[FitResult]
+    ) -> None:
+        """Write Preview to a new contour axis inside the savepoint."""
+        target_axis_id = axis_id
+        if self._has_grid_results(results):
+            target_axis_id = self._create_contour_axis(results)
+            self._preview_axis_ids.add(target_axis_id)
+        super().preview_results_to_axis(target_axis_id, results)
+
+    def apply_results_to_axis(
+        self, axis_id: int, results: Sequence[FitResult]
+    ) -> None:
+        """Write OK output to a new contour axis inside the transaction."""
+        target_axis_id = axis_id
+        if self._has_grid_results(results):
+            target_axis_id = self._create_contour_axis(results)
+        super().apply_results_to_axis(target_axis_id, results)
 
     def _interpolate_one_series(self, series: SeriesChoice) -> FitResult:
         df = self._repo.query_df(series.sql_query)
@@ -571,6 +670,16 @@ class SeriesInterpolateDialog(SeriesOperationDialogBase):
             pd.to_numeric(df[z_col], errors="coerce").to_numpy(dtype=float)
             if z_col is not None else None
         )
+        model = self._model_name()
+        if model in SURFACE_MODELS:
+            if z_raw is None:
+                raise ValueError(f"{series.name}: the selected 3D model requires X, Y and Z roles.")
+            x_data, y_data, z_data = self._prepare_surface_xyz(x_raw, y_raw, z_raw, label=series.name)
+            x_eval, y_eval, z_eval, params, metrics, message = self._evaluate_surface(
+                model, x_data, y_data, z_data
+            )
+            return self._make_result(series, model, x_eval, y_eval, z_eval, params, metrics, message)
+
         if z_raw is None:
             x_data, y_data = self.prepare_input_xy(x_raw, y_raw, label=series.name)
             z_data = None
@@ -580,7 +689,6 @@ class SeriesInterpolateDialog(SeriesOperationDialogBase):
             )
 
         x_eval = self._x_eval(x_data)
-        model = self._model_name()
 
         start_params = self._start_params()
         y_eval, params, message = self._evaluate_model(
@@ -606,28 +714,26 @@ class SeriesInterpolateDialog(SeriesOperationDialogBase):
             params.update({f"z_{key}": value for key, value in z_params.items()})
             message = f"Y: {message}; Z: {z_message}"
 
-        safe_model_name = _TABLE_SAFE_RE.sub(
-            "_",
-            model.strip().lower(),
-        ).strip("_") or "series"
+        return self._make_result(
+            series, model, x_eval, y_eval, z_eval, params, metrics, message
+        )
 
+    def _make_result(
+        self, series: SeriesChoice, model: str, x_eval: np.ndarray,
+        y_eval: np.ndarray, z_eval: np.ndarray | None, params: dict[str, float],
+        metrics: dict[str, float], message: str,
+    ) -> FitResult:
+        safe_model_name = _TABLE_SAFE_RE.sub("_", model.strip().lower()).strip("_") or "series"
         table_name = generated_table_name(
             f"Interpolation_axis{self.series_selector.selected_axis_id()}"
             f"_series{series.series_id}_{safe_model_name}",
             fallback="Interpolation_Result",
         )
-
         return FitResult(
-            source=series,
-            model=model,
-            table_name=table_name,
+            source=series, model=model, table_name=table_name,
             output_name=f"Interpolate: {series.name} [{model}]",
-            x_eval=x_eval,
-            y_eval=y_eval,
-            z_eval=z_eval,
-            params=params,
-            metrics=metrics,
-            message=message,
+            x_eval=x_eval, y_eval=y_eval, z_eval=z_eval, params=params,
+            metrics=metrics, message=message,
         )
 
     @staticmethod
@@ -662,6 +768,100 @@ class SeriesInterpolateDialog(SeriesOperationDialogBase):
         """Backward-compatible 2D column resolver."""
         x_name, y_name, _z_name = SeriesInterpolateDialog._series_columns(df, roles)
         return x_name, y_name
+
+    @staticmethod
+    def _prepare_surface_xyz(
+        x: np.ndarray, y: np.ndarray, z: np.ndarray, *, label: str
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        if not (x.size == y.size == z.size):
+            raise ValueError(f"{label}: X, Y and Z must have equal lengths.")
+        frame = pd.DataFrame({"x": x, "y": y, "z": z}).replace(
+            [np.inf, -np.inf], np.nan
+        ).dropna()
+        frame = frame.groupby(["x", "y"], as_index=False, sort=True)["z"].mean()
+        if len(frame) < 3:
+            raise ValueError(f"{label}: at least three distinct X/Y points are required.")
+        return tuple(frame[c].to_numpy(dtype=float) for c in ("x", "y", "z"))
+
+    def _axis_grid(self, values: np.ndarray, count: int, range_text: str) -> np.ndarray:
+        if range_text.strip():
+            limits = self._parse_values(range_text)
+            if limits.size < 2:
+                raise ValueError("Grid range must contain start and stop.")
+            start, stop = float(limits[0]), float(limits[1])
+        else:
+            start, stop = float(np.min(values)), float(np.max(values))
+            if self._extrap_check.isChecked():
+                pad = (stop - start) * float(self._extend_spin.value()) / 100.0
+                start, stop = start - pad, stop + pad
+        if start > stop:
+            start, stop = stop, start
+        if start == stop:
+            raise ValueError("Grid range endpoints must differ.")
+        return np.linspace(start, stop, count)
+
+    def _evaluate_surface(
+        self, model: str, x: np.ndarray, y: np.ndarray, z: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[str, float], dict[str, float], str]:
+        x_axis = self._axis_grid(x, self._points_spin.value(), self._range_edit.text())
+        y_axis = self._axis_grid(y, self._grid_y_points_spin.value(), self._y_range_edit.text())
+        xx, yy = np.meshgrid(x_axis, y_axis, indexing="xy")
+        targets = np.column_stack((xx.ravel(), yy.ravel()))
+        source = np.column_stack((x, y))
+        params: dict[str, float] = {"nx": float(x_axis.size), "ny": float(y_axis.size)}
+
+        if model == MODEL_3D_REGULAR:
+            ux, uy = np.unique(x), np.unique(y)
+            if ux.size * uy.size != z.size:
+                raise ValueError("Regular-grid interpolation requires one Z value for every X/Y grid pair.")
+            for axis, name in ((ux, "X"), (uy, "Y")):
+                if axis.size > 2 and not np.allclose(np.diff(axis), np.diff(axis)[0], rtol=1e-6, atol=1e-12):
+                    raise ValueError(f"{name} values are not equally spaced; use 3D uneven/scattered or 3D RBF.")
+            grid = pd.DataFrame({"x": x, "y": y, "z": z}).pivot(index="x", columns="y", values="z")
+            interpolator = RegularGridInterpolator(
+                (grid.index.to_numpy(float), grid.columns.to_numpy(float)),
+                grid.to_numpy(float), bounds_error=False, fill_value=None if self._extrap_check.isChecked() else np.nan,  # type: ignore[arg-type]
+            )
+            z_grid = interpolator(targets)
+            z_source = interpolator(source)
+            message = f"Regular-grid surface converted to {x_axis.size} x {y_axis.size} grid"
+        elif model == MODEL_3D_SCATTERED:
+            interpolator = LinearNDInterpolator(source, z, fill_value=np.nan)
+            z_grid = np.asarray(interpolator(targets), dtype=float)
+            z_source = np.asarray(interpolator(source), dtype=float)
+            message = f"Uneven/scattered surface converted to {x_axis.size} x {y_axis.size} grid"
+        else:
+            kernel = self._rbf_kernel_combo.currentText()
+            smoothing = float(self._rbf_smoothing_spin.value())
+            epsilon_kernels = {
+                "multiquadric", "inverse_multiquadric",
+                "inverse_quadratic", "gaussian",
+            }
+            if kernel in epsilon_kernels:
+                interpolator = RBFInterpolator(
+                    source, z, kernel=kernel, smoothing=smoothing,
+                    epsilon=float(self._rbf_epsilon_spin.value()),
+                )
+            else:
+                interpolator = RBFInterpolator(
+                    source, z, kernel=kernel, smoothing=smoothing,
+                )
+            z_grid = np.asarray(interpolator(targets), dtype=float)
+            z_source = np.asarray(interpolator(source), dtype=float)
+            params.update({"epsilon": float(self._rbf_epsilon_spin.value()), "smoothing": float(self._rbf_smoothing_spin.value())})
+            if not self._extrap_check.isChecked():
+                inside = Delaunay(source).find_simplex(targets) >= 0
+                z_grid[~inside] = np.nan
+            message = f"RBF ({kernel}) surface converted to {x_axis.size} x {y_axis.size} grid"
+
+        finite = np.isfinite(z_source) & np.isfinite(z)
+        metrics: dict[str, float] = {}
+        if finite.any():
+            residual = z[finite] - z_source[finite]
+            metrics["z_rmse"] = float(np.sqrt(np.mean(residual ** 2)))
+            total = float(np.sum((z[finite] - np.mean(z[finite])) ** 2))
+            metrics["z_r2"] = 1.0 - float(np.sum(residual ** 2)) / total if total > 0 else float("nan")
+        return xx.ravel(), yy.ravel(), z_grid, params, metrics, message
 
     def _prepare_input_xyz(
         self,
@@ -1016,7 +1216,19 @@ class SeriesInterpolateDialog(SeriesOperationDialogBase):
         return result.to_frame()
 
     def result_table_name(self, axis_id: int, result: FitResult) -> str:
-        return result.table_name
+        """Return a generated name tied to the actual destination axis.
+
+        Never reuse the source table name. Preview adds its own suffix in the
+        base class, and all operation-owned tables retain the generated prefix.
+        """
+        safe_model = _TABLE_SAFE_RE.sub(
+            "_", result.model.strip().lower()
+        ).strip("_") or "series"
+        return generated_table_name(
+            f"Interpolation_axis{axis_id}"
+            f"_series{result.source.series_id}_{safe_model}",
+            fallback="Interpolation_Result",
+        )
 
     def result_series_spec(self, axis_id: int, table_name: str, result: FitResult) -> ResultSeriesSpec:
         is_3d = result.z_eval is not None

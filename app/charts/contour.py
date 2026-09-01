@@ -326,7 +326,10 @@ class ContourAxisRenderer(BaseAxisRenderer):
         """The band keywords, adjusted for drawing lines rather than areas."""
         kwargs = dict(base)
         for name in ("linewidths", "linestyles"):
-            value = self.opt(name, options)
+            # opt_typed, not opt: linewidths is declared a float and a string
+            # one is read by Matplotlib as a sequence of characters.
+            # linestyles declares a list of choices, which is passed through.
+            value = self.opt_typed(name, options)
             if value is not None and value != "":
                 kwargs[name] = value
 

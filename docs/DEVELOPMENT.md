@@ -254,6 +254,20 @@ Renaming `Name` later orphans every axis already saved with the old name;
 add the rename to `CHART_TYPE_ALIASES` in `axis_renderer_scanner.py` instead
 of just changing the string.
 
+The `type` in a `Kwargs` entry is enforced, not decoration. Options arrive as
+text far more often than not — the kwargs editor stores what was typed, and so
+does a saved descriptor — so `get_kwargs` converts each value to its declared
+type before forwarding it, and drops one that cannot be converted with a debug
+log rather than passing it on. Matplotlib does not coerce: `plot_surface`
+computes `(rows - 1) % rstride` and raises on a string, and `linewidths="0.5"`
+is read as the *characters* `0`, `.`, `5`.
+
+`opt` is deliberately left raw, because a renderer-owned option is parsed by
+the renderer that owns it and several are free-form — contour `levels` is a
+count *or* a comma-separated list. Use `opt` when you are going to parse the
+value yourself, and `opt_typed` when you are handing it straight to
+Matplotlib. Covered by `app/tests/test_renderer_option_types.py`.
+
 Useful shared helpers already on the base class: `series_data_color` /
 `series_color` (per-series colour, with an optional `color` data column
 overriding the style), `color_sequence_from_values` (integer columns → the
@@ -384,7 +398,7 @@ assert what it must **not** reject.
 
 | Operation | Reads | Produces |
 | --- | --- | --- |
-| Fit | one series | fitted curve + parameters |
+| Fit | one series | fitted curve or surface + parameters |
 | Interpolation | one series | resampled curve |
 | Smoothing | one series | smoothed curve |
 | Outliers | one series | `Hide` flags on the source rows |
@@ -454,9 +468,26 @@ where `axis_name` is only there so the error names the axis that was wrong —
 and writes the result as `x, y, z` with a Surface Plot descriptor; a curve
 takes the `x, y` Scatter Plot path instead.
 
+**Fit** takes the same distinction, and reads it from the *model* rather than
+from the data: the same series can source either kind, and it is the function
+that decides how many inputs it takes (`SeriesFitDialog._is_2d_fit`). A
+surface fit reads the series' `z` role as the target and stacks `x` and `y`
+into the `(N, 2)` array the model expects, then writes `x, y, z_fit` with
+three roles and `surface: True`, so the result is drawn as a surface instead
+of the dashed overlay a curve fit produces.
+
+Two one-dimensional habits are deliberately skipped on that path.
+`prepare_input_xy` sorts by x and averages repeated x, and both are wrong for
+a pair: a grid is mostly points that share an x with a different y, and
+averaging them would collapse 625 points to 25. Non-finite rows are still
+dropped. `choose_starting_point` had to stop ravelling its x for the same
+reason — flattening `(N, 2)` into 2N loose numbers made every Estimate on a
+3D function fail before the search began.
+
 Tests for all four: `app/tests/test_new_operations.py`. The library itself is
 covered by `app/tests/test_fit_starting_point.py`, which calls every
-discovered function with the input shape its declaration asks for.
+discovered function with the input shape its declaration asks for, and the
+surface half of the Fit dialog by `app/tests/test_fit_surface.py`.
 
 ### 7.3 The `.mplstyle` library
 

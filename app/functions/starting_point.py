@@ -103,7 +103,12 @@ def choose_starting_point(
     seed: int | None = None,
 ) -> StartingPoint:
     """Return the parameters a fit should start from, and their provenance."""
-    x_array = np.asarray(x, dtype=float).ravel()
+    # A surface is called with an (N, 2) array of X/Y pairs, and ravelling
+    # that would hand the model 2N loose numbers - which it refuses, so every
+    # Estimate on a 3D function would fail before the search began.
+    x_array = np.asarray(x, dtype=float)
+    if x_array.ndim < 2:
+        x_array = x_array.ravel()
     y_array = np.asarray(y, dtype=float).ravel()
     start = np.asarray(declared, dtype=float).ravel()
     low = np.asarray(lower, dtype=float).ravel()

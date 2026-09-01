@@ -4224,3 +4224,46 @@ msgstr "Aggiungi file .mplstyle alla pila"
 
 msgid "Load"
 msgstr "Carica"
+
+
+# ---------------------------------------------------------------
+# Demo projects: surfaces and contour maps
+# ---------------------------------------------------------------
+
+msgid "Wave interference - where the contour map wins"
+msgstr "Interferenza d'onda - dove vince la mappa di contorno"
+
+msgid "Two coherent sources on a ripple tank, drawn both ways. A fringe is a level set, so the contour map draws the physics directly while the surface shows the same field as a shape seen from an angle."
+msgstr "Due sorgenti coerenti su un ondoscopio, disegnate in entrambi i modi. Una frangia è un insieme di livello, quindi la mappa di contorno disegna direttamente la fisica, mentre la superficie mostra lo stesso campo come una forma vista di scorcio."
+
+msgid "Membrane mode - signed data and a diverging colormap"
+msgstr "Modo di membrana - dati con segno e mappa di colori divergente"
+
+msgid "One vibration mode of a round drum head, positive on two quarters and negative on the other two. A diverging colormap puts white on the nodal lines, and circular_mask keeps the square grid off the round drum."
+msgstr "Un modo di vibrazione di una pelle di tamburo rotonda, positivo su due quarti e negativo sugli altri due. Una mappa di colori divergente mette il bianco sulle linee nodali, e circular_mask tiene la griglia quadrata fuori dal tamburo rotondo."
+
+msgid "Cost landscape - four decades, two ways"
+msgstr "Panorama di costo - quattro decadi, due modi"
+
+msgid "The Rosenbrock function, whose rim is ten thousand times its valley floor. The surface takes a log of it; the contour map keeps the raw values and names the levels one at a time, which is what the levels option takes a list for."
+msgstr "La funzione di Rosenbrock, il cui bordo è diecimila volte il fondo della sua valle. La superficie ne prende il logaritmo; la mappa di contorno mantiene i valori grezzi e nomina i livelli uno alla volta, ed è per questo che l'opzione dei livelli accetta un elenco."
+
+
+# ---------------------------------------------------------------
+# Interpolation onto a grid
+# ---------------------------------------------------------------
+
+msgid "Grid Y points:"
+msgstr "Punti Y della griglia:"
+
+msgid "RBF epsilon:"
+msgstr "Epsilon RBF:"
+
+msgid "RBF kernel:"
+msgstr "Kernel RBF:"
+
+msgid "RBF smoothing:"
+msgstr "Smoothing RBF:"
+
+msgid "Y range:"
+msgstr "Intervallo Y:"
