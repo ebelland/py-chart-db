@@ -322,9 +322,28 @@ def test_edited_text_becomes_the_number_the_schema_declares() -> None:
     assert isinstance(kwargs["linewidth"], float)
 
 
-def test_a_value_that_will_not_convert_is_passed_through() -> None:
-    """So Matplotlib complains about what was typed, not this module."""
-    assert BarAxisRenderer().get_kwargs({"axis_kwargs": {"alpha": "wide"}})["alpha"] == "wide"
+def test_a_value_that_will_not_convert_is_dropped() -> None:
+    """Not forwarded raw for Matplotlib to choke on: a typo should cost the
+    option, not the chart. The dropped name is logged at debug with the
+    renderer that declared it."""
+    assert "alpha" not in BarAxisRenderer().get_kwargs({"axis_kwargs": {"alpha": "wide"}})
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [("yes", True), ("on", True), ("1", True), ("no", False), ("off", False)],
+)
+def test_a_boolean_written_as_a_word_is_understood(text: str, expected: bool) -> None:
+    """A checkbox, a config file and a hand-typed option each spell a boolean
+    differently, and all three end up in the same schema entry."""
+    forwarded = BarAxisRenderer().get_kwargs({"axis_kwargs": {"fill": text}})
+
+    assert forwarded["fill"] is expected
+
+
+def test_a_number_written_as_a_word_is_not_a_boolean() -> None:
+    """``bool("wide")`` is True, which is how a typo becomes a silent setting."""
+    assert "fill" not in BarAxisRenderer().get_kwargs({"axis_kwargs": {"fill": "wide"}})
 
 
 @pytest.mark.parametrize("empty", [None, "", kwarg_spec.DEFAULT])

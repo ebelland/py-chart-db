@@ -117,9 +117,68 @@ def as_meta(meta: object) -> dict[str, Any]:
 # ----------------------------------------------------------------------
 # Resolving values
 # ----------------------------------------------------------------------
+#: What a checkbox, a config file and a hand-typed option may each call a
+#: boolean. Compared lowercased and stripped; anything else is not one.
+TRUE_WORDS: frozenset[str] = frozenset({"1", "true", "yes", "on"})
+FALSE_WORDS: frozenset[str] = frozenset({"0", "false", "no", "off"})
+
+#: Returned by :func:`coerce` for a value that cannot be made into the type
+#: its schema entry declares, and so must not be forwarded.
+UNCONVERTIBLE: object = object()
+
+
+def coerce(value: object, meta: Mapping[str, Any]) -> Any:
+    """Return *value* as the type its schema entry declares.
+
+    Options reach a renderer as text far more often than not: the axis options
+    editor stores what was typed, and so does a saved descriptor, so
+    ``rstride`` arrives as ``"2"`` rather than ``2``.  Matplotlib does not
+    coerce - ``plot_surface`` computes ``(rows - 1) % rstride`` and raises
+    *unsupported operand type(s) for %: 'int' and 'str'*, and a string
+    ``linewidth`` reaches the C++ layer and fails there instead, with a
+    message that names nothing the person typed.
+
+    Only int, float and bool are converted.  A renderer-owned option that is
+    free-form is parsed by the renderer that owns it: contour ``levels`` is
+    deliberately either a count or a comma-separated list, which no scalar
+    conversion could express.
+    """
+    declared = meta.get("type")
+    if declared not in (int, float, bool) or value is None:
+        return value
+
+    if declared is bool:
+        if isinstance(value, bool):
+            return value
+        text = str(value).strip().lower()
+        if text in TRUE_WORDS:
+            return True
+        if text in FALSE_WORDS:
+            return False
+        return UNCONVERTIBLE
+
+    # A bool where a number was declared is left alone: it is almost certainly
+    # a mis-declared option rather than the number 0 or 1, and silently
+    # turning it into one would hide that.
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return declared(value)
+
+    text = str(value).strip()
+    if text == "":
+        # Empty means "not set" to every caller downstream, which drops it.
+        return value
+    try:
+        return int(float(text)) if declared is int else float(text)
+    except (TypeError, ValueError):
+        return UNCONVERTIBLE
+
+
 def resolve(
     spec: Mapping[str, Any],
     sources: Iterable[Mapping[str, Any]],
+    dropped: list[tuple[str, Any, Any]] | None = None,
 ) -> dict[str, Any]:
     """Resolve every key in *spec* against *sources*, most specific first.
 
@@ -132,6 +191,12 @@ def resolve(
     are not the same thing: ``picker=None`` reaches
     ``Line2D.set_pickradius(None)`` and raises *"pick radius should be a
     distance"*, while omitting the key simply uses the default.
+
+    A value that cannot be made into its declared type is dropped too, and
+    appended to *dropped* as ``(name, value, declared_type)`` when a list is
+    given: this module has no logger of its own, and the caller wants to name
+    the renderer in the message anyway.  A typo should cost the option, not
+    the chart.
     """
     ordered = [source for source in sources if isinstance(source, Mapping)]
     resolved: dict[str, Any] = {}
@@ -140,7 +205,12 @@ def resolve(
         value = _first(name, ordered, meta.get("default"))
         if is_default(value) or value == "":
             continue
-        resolved[name] = _coerced(value, meta)
+        coerced = coerce(value, meta)
+        if coerced is UNCONVERTIBLE:
+            if dropped is not None:
+                dropped.append((name, value, meta.get("type")))
+            continue
+        resolved[name] = coerced
     return resolved
 
 
@@ -148,12 +218,20 @@ def resolve_one(
     spec: Mapping[str, Any],
     name: str,
     sources: Iterable[Mapping[str, Any]],
+    *,
+    typed: bool = False,
 ) -> Any:
     """Resolve one key, returning None when it is unset.
 
     Kept separate from :func:`resolve` because a renderer reading its own
     option wants the value whatever it is - including the schema default -
     while a forwarded keyword wants to be absent.
+
+    Raw by default, and deliberately: several renderer-owned options are
+    free-form, and contour ``levels`` is a count or a list.  Pass
+    ``typed=True`` for one that is handed to Matplotlib after all, where
+    ``linewidths="0.5"`` is a *string* Matplotlib reads as the characters
+    ``0``, ``.``, ``5`` and draws three lines of nonsense widths.
 
     An empty string is *not* collapsed to None here, though :func:`resolve`
     drops it: emptiness means something to some renderers - ``contour``
@@ -168,7 +246,10 @@ def resolve_one(
     )
     if is_default(value):
         return None
-    return _coerced(value, meta)
+    if not typed:
+        return value
+    coerced = coerce(value, meta)
+    return None if coerced is UNCONVERTIBLE else coerced
 
 
 def _first(name: str, sources: list[Mapping[str, Any]], fallback: object) -> object:
@@ -176,25 +257,6 @@ def _first(name: str, sources: list[Mapping[str, Any]], fallback: object) -> obj
         if name in source:
             return source[name]
     return fallback
-
-
-def _coerced(value: object, meta: Mapping[str, Any]) -> Any:
-    """Turn an edited string back into the number the schema declares.
-
-    Only strings are touched, and only where the schema says ``float`` or
-    ``int``: the editor writes text, and every renderer was converting it back
-    itself - ``float(str(kwargs[key]))`` repeated over five keys in ``bar``
-    alone.  A string that will not convert is passed through unchanged, so
-    Matplotlib raises about the value the person actually typed instead of
-    this module hiding it.
-    """
-    declared = meta.get("type")
-    if not isinstance(value, str) or declared not in (float, int):
-        return value
-    try:
-        return declared(value)
-    except (TypeError, ValueError):
-        return value
 
 
 # ----------------------------------------------------------------------

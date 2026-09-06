@@ -11,7 +11,7 @@ the columns it needs and the series SQL is responsible for aliasing to them.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, ClassVar, Protocol
 import numpy as np
 import pandas as pd
 from matplotlib import colormaps, rcParams
@@ -27,19 +27,24 @@ from app.charts.kwarg_spec import (
     LINE_KWARGS,
     PATCH_KWARGS,
     RCPARAM,
-    VIEW_OPTIONS,
     STYLE_DEFAULT,
+    VIEW_OPTIONS,
     merge,
     pick,
 )
+from app.logs.logger import applogger
+
+#: Kept as aliases of the shared vocabulary, which now owns the conversion.
+_TRUE_WORDS = kwarg_spec.TRUE_WORDS
+_FALSE_WORDS = kwarg_spec.FALSE_WORDS
 
 # Re-exported deliberately.  Renderers are re-executed from disk by the
 # renderer scanner while ``app.charts.base`` stays cached in sys.modules, so a
 # renderer edited while the application runs can be newer than the base module
-# it imports; a missing name then fails as an ImportError that says which name
-# is missing.  Every renderer already imports from base, so the shared
-# vocabulary is reachable the same way rather than through a second import
-# line each of them would have to grow.
+# it imports; a missing name then fails as an ImportError naming the name.
+# Every renderer already imports from base, so the shared vocabulary is
+# reachable the same way rather than through a second import line each of them
+# would have to grow.
 __all__ = [
     "ARTIST_ADVANCED_KWARGS",
     "ARTIST_KWARGS",
@@ -265,8 +270,7 @@ class BaseAxisRenderer(Protocol):
 
         Reads :attr:`Options` first and falls back to :attr:`Kwargs`, so a
         renderer that has not been split yet resolves exactly as before.
-        Returns None for an unset value, which is what the callers that pass
-        the result straight to Matplotlib rely on.
+        Returns the value raw; :meth:`opt_typed` is the converting version.
         """
         spec = self.Options if name in self.Options else self.Kwargs
         return kwarg_spec.resolve_one(spec, name, self._sources(options))
@@ -277,8 +281,8 @@ class BaseAxisRenderer(Protocol):
         The sub-dicts are merged key by key rather than replaced, so a series
         overriding its colour keeps the axis-wide alpha.  Seven renderers had
         their own copy of this - ``bar``, ``contour``, ``broken_bar``,
-        ``text``, ``table`` and both surfaces - identical down to the
-        variable names.
+        ``text``, ``table`` and both surfaces - identical down to the variable
+        names.
         """
         merged = dict(options or {})
         for name in self.VALUE_SOURCES:
@@ -291,6 +295,7 @@ class BaseAxisRenderer(Protocol):
                 merged[key] = value
         return merged
 
+
     def ensure_required_roles(self,df:pd.DataFrame) ->bool:
         """Return True when *df* carries every column this renderer needs.
 
@@ -301,6 +306,39 @@ class BaseAxisRenderer(Protocol):
             if role not in df.columns:
                 return False
         return True
+
+    #: Returned by :meth:`_coerce_option` for a value that cannot be made
+    #: into the type the option declares, and so must not be forwarded.
+    _UNCONVERTIBLE: ClassVar[object] = kwarg_spec.UNCONVERTIBLE
+
+    @classmethod
+    def _coerce_option(cls, value: Any, meta: dict) -> Any:
+        """Return *value* as the type the option declares.
+
+        The conversion itself lives in ``kwarg_spec`` now, so that
+        :func:`~app.charts.kwarg_spec.resolve` applies exactly the same rules
+        to a forwarded keyword as this applies to one a renderer reads for
+        itself - two implementations of "is this a number?" is how they drift.
+        Kept as a method because renderers call it.
+        """
+        return kwarg_spec.coerce(value, meta if isinstance(meta, dict) else {})
+
+    def opt_typed(self, name: str, options: dict) -> Any:
+        """Like :meth:`opt`, but converted to the type the option declares.
+
+        For a renderer-owned option that is still handed to Matplotlib.
+        :meth:`opt` stays raw because several of them are deliberately
+        free-form - contour ``levels`` is a count or a list, ``linestyles`` is
+        one of four words - but a numeric one has to arrive as a number:
+        ``linewidths="0.5"`` is a *string* to Matplotlib, which reads it as
+        the sequence of characters ``0``, ``.``, ``5`` and draws three lines
+        of nonsense widths.
+
+        Returns None when the value cannot be converted, which every caller
+        already treats as "not set".
+        """
+        spec = self.Options if name in self.Options else self.Kwargs
+        return kwarg_spec.resolve_one(spec, name, self._sources(options), typed=True)
 
     def get_kwargs(self, options: dict) -> dict:
         """Build the Matplotlib keyword arguments for this renderer.
@@ -316,8 +354,23 @@ class BaseAxisRenderer(Protocol):
         distance"*, while omitting the key uses the default - and dropping is
         also what lets the style sheet decide, which is the whole meaning of
         ``DEFAULT``.
+
+        Values are coerced to the type each entry declares; one that cannot be
+        is dropped with a log entry rather than forwarded, on the same
+        principle as the rest of the option handling - a typo should cost the
+        option, not the chart.
         """
-        return kwarg_spec.resolve(self.Kwargs, self._sources(options))
+        dropped: list[tuple[str, Any, Any]] = []
+        kwargs = kwarg_spec.resolve(self.Kwargs, self._sources(options), dropped)
+        for name, value, declared in dropped:
+            applogger.debug(
+                "%s: option %r=%r is not a %s; leaving it out of the chart.",
+                type(self).__name__,
+                name,
+                value,
+                getattr(declared, "__name__", "value"),
+            )
+        return kwargs
 
     # ------------------------------------------------------------------
     # Axis annotations
