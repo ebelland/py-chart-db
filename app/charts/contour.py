@@ -75,6 +75,9 @@ class ContourAxisRenderer(BaseAxisRenderer):
     RequiredRoles: list[str] = ["x", "y", "z"]
     OptionalRoles: list[str] = []
 
+    #: A second scalar field would cover the first, not compare with it.
+    MaxSeries: int | None = 1
+
     Kwargs: dict[str, object] = {
         "levels": {
             "default": "",

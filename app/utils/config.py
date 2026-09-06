@@ -1,16 +1,37 @@
-"""Read and write the application-level ``config.json``.
+"""The application's own catalogue, and the settings a person accumulates.
 
-This file holds machine-level preferences: last opened database, icon sets,
-the action catalogue, remembered dialog entries, window geometry.  Anything
-that belongs to a specific figure is stored in the figure descriptor instead,
-so that it travels with the .dhub file.
+Two files, and the difference between them is who writes them:
 
-Everything here goes through :func:`get_section` / :func:`set_section` rather
-than through one accessor pair per key.  Why: every feature that wants to
-remember something was otherwise adding two near-identical functions, and the
+``config.json``
+    Ships with the application.  The action catalogue and the message
+    catalogue: every button's label, icon and tooltip, every message box's
+    wording.  Versioned, reviewed, translated, and never written at runtime.
+
+``user.json``
+    Written by the application as it runs, and by nothing else.  The last
+    database opened, where the windows were, what each dialog was set to last
+    time, the chosen style, language and save format.  Not versioned - it
+    describes one person's machine.
+
+They used to be one file, and the cost of that showed up in the repository
+rather than in a bug report: running the test suite rewrote ``last_database``
+to a pytest temporary directory and left it in ``git status`` every time, so
+a real diff had to be picked out from around it.  ``app_style``, the window
+geometry and twelve dialogs' remembered entries were versioned the same way -
+committed by whoever happened to run the application before committing.
+
+Which file a key belongs to is deliberately *not* decided by a list of user
+keys.  Such a list needs extending every time a feature remembers something
+new, and forgetting to extend it loses the setting silently.  It is the other
+way round: :data:`APPLICATION_SECTIONS` is a closed set of two, and anything
+written while the application runs is a user setting by definition.
+
+Everything goes through :func:`get_section` / :func:`set_section` rather than
+through one accessor pair per key.  Why: every feature that wanted to remember
+something was otherwise adding two near-identical functions, and the
 read-modify-write dance around ``load_config``/``save_config`` was copied with
-it - which is how a section can be silently dropped by a writer that saved a
-stale copy of the whole file.
+it - which is how a section gets silently dropped by a writer that saved a
+stale copy of the whole document.
 """
 from __future__ import annotations
 
@@ -28,78 +49,181 @@ def _repo_root() -> Path:
 
 
 CONFIG_PATH = _repo_root().parent / "config.json"
+USER_CONFIG_PATH = _repo_root().parent / "user.json"
 MPLSTYLES_DIR = _repo_root().parent / "mplstyles"
 
+#: The only top-level keys ``config.json`` owns.  Closed on purpose: a key
+#: that is not in here and is found in config.json is a setting left over from
+#: before the split, and is moved out on the next load.
+APPLICATION_SECTIONS: frozenset[str] = frozenset({"actions", "messages"})
 
-# Parsed config.json, with the file signature it was parsed from.
-# See load_config for why this is worth caching.
-_cache: dict[str, Any] | None = None
-_cache_stamp: tuple[int, int] | None = None
+
+# Each file parsed once, with the signature it was parsed from, plus the
+# merged view the readers actually get.  See _read for why this is worth it.
+_cache: dict[Path, dict[str, Any]] = {}
+_cache_stamp: dict[Path, tuple[int, int] | None] = {}
+_merged: dict[str, Any] | None = None
+_merged_stamp: tuple[Any, Any] | None = None
+_migrated_from: Path | None = None
 
 
-def _file_stamp() -> tuple[int, int] | None:
-    """Return (mtime_ns, size) of config.json, or None when it is missing."""
+def _file_stamp(path: Path) -> tuple[int, int] | None:
+    """Return (mtime_ns, size) of *path*, or None when it is missing."""
     try:
-        info = CONFIG_PATH.stat()
+        info = path.stat()
     except OSError:
         return None
     return (info.st_mtime_ns, info.st_size)
 
 
-def load_config() -> dict[str, Any]:
-    """Return the whole configuration, or an empty mapping if unreadable.
+def _read(path: Path) -> dict[str, Any]:
+    """Return one file's contents, or an empty mapping if unreadable.
 
-    The result is cached against the file's mtime and size.  This matters more
-    than it looks: config.json now holds the action catalogue, and resolving
-    one button's icon, label and tooltip asks for it several times - so every
-    menu and every toolbar was re-reading and re-parsing the whole file dozens
-    of times while building.  Keying on the stamp rather than caching forever
-    keeps a hand-edit picked up on the next call.
+    Cached against the file's mtime and size.  This matters more than it
+    looks: config.json holds the action catalogue, and resolving one button's
+    icon, label and tooltip asks for it several times - so every menu and
+    every toolbar was re-reading and re-parsing the whole file dozens of times
+    while building.  Keying on the stamp rather than caching forever keeps a
+    hand-edit picked up on the next call.
     """
-    global _cache, _cache_stamp
-
-    stamp = _file_stamp()
+    stamp = _file_stamp(path)
     if stamp is None:
-        _cache, _cache_stamp = {}, None
+        _cache[path], _cache_stamp[path] = {}, None
         return {}
-    if _cache is not None and stamp == _cache_stamp:
-        return _cache
+    if _cache_stamp.get(path) == stamp and path in _cache:
+        return _cache[path]
 
     try:
-        data = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
-        applogger.exception("Failed to load config: %s", CONFIG_PATH)
+        applogger.exception("Failed to load config: %s", path)
+        _cache[path], _cache_stamp[path] = {}, stamp
         return {}
 
-    _cache = data if isinstance(data, dict) else {}
-    _cache_stamp = stamp
-    return _cache
+    _cache[path] = data if isinstance(data, dict) else {}
+    _cache_stamp[path] = stamp
+    return _cache[path]
 
 
-def save_config(cfg: dict[str, Any]) -> None:
-    """Write the whole configuration back, pretty-printed.
+def _write(path: Path, data: dict[str, Any]) -> bool:
+    """Write one file, pretty-printed.  True when it reached the disk.
 
-    ``indent=2`` and ``sort_keys=False`` are deliberate: config.json is meant
-    to be opened and edited by hand, and reordering it on every save would make
-    every diff unreadable.
+    ``indent=2`` and ``sort_keys=False`` are deliberate: both files are meant
+    to be opened and read by a person, and reordering them on every save would
+    make every diff unreadable.
     """
-    global _cache, _cache_stamp
+    global _merged
     try:
-        CONFIG_PATH.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     except Exception:
-        applogger.exception("Failed to save config: %s", CONFIG_PATH)
-        return
+        applogger.exception("Failed to save config: %s", path)
+        return False
 
     # Adopt what was just written instead of invalidating: a save is usually
     # followed by a read, and the writer already holds the whole document.
-    _cache, _cache_stamp = cfg, _file_stamp()
+    _cache[path], _cache_stamp[path] = data, _file_stamp(path)
+    _merged = None
+    return True
+
+
+def load_config() -> dict[str, Any]:
+    """Return both files as one mapping, the user's settings winning.
+
+    A read-only view: mutating the result changes nothing on disk, and which
+    of the two files a key came from is not something a reader should have to
+    know.
+    """
+    global _merged, _merged_stamp
+
+    _migrate_user_keys()
+    application = _read(CONFIG_PATH)
+    user = _read(USER_CONFIG_PATH)
+
+    stamp = (_cache_stamp.get(CONFIG_PATH), _cache_stamp.get(USER_CONFIG_PATH))
+    if _merged is not None and stamp == _merged_stamp:
+        return _merged
+
+    _merged = {**application, **user}
+    _merged_stamp = stamp
+    return _merged
+
+
+def load_user_config() -> dict[str, Any]:
+    """Return the user's settings alone, without the shipped catalogue."""
+    _migrate_user_keys()
+    return _read(USER_CONFIG_PATH)
+
+
+def save_user_config(cfg: dict[str, Any]) -> None:
+    """Replace the user's settings wholesale.
+
+    A caller wanting to change one thing wants :func:`set_section` or
+    :func:`update_section`: this overwrites everything, including the sections
+    the caller never looked at and may have read minutes ago.
+    """
+    _write(USER_CONFIG_PATH, cfg)
+
+
+# ----------------------------------------------------------------------
+# Migration
+# ----------------------------------------------------------------------
+def _migrate_user_keys() -> None:
+    """Move settings left in config.json into user.json, once per file.
+
+    A settings file cannot be split by editing the repository's copy: the file
+    on a person's machine is the one holding their windows, their language and
+    their last database, and shipping a stripped config.json would simply lose
+    them.  So the split happens where the real data is - on the first load
+    after the update - and config.json is left holding the two catalogues.
+
+    Rewriting config.json is attempted but not required: an application
+    installed into a read-only directory keeps working, because until the keys
+    can be moved they are still read from where they are.  Anything already in
+    user.json wins, being by definition newer than what is still in
+    config.json.
+    """
+    global _migrated_from
+    if _migrated_from == CONFIG_PATH:
+        return
+
+    application = _read(CONFIG_PATH)
+    settings = {
+        name: value
+        for name, value in application.items()
+        if name not in APPLICATION_SECTIONS
+    }
+    if not settings:
+        _migrated_from = CONFIG_PATH
+        return
+
+    user = dict(_read(USER_CONFIG_PATH))
+    moved = sorted(name for name in settings if name not in user)
+    if not _write(USER_CONFIG_PATH, {**settings, **user}):
+        return
+
+    _migrated_from = CONFIG_PATH
+    _write(
+        CONFIG_PATH,
+        {
+            name: value
+            for name, value in application.items()
+            if name in APPLICATION_SECTIONS
+        },
+    )
+    applogger.info(
+        "Moved %d setting(s) out of %s into %s: %s",
+        len(moved),
+        CONFIG_PATH.name,
+        USER_CONFIG_PATH.name,
+        ", ".join(moved) or "none that were not already there",
+    )
 
 
 # ----------------------------------------------------------------------
 # Sections
 # ----------------------------------------------------------------------
 def get_section(name: str, default: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Return one top-level object from the configuration.
+    """Return one top-level object from either file, the user's winning.
 
     A missing or non-object section reads as *default* (empty by default), so
     callers never have to guard against a hand-edited file.
@@ -111,10 +235,27 @@ def get_section(name: str, default: dict[str, Any] | None = None) -> dict[str, A
 
 
 def set_section(name: str, value: dict[str, Any]) -> None:
-    """Replace one top-level object, leaving every other section untouched."""
-    cfg = load_config()
+    """Replace one top-level object in user.json, leaving the rest untouched.
+
+    Always user.json, whatever the section is called: a section written while
+    the application runs is a setting, and a catalogue is not edited by the
+    program that reads it.  A caller naming a catalogue section is doing
+    something wrong and is told so, rather than quietly overwriting a shipped,
+    translated, reviewed file.
+    """
+    if name in APPLICATION_SECTIONS:
+        applogger.warning(
+            "Refusing to write section %r: it belongs to the catalogue in %s.",
+            name,
+            CONFIG_PATH.name,
+            show_dialog=False,
+            raise_error=False,
+        )
+        return
+
+    cfg = dict(load_user_config())
     cfg[name] = value
-    save_config(cfg)
+    save_user_config(cfg)
 
 
 def update_section(name: str, **values: Any) -> None:
@@ -125,15 +266,15 @@ def update_section(name: str, **values: Any) -> None:
 
 
 def get_value(name: str, default: Any = None) -> Any:
-    """Return one top-level scalar from the configuration."""
+    """Return one top-level scalar from either file, the user's winning."""
     return load_config().get(name, default)
 
 
 def set_value(name: str, value: Any) -> None:
-    """Write one top-level scalar, leaving every other key untouched."""
-    cfg = load_config()
+    """Write one top-level scalar to user.json, leaving the rest untouched."""
+    cfg = dict(load_user_config())
     cfg[name] = value
-    save_config(cfg)
+    save_user_config(cfg)
 
 
 # ----------------------------------------------------------------------
@@ -161,9 +302,9 @@ def get_language() -> str:
     show Auto back as the choice that was made rather than as the language it
     happened to resolve to.
 
-    A config.json with no language key means a fresh installation, and a fresh
-    installation should speak the language the machine is set to rather than
-    English - so the fallback is "auto" and not a code.
+    No stored language means a fresh installation, and a fresh installation
+    should speak the language the machine is set to rather than English - so
+    the fallback is "auto" and not a code.
     """
     return str(get_value("language", AUTO_LANGUAGE) or AUTO_LANGUAGE)
 

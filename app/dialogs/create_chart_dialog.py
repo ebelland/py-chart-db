@@ -23,6 +23,7 @@ from app.scanners.axis_renderer_scanner import (
     renderers,
 )
 from app.charts.base import BaseAxisRenderer
+from app.logs.logger import applogger
 from app.data.sqlite_repo import SqliteRepo
 from app.data.data_source import quote_identifier
 from app.utils.messages import show_message
@@ -251,7 +252,16 @@ class NewPlotTabDialog(QDialog):
                                       layout=series_header_layout,
                                   )
 
+        # Says, when it applies, that the entries below are not going to end
+        # up on one axes together.  Hidden the rest of the time: a note that
+        # is always there is a note nobody reads.
+        self._series_split_note = QLabel(series_list_group)
+        self._series_split_note.setWordWrap(True)
+        self._series_split_note.setProperty("muted", True)
+        self._series_split_note.hide()
+
         series_list_layout.addWidget(series_header)
+        series_list_layout.addWidget(self._series_split_note)
         series_list_layout.addWidget(self._series_list, 1)
 
 
@@ -398,6 +408,7 @@ class NewPlotTabDialog(QDialog):
         # Start with one ready-to-edit series so the dialog is usable by
         # default and the generated SQL is visible immediately.
         self._on_add_series()
+        self._sync_series_mode()
 
     @property
     def result(self) -> NewPlotTabResult | None:
@@ -784,15 +795,104 @@ class NewPlotTabDialog(QDialog):
         using_current = self._rb_current_figure.isChecked()
         self._edit_figure_name.setEnabled(not using_current)
 
-        can_use_existing_axis = using_current and self._combo_axes.count() > 0
+        # An existing axis is one axis: it cannot hold a set of series the
+        # renderer wants spread over several, so the choice is withdrawn
+        # rather than accepted and then refused on Create.
+        splitting = len(self._axis_groups(self._ordered_drafts())) > 1
+        can_use_existing_axis = (
+            using_current and self._combo_axes.count() > 0 and not splitting
+        )
         self._rb_existing_axis.setEnabled(can_use_existing_axis)
         self._combo_axes.setEnabled(
             can_use_existing_axis and self._rb_existing_axis.isChecked()
         )
-        self._edit_axis_name.setEnabled(self._rb_new_axis.isChecked())
+        self._rb_existing_axis.setToolTip(
+            _("One axis cannot hold this many series of this chart type.")
+            if splitting
+            else ""
+        )
+        # Each axis of a split takes its own series' name, so there is nothing
+        # for one axis-name field to name.
+        self._edit_axis_name.setEnabled(self._rb_new_axis.isChecked() and not splitting)
 
         if not can_use_existing_axis:
             self._rb_new_axis.setChecked(True)
+
+    # ------------------------------------------------------------------
+    # How many series fit on one axes.
+    # ------------------------------------------------------------------
+    def _max_series_per_axis(self) -> int | None:
+        """Return the selected renderer's series limit, or None for no limit.
+
+        Read from the renderer class rather than from a list of chart-type
+        names kept here: the renderers that draw one series already say so in
+        their own code, and a second list in the dialog would be a second
+        place to forget a new one.
+        """
+        limit = getattr(self._current_renderer_class(), "MaxSeries", None)
+        if limit is None:
+            return None
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError):
+            applogger.warning(
+                "Renderer %r declares an unusable MaxSeries=%r; treating it as "
+                "unlimited.",
+                self._current_renderer_name(),
+                limit,
+            )
+            return None
+        return limit if limit > 0 else None
+
+    def _ordered_drafts(self) -> list[SeriesDraft]:
+        """Return the drafts in the order they are shown in the list.
+
+        Which axis a series lands on now depends on this order, so it is read
+        from the widget rather than from the insertion order of the map.
+        """
+        return [
+            self._draft_for_item(item)
+            for item in (
+                self._series_list.item(row) for row in range(self._series_list.count())
+            )
+            if item is not None
+        ]
+
+    def _axis_groups(self, drafts: list[SeriesDraft]) -> list[list[SeriesDraft]]:
+        """Split *drafts* into the groups that each share one axes."""
+        limit = self._max_series_per_axis()
+        if limit is None or not drafts:
+            return [list(drafts)] if drafts else []
+        return [drafts[start : start + limit] for start in range(0, len(drafts), limit)]
+
+    def _sync_series_mode(self) -> None:
+        """Say what will happen to the series list, and re-sync the target."""
+        limit = self._max_series_per_axis()
+        groups = self._axis_groups(self._ordered_drafts())
+
+        if limit is None or len(groups) <= 1:
+            self._series_split_note.clear()
+            self._series_split_note.hide()
+        else:
+            chart_type = self._current_renderer_name()
+            self._series_split_note.setText(
+                _(
+                    "{chart} draws one series per axis: the {count} below will "
+                    "each get an axis of their own."
+                ).format(chart=chart_type, count=len(groups))
+                if limit == 1
+                else _(
+                    "{chart} draws up to {limit} series per axis: the {count} "
+                    "below will be split across {axes} axes."
+                ).format(
+                    chart=chart_type,
+                    limit=limit,
+                    count=len(self._ordered_drafts()),
+                    axes=len(groups),
+                )
+            )
+            self._series_split_note.show()
+        self._sync_controls()
 
     # ------------------------------------------------------------------
     # Series list management.
@@ -834,6 +934,7 @@ class NewPlotTabDialog(QDialog):
             user_named=False,
         )
         self._series_list.setCurrentItem(item)
+        self._sync_series_mode()
 
     def _on_remove_series(self, _checked: bool = False) -> None:
         """Remove the selected series draft."""
@@ -849,6 +950,7 @@ class NewPlotTabDialog(QDialog):
             self._series_list.setCurrentRow(max(0, row - 1))
         else:
             self._set_series_editor_enabled(False)
+        self._sync_series_mode()
 
     # ------------------------------------------------------------------
     # Series editor bindings.
@@ -1119,6 +1221,9 @@ class NewPlotTabDialog(QDialog):
             draft.roles = self._current_role_mapping()
             self._set_default_series_name(series_item, draft)
         self._update_sql()
+        # Last: the note and the target radios depend on the renderer that
+        # has just been selected.
+        self._sync_series_mode()
 
     def _on_table_changed(self, _index: int = 0) -> None:
         """Refresh role choices, SQL and automatic names when the data source changes."""
@@ -1233,7 +1338,7 @@ class NewPlotTabDialog(QDialog):
         self._persist_editor_to_draft()
         chart_type = self._selected_chart_type()
 
-        drafts = list(self._series_by_item.values())
+        drafts = self._ordered_drafts()
         if not drafts:
             show_message(self, "chart.no_series")
             return
@@ -1257,48 +1362,114 @@ class NewPlotTabDialog(QDialog):
                 ncols=1,
             )
 
+        # One group per axes.  A renderer that draws a single series - a
+        # surface, a pie, a contour map - gets one axis each rather than one
+        # axis that keeps the first series and logs the others away.
+        groups = self._axis_groups(drafts)
+
         if self._rb_existing_axis.isChecked() and self._rb_current_figure.isChecked():
             axis_id_data = self._combo_axes.currentData()
             if axis_id_data is None:
                 return
             axis_id = int(axis_id_data)
+            if not self._existing_axis_has_room(axis_id, len(drafts), chart_type):
+                return
             self._repo.update_axis_chart_type(axis_id=axis_id, chart_type=chart_type)
+            axis_ids = [axis_id]
+            groups = [drafts]
         else:
-            axis_index = self._repo.next_axis_index(figure_id)
-            self._repo.ensure_figure_grid_capacity(
-                figure_id=figure_id,
-                needed_axes=axis_index + 1,
-            )
-            axis_id = self._repo.create_axis_descriptor(
-                figure_id=figure_id,
-                axis_index=axis_index,
-                chart_type=chart_type,
-                title=(
-                    (self._edit_axis_name.text() or "").strip()
-                    or self._axis_title_from_series(drafts)
-                ),
-                x_label=self._axis_label_for_role(drafts, "x"),
-                y_label=self._axis_label_for_role(drafts, "y"),
-                z_label=self._axis_label_for_role(drafts, "z"),
-                options=self._default_axis_options(chart_type),
-            )
+            axis_ids = self._create_axes_for_groups(figure_id, chart_type, groups)
 
         created = 0
-        for draft in drafts:
-            series_index = self._repo.next_series_index(axis_id)
-            self._repo.create_series_descriptor(
-                axis_id=axis_id,
-                series_index=series_index,
-                name=draft.name,
-                sql_query=draft.sql,
-                roles=self._series_roles(draft),
-                style={"label": draft.name},
-            )
-            created += 1
+        for axis_id, group in zip(axis_ids, groups):
+            for draft in group:
+                series_index = self._repo.next_series_index(axis_id)
+                self._repo.create_series_descriptor(
+                    axis_id=axis_id,
+                    series_index=series_index,
+                    name=draft.name,
+                    sql_query=draft.sql,
+                    roles=self._series_roles(draft),
+                    style={"label": draft.name},
+                )
+                created += 1
 
         self._result = NewPlotTabResult(
             figure_id=int(figure_id),
-            axis_id=int(axis_id),
+            # The first axis, so the caller selects the one holding the series
+            # the person was editing when they pressed Create.
+            axis_id=int(axis_ids[0]),
             series_count=int(created),
         )
         self.accept()
+
+    def _existing_axis_has_room(
+        self,
+        axis_id: int,
+        wanted: int,
+        chart_type: str,
+    ) -> bool:
+        """True when *wanted* more series fit on an existing axis.
+
+        Checked here rather than left to the renderer: the renderer's own
+        guard runs at draw time, by which point the series are in the
+        database and the chart has silently lost them.
+        """
+        limit = self._max_series_per_axis()
+        if limit is None:
+            return True
+
+        existing = int(self._repo.next_series_index(axis_id))
+        if existing + wanted <= limit:
+            return True
+
+        show_message(
+            self,
+            "chart.axis_series_limit",
+            chart=chart_type,
+            limit=limit,
+            existing=existing,
+            wanted=wanted,
+        )
+        return False
+
+    def _create_axes_for_groups(
+        self,
+        figure_id: int,
+        chart_type: str,
+        groups: list[list[SeriesDraft]],
+    ) -> list[int]:
+        """Create one axis per group and return their ids, in order.
+
+        The grid is grown once for the whole set rather than per axis, so a
+        figure gaining four surfaces is one capacity change and not four.
+        """
+        first_index = int(self._repo.next_axis_index(figure_id))
+        self._repo.ensure_figure_grid_capacity(
+            figure_id=figure_id,
+            needed_axes=first_index + len(groups),
+        )
+
+        # A single axis keeps the name the person typed.  Several cannot: one
+        # field names one axis, so each takes the title of the series on it.
+        typed_name = (self._edit_axis_name.text() or "").strip()
+        axis_ids: list[int] = []
+        for offset, group in enumerate(groups):
+            title = self._axis_title_from_series(group)
+            if len(groups) == 1 and typed_name:
+                title = typed_name
+            axis_ids.append(
+                int(
+                    self._repo.create_axis_descriptor(
+                        figure_id=figure_id,
+                        axis_index=first_index + offset,
+                        chart_type=chart_type,
+                        title=title,
+                        x_label=self._axis_label_for_role(group, "x"),
+                        y_label=self._axis_label_for_role(group, "y"),
+                        z_label=self._axis_label_for_role(group, "z"),
+                        options=self._default_axis_options(chart_type),
+                    )
+                )
+            )
+        return axis_ids

@@ -20,6 +20,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from app.charts.base import merge
 from app.charts.bar import BarAxisRenderer
 from app.charts.base import BaseAxisRenderer, SeriesData
 from app.logs.logger import applogger
@@ -44,65 +45,74 @@ class ParetoAxisRenderer(BarAxisRenderer, BaseAxisRenderer):
     RequiredRoles: list[str] = ["Y"]
     OptionalRoles: list[str] = ["X", "color", "YError", "XError", "Bottom", "Left"]
 
-    Kwargs: dict[str, object] = {
-        **BarAxisRenderer.Kwargs,
-        "cumulative_line": {
-            "default": True,
-            "type": bool,
-            "group": "Pareto",
-            "description": (
-                "Draw the running total as a percentage on a second axis. "
-                "Without it this is a sorted bar chart."
-            ),
-        },
-        "cumulative_color": {
-            "default": "#D32F2F",
-            "type": str,
-            "kind": "color",
-            "group": "Pareto",
-            "description": "Colour of the cumulative line and its axis.",
-        },
-        "cumulative_label": {
-            "default": "Cumulative %",
-            "type": str,
-            "group": "Pareto",
-            "description": "Label for the cumulative axis on the right.",
-        },
-        "reference_percent": {
-            "default": 80.0,
-            "type": float,
-            "min": 0.0,
-            "max": 100.0,
-            "group": "Pareto",
-            "description": (
-                "Horizontal reference line, as a percentage. 80 is the "
-                "conventional one. Set to 0 to draw no reference."
-            ),
-        },
-        "max_categories": {
-            "default": 0,
-            "type": int,
-            "min": 0,
-            "max": 1000,
-            "group": "Pareto",
-            "description": (
-                "Keep only this many categories and total the rest into a "
-                "single 'Other' bar. 0 keeps every category. The cumulative "
-                "line still accounts for all of them, so the total stays 100%."
-            ),
-        },
-        "ascending": {
-            "default": False,
-            "type": bool,
-            "group": "Pareto",
-            "description": (
-                "Sort smallest first instead. The cumulative line then rises "
-                "slowly and late, which is the wrong shape for the usual "
-                "reading but right for a 'long tail' argument."
-            ),
-        },
-    }
+    #: Unchanged from the bar renderer: a Pareto chart draws bars.
+    Kwargs: dict[str, object] = dict(BarAxisRenderer.Kwargs)
 
+    #: The bar renderer's options, plus this chart's own.  These used to
+    #: sit in Kwargs beside the real keywords and be removed again on the
+    #: way out, through a PARETO_ONLY tuple whose comment had to warn that
+    #: anything added to the schema had to be named there too.  Declaring
+    #: them as options is that warning, enforced.
+    Options: dict[str, object] = merge(
+        BarAxisRenderer.Options,
+        {
+            "cumulative_line": {
+                "default": True,
+                "type": bool,
+                "group": "Pareto",
+                "description": (
+                    "Draw the running total as a percentage on a second axis. "
+                    "Without it this is a sorted bar chart."
+                ),
+            },
+            "cumulative_color": {
+                "default": "#D32F2F",
+                "type": str,
+                "kind": "color",
+                "group": "Pareto",
+                "description": "Colour of the cumulative line and its axis.",
+            },
+            "cumulative_label": {
+                "default": "Cumulative %",
+                "type": str,
+                "group": "Pareto",
+                "description": "Label for the cumulative axis on the right.",
+            },
+            "reference_percent": {
+                "default": 80.0,
+                "type": float,
+                "min": 0.0,
+                "max": 100.0,
+                "group": "Pareto",
+                "description": (
+                    "Horizontal reference line, as a percentage. 80 is the "
+                    "conventional one. Set to 0 to draw no reference."
+                ),
+            },
+            "max_categories": {
+                "default": 0,
+                "type": int,
+                "min": 0,
+                "max": 1000,
+                "group": "Pareto",
+                "description": (
+                    "Keep only this many categories and total the rest into a "
+                    "single 'Other' bar. 0 keeps every category. The cumulative "
+                    "line still accounts for all of them, so the total stays 100%."
+                ),
+            },
+            "ascending": {
+                "default": False,
+                "type": bool,
+                "group": "Pareto",
+                "description": (
+                    "Sort smallest first instead. The cumulative line then rises "
+                    "slowly and late, which is the wrong shape for the usual "
+                    "reading but right for a 'long tail' argument."
+                ),
+            },
+        },
+    )
     # ------------------------------------------------------------------
     # Ordering
     # ------------------------------------------------------------------
@@ -155,25 +165,6 @@ class ParetoAxisRenderer(BarAxisRenderer, BaseAxisRenderer):
             return super()._collect_categories(series)
         return sorted(totals, key=lambda category: totals[category], reverse=True)
 
-    #: The options this renderer consumes itself.  The bar renderer forwards
-    #: everything it does not recognise straight to ``ax.bar``, which rejects
-    #: unknown keywords - so anything added here has to be named here too.
-    PARETO_ONLY: tuple[str, ...] = (
-        "cumulative_line",
-        "cumulative_color",
-        "cumulative_label",
-        "reference_percent",
-        "max_categories",
-        "ascending",
-    )
-
-    def _bar_kwargs(self, options: dict[str, Any]) -> dict[str, Any]:
-        """Drop the Pareto options before the rest reach Matplotlib."""
-        kwargs = super()._bar_kwargs(options)
-        for key in self.PARETO_ONLY:
-            kwargs.pop(key, None)
-        return kwargs
-
     # ------------------------------------------------------------------
     # Rendering
     # ------------------------------------------------------------------
@@ -195,9 +186,9 @@ class ParetoAxisRenderer(BarAxisRenderer, BaseAxisRenderer):
         if not visible:
             return
 
-        merged = self._merge_options(axis_options, visible[0].style or {})
-        ascending = bool(merged.get("ascending", False))
-        limit = max(0, int(merged.get("max_categories", 0) or 0))
+        merged = self.merge_style(axis_options, visible[0].style or {})
+        ascending = bool(self.opt("ascending", merged))
+        limit = max(0, int(self.opt("max_categories", merged) or 0))
 
         totals = self._category_totals(visible)
         ordered = sorted(

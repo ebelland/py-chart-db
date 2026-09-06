@@ -4034,3 +4034,18 @@ msgstr "Automatico y, manuale x e z"
 
 msgid "Manual (all axes)"
 msgstr "Manuale (tutti gli assi)"
+
+msgid "One axis cannot hold this many series of this chart type."
+msgstr "Un solo asse non può contenere così tante serie di questo tipo di grafico."
+
+msgid "{chart} draws one series per axis: the {count} below will each get an axis of their own."
+msgstr "{chart} disegna una serie per asse: le {count} qui sotto avranno ciascuna un asse dedicato."
+
+msgid "{chart} draws up to {limit} series per axis: the {count} below will be split across {axes} axes."
+msgstr "{chart} disegna fino a {limit} serie per asse: le {count} qui sotto saranno distribuite su {axes} assi."
+
+msgid "Series"
+msgstr "Serie"
+
+msgid "{chart} draws {limit} series per axis, and this axis already has {existing}. Choose 'Add new axis' instead, or remove {wanted} series."
+msgstr "{chart} disegna {limit} serie per asse e questo asse ne ha già {existing}. Scegli 'Aggiungi nuovo asse' oppure rimuovi {wanted} serie."

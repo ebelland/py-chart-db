@@ -26,10 +26,33 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
+from matplotlib import rcParams
 
-from app.charts.base import BaseAxisRenderer, SeriesData
+from app.charts.base import (
+    ARTIST_KWARGS,
+    CMAP_KWARGS,
+    VIEW_OPTIONS,
+    BaseAxisRenderer,
+    SeriesData,
+    merge,
+    pick,
+)
 from app.charts.grids import finite_xyz, pivot_to_grid
 from app.logs.logger import applogger
+
+
+def _surface_kwargs(renderer: BaseAxisRenderer, options: dict[str, Any]) -> dict[str, Any]:
+    """Return the keywords to forward, with the style's colormap applied.
+
+    Nothing to remove - Options never reaches here.  The colormap is the one
+    decision made in code rather than in the schema: a surface is always
+    colour-mapped, so an unset cmap falls back to the style's ``image.cmap``
+    rather than leaving Matplotlib to draw one flat colour.  Which map is the
+    style's to say; that there is one is the renderer's.
+    """
+    kwargs = renderer.get_kwargs(options)
+    kwargs.setdefault("cmap", rcParams["image.cmap"])
+    return kwargs
 
 
 def _view_kwargs(options: dict[str, Any], renderer: BaseAxisRenderer) -> dict[str, float]:
@@ -61,98 +84,86 @@ class SurfaceAxisRenderer(BaseAxisRenderer):
     RequiredRoles: list[str] = ["x", "y", "z"]
     OptionalRoles: list[str] = []
 
-    Kwargs: dict[str, object] = {
-        "cmap": {
-            "default": "viridis",
-            "type": str,
-            "group": "Appearance",
-            "description": "Colormap the surface height is mapped through, e.g. 'viridis' or 'coolwarm'.",
+    #: Two surfaces sharing one set of axes occlude each other.
+    MaxSeries: int | None = 1
+
+    #: Forwarded verbatim to ``plot_surface``.
+    Kwargs: dict[str, object] = merge(
+        pick(CMAP_KWARGS, "cmap"),
+        pick(ARTIST_KWARGS, "alpha"),
+        {
+            "cmap": {
+                "description": (
+                    "Colormap the surface height is mapped through. From the "
+                    "style's image.cmap when unset - a surface is always "
+                    "colour-mapped, but which map is the style's to say."
+                ),
+            },
+            "alpha": {"description": "Surface opacity."},
+            "edgecolor": {
+                "default": None,
+                "type": str,
+                "kind": "color",
+                "group": "Appearance",
+                "description": "Face outline colour. Leave empty for no visible mesh.",
+            },
+            "linewidth": {
+                # Deliberately 0.0 rather than left to patch.linewidth: a mesh
+                # over a dense grid is a black rectangle, so this renderer
+                # overrules the style on purpose and says so.
+                "default": 0.0,
+                "type": float,
+                "min": 0.0,
+                "max": 5.0,
+                "step": 0.1,
+                "group": "Appearance",
+                "description": "Face outline width. 0 draws no mesh.",
+            },
+            "antialiased": {
+                "default": True,
+                "type": bool,
+                "group": "Appearance",
+                "description": "Antialias the surface edges.",
+            },
+            "rstride": {
+                "default": 1,
+                "type": int,
+                "min": 1,
+                "max": 100,
+                "group": "Sampling",
+                "description": "Draw every Nth row of the grid. Raise this on a large grid to keep rendering fast.",
+            },
+            "cstride": {
+                "default": 1,
+                "type": int,
+                "min": 1,
+                "max": 100,
+                "group": "Sampling",
+                "description": "Draw every Nth column of the grid.",
+            },
         },
-        "alpha": {
-            "default": None,
-            "type": float,
-            "min": 0.0,
-            "max": 1.0,
-            "step": 0.05,
-            "group": "Appearance",
-            "description": "Surface opacity.",
+    )
+
+    #: Read here and never forwarded: the mask reshapes the data before it is
+    #: drawn, and the camera is set on the axes afterwards.
+    Options: dict[str, object] = merge(
+        VIEW_OPTIONS,
+        {
+            "circular_mask": {
+                "default": False,
+                "type": bool,
+                "group": "Mask",
+                "description": "Blank out the grid outside a circular boundary centred on the data - a wafer-shaped surface instead of a rectangular one.",
+            },
+            "mask_radius": {
+                "default": None,
+                "type": float,
+                "min": 0.0,
+                "group": "Mask",
+                "description": "Radius of the circular mask, in x/y data units. Defaults to half the shorter grid extent when empty.",
+            },
         },
-        "edgecolor": {
-            "default": None,
-            "type": str,
-            "kind": "color",
-            "group": "Appearance",
-            "description": "Face outline color. Leave empty for no visible mesh.",
-        },
-        "linewidth": {
-            "default": 0.0,
-            "type": float,
-            "min": 0.0,
-            "max": 5.0,
-            "step": 0.1,
-            "group": "Appearance",
-            "description": "Face outline width.",
-        },
-        "antialiased": {
-            "default": True,
-            "type": bool,
-            "group": "Appearance",
-            "description": "Antialias the surface edges.",
-        },
-        "rstride": {
-            "default": 1,
-            "type": int,
-            "min": 1,
-            "max": 100,
-            "group": "Sampling",
-            "description": "Draw every Nth row of the grid. Raise this on a large grid to keep rendering fast.",
-        },
-        "cstride": {
-            "default": 1,
-            "type": int,
-            "min": 1,
-            "max": 100,
-            "group": "Sampling",
-            "description": "Draw every Nth column of the grid.",
-        },
-        "circular_mask": {
-            "default": False,
-            "type": bool,
-            "group": "Mask",
-            "description": "Blank out the grid outside a circular boundary centred on the data - a wafer-shaped surface instead of a rectangular one.",
-        },
-        "mask_radius": {
-            "default": None,
-            "type": float,
-            "min": 0.0,
-            "group": "Mask",
-            "description": "Radius of the circular mask, in x/y data units. Defaults to half the shorter grid extent when empty.",
-        },
-        "elev": {
-            "default": None,
-            "type": float,
-            "min": -180.0,
-            "max": 180.0,
-            "group": "View",
-            "description": "Camera elevation angle, in degrees.",
-        },
-        "azim": {
-            "default": None,
-            "type": float,
-            "min": -180.0,
-            "max": 180.0,
-            "group": "View",
-            "description": "Camera azimuth angle, in degrees.",
-        },
-        "roll": {
-            "default": None,
-            "type": float,
-            "min": -180.0,
-            "max": 180.0,
-            "group": "View",
-            "description": "Camera roll angle, in degrees.",
-        },
-    }
+    )
 
     def render_axis(
         self,
@@ -180,7 +191,7 @@ class SurfaceAxisRenderer(BaseAxisRenderer):
             )
 
         sd = valid_series[0]
-        merged = self._merge_options(axis_options, sd.style or {})
+        merged = self.merge_style(axis_options, sd.style or {})
         grid = pivot_to_grid(sd.df)
         if grid is None:
             applogger.error(
@@ -196,7 +207,7 @@ class SurfaceAxisRenderer(BaseAxisRenderer):
         if bool(self.opt("circular_mask", merged)):
             z_grid = self._apply_circular_mask(x_grid, y_grid, z_grid, merged)
 
-        kwargs = self._surface_kwargs(merged)
+        kwargs = _surface_kwargs(self, merged)
         ax.plot_surface(x_grid, y_grid, z_grid, **kwargs)
 
         view = _view_kwargs(axis_options, self)
@@ -228,21 +239,6 @@ class SurfaceAxisRenderer(BaseAxisRenderer):
         masked[distance > radius] = np.nan
         return masked
 
-    def _surface_kwargs(self, options: dict[str, Any]) -> dict[str, Any]:
-        kwargs = self.get_kwargs(options)
-        for key in ("circular_mask", "mask_radius", "elev", "azim", "roll"):
-            kwargs.pop(key, None)
-        return {key: value for key, value in kwargs.items() if value is not None and value != ""}
-
-    def _merge_options(self, axis_options: dict[str, Any], style: dict[str, Any]) -> dict[str, Any]:
-        merged = dict(axis_options or {})
-        axis_kwargs = dict(merged.get("axis_kwargs", {}) or {})
-        axis_kwargs.update(style.get("axis_kwargs", {}) or {})
-        for key, value in style.items():
-            if key != "axis_kwargs":
-                merged[key] = value
-        merged["axis_kwargs"] = axis_kwargs
-        return merged
 
 
 class TriSurfaceAxisRenderer(BaseAxisRenderer):
@@ -265,69 +261,30 @@ class TriSurfaceAxisRenderer(BaseAxisRenderer):
     RequiredRoles: list[str] = ["x", "y", "z"]
     OptionalRoles: list[str] = []
 
+    #: Two surfaces sharing one set of axes occlude each other.
+    MaxSeries: int | None = 1
+
+    #: The gridded renderer's, without the two grid-only sampling keywords:
+    #: ``plot_trisurf`` walks triangles, not rows and columns.
     Kwargs: dict[str, object] = {
-        "cmap": {
-            "default": "viridis",
-            "type": str,
-            "group": "Appearance",
-            "description": "Colormap the surface height is mapped through, e.g. 'viridis' or 'coolwarm'.",
-        },
-        "alpha": {
-            "default": None,
-            "type": float,
-            "min": 0.0,
-            "max": 1.0,
-            "step": 0.05,
-            "group": "Appearance",
-            "description": "Surface opacity.",
-        },
-        "edgecolor": {
-            "default": None,
-            "type": str,
-            "kind": "color",
-            "group": "Appearance",
-            "description": "Triangle outline color. Leave empty for no visible mesh.",
-        },
-        "linewidth": {
-            "default": 0.2,
-            "type": float,
-            "min": 0.0,
-            "max": 5.0,
-            "step": 0.1,
-            "group": "Appearance",
-            "description": "Triangle outline width.",
-        },
-        "antialiased": {
-            "default": True,
-            "type": bool,
-            "group": "Appearance",
-            "description": "Antialias the surface edges.",
-        },
-        "elev": {
-            "default": None,
-            "type": float,
-            "min": -180.0,
-            "max": 180.0,
-            "group": "View",
-            "description": "Camera elevation angle, in degrees.",
-        },
-        "azim": {
-            "default": None,
-            "type": float,
-            "min": -180.0,
-            "max": 180.0,
-            "group": "View",
-            "description": "Camera azimuth angle, in degrees.",
-        },
-        "roll": {
-            "default": None,
-            "type": float,
-            "min": -180.0,
-            "max": 180.0,
-            "group": "View",
-            "description": "Camera roll angle, in degrees.",
-        },
+        key: value
+        for key, value in SurfaceAxisRenderer.Kwargs.items()
+        if key not in ("rstride", "cstride")
     }
+    Kwargs["linewidth"] = {
+        **dict(Kwargs["linewidth"]),  # pyright: ignore[reportArgumentType]
+        # Not 0.0 here: the triangles of a scattered surface are the reading,
+        # and a faint mesh is what shows where the data actually was.
+        "default": 0.2,
+        "description": "Triangle outline width.",
+    }
+    Kwargs["edgecolor"] = {
+        **dict(Kwargs["edgecolor"]),  # pyright: ignore[reportArgumentType]
+        "description": "Triangle outline colour. Leave empty for no visible mesh.",
+    }
+
+    #: No mask: it blanks cells of a grid, and there is no grid here.
+    Options: dict[str, object] = dict(VIEW_OPTIONS)
 
     def render_axis(
         self,
@@ -354,7 +311,7 @@ class TriSurfaceAxisRenderer(BaseAxisRenderer):
             )
 
         sd = valid_series[0]
-        merged = self._merge_options(axis_options, sd.style or {})
+        merged = self.merge_style(axis_options, sd.style or {})
         x, y, z = finite_xyz(sd.df)
         if x.size < 3:
             applogger.error(
@@ -365,7 +322,7 @@ class TriSurfaceAxisRenderer(BaseAxisRenderer):
             )
             return
 
-        kwargs = self._surface_kwargs(merged)
+        kwargs = _surface_kwargs(self, merged)
         ax.plot_trisurf(x, y, z, **kwargs)
 
         view = _view_kwargs(axis_options, self)
@@ -373,19 +330,3 @@ class TriSurfaceAxisRenderer(BaseAxisRenderer):
             ax.view_init(**view)
 
         self.apply_annotations(ax, axis_options)
-
-    def _surface_kwargs(self, options: dict[str, Any]) -> dict[str, Any]:
-        kwargs = self.get_kwargs(options)
-        for key in ("elev", "azim", "roll"):
-            kwargs.pop(key, None)
-        return {key: value for key, value in kwargs.items() if value is not None and value != ""}
-
-    def _merge_options(self, axis_options: dict[str, Any], style: dict[str, Any]) -> dict[str, Any]:
-        merged = dict(axis_options or {})
-        axis_kwargs = dict(merged.get("axis_kwargs", {}) or {})
-        axis_kwargs.update(style.get("axis_kwargs", {}) or {})
-        for key, value in style.items():
-            if key != "axis_kwargs":
-                merged[key] = value
-        merged["axis_kwargs"] = axis_kwargs
-        return merged
