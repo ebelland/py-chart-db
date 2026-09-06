@@ -2465,6 +2465,40 @@ class SqliteRepo:
         return report
 
     @ensure_connection_wrapper
+    def save_as(self, target_path: Path) -> Path:
+        """Write a compacted copy of this database to *target_path*.
+
+        Uses ``VACUUM INTO`` rather than copying the file on disk: with WAL
+        mode active (see __init__), the .dhub file is not the whole database
+        on its own until its -wal side file is checkpointed into it, so a
+        plain filesystem copy of just the .dhub file can silently miss
+        recent writes. ``VACUUM INTO`` instead builds one self-contained,
+        up-to-date file directly from the live connection.
+
+        Refuses inside an open transaction, on the same principle as
+        :meth:`optimize_db`: SQLite refuses to VACUUM there, and letting the
+        error travel up would abort whatever multi-step operation triggered
+        it. An existing file at *target_path* is removed first - the target
+        came out of a save dialog that has already confirmed the overwrite -
+        because VACUUM INTO refuses to write over one itself.
+        """
+        assert self._con is not None
+        target = self.ensure_dhub_extension(target_path)
+
+        if self._con.in_transaction:
+            raise RuntimeError(
+                "Cannot save as while a transaction is open. Commit first."
+            )
+
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists():
+            target.unlink()
+
+        self._con.execute("VACUUM INTO ?", (str(target),))
+        applogger.info("Saved a copy of the database to %s", target)
+        return target
+
+    @ensure_connection_wrapper
     def check_database(self) -> DatabaseReport:
         """Run integrity checks and look for orphaned descriptor rows/tables."""
         assert self._con is not None

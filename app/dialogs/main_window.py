@@ -417,6 +417,7 @@ class MainWindow(QMainWindow):
         return [
             action_menu_item("new", self._on_new_file),
             action_menu_item("open", self._on_open_database),
+            action_menu_item("save_as", self._on_save_as),
             action_menu_item("import", self._on_import_data),
             action_menu_item("query_builder", self._on_query_builder),
             action_menu_item("create_demo", self._on_create_demo),
@@ -1278,6 +1279,36 @@ class MainWindow(QMainWindow):
         except Exception as exc:  # noqa: BLE001
             applogger.exception("Failed to open database: %s", exc)
             show_message(self, "database.open_failed", error=exc)
+
+    def _on_save_as(self) -> None:
+        """Save a copy of the current database under a new name, and switch to it.
+
+        ``SqliteRepo.save_as`` uses VACUUM INTO rather than copying the .dhub
+        file: with WAL mode active, the file on disk is not the whole
+        database until its -wal side file is checkpointed into it, so a
+        plain filesystem copy could silently miss recent writes.
+        """
+        base_dir = str(self._db_path.parent) if self._db_path else ""
+        file_path, _unused = QFileDialog.getSaveFileName(
+            self,
+            _("Save database as"),
+            base_dir,
+            "Data Hub DB (*.dhub)",
+        )
+        if not file_path:
+            return
+
+        target = SqliteRepo.ensure_dhub_extension(Path(file_path))
+        if self._db_path is not None and target == self._db_path:
+            return
+
+        applogger.info("Saving database as: %s", target)
+        try:
+            saved_path = self._repo.save_as(target)
+            self._switch_database(saved_path)
+        except Exception as exc:  # noqa: BLE001
+            applogger.exception("Failed to save database as: %s", exc)
+            show_message(self, "database.save_as_failed", error=exc)
 
     def _on_import_data(self, source_path: Path | None = None) -> None:
         """Open the import dialog and refresh UI if import succeeds.

@@ -297,6 +297,14 @@
       "SegoeFluent": "E74E",
       "ThemeIcon": "document-save"
     },
+    "save_as": {
+      "text": "Save As...",
+      "description": "Save the current database under a new name, and switch to it",
+      "shortcut": "Ctrl+Shift+S",
+      "SFSymbol": "square.and.arrow.down.on.square",
+      "SegoeFluent": "E792",
+      "ThemeIcon": "document-save-as"
+    },
     "select_all": {
       "text": "Select all",
       "description": "Select all items",
@@ -427,6 +435,11 @@
       "level": "error",
       "title": "Open database",
       "text": "Could not open the database:\n{error}"
+    },
+    "database.save_as_failed": {
+      "level": "error",
+      "title": "Save database as",
+      "text": "Could not save the database as a new file:\n{error}"
     },
     "demo.build_failed": {
       "level": "error",

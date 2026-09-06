@@ -4049,3 +4049,15 @@ msgstr "Serie"
 
 msgid "{chart} draws {limit} series per axis, and this axis already has {existing}. Choose 'Add new axis' instead, or remove {wanted} series."
 msgstr "{chart} disegna {limit} serie per asse e questo asse ne ha già {existing}. Scegli 'Aggiungi nuovo asse' oppure rimuovi {wanted} serie."
+
+msgid "Save As..."
+msgstr "Salva con nome..."
+
+msgid "Save the current database under a new name, and switch to it"
+msgstr "Salva il database corrente con un nuovo nome e passa ad esso"
+
+msgid "Save database as"
+msgstr "Salva database con nome"
+
+msgid "Could not save the database as a new file:\n{error}"
+msgstr "Impossibile salvare il database come nuovo file:\n{error}"
