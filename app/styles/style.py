@@ -1860,9 +1860,12 @@ class ActionSpec:
         return tr(self.description) if self.description else ""
 
 _cache: dict[str, ActionSpec] | None = None
-# The section the cache was built from.  load_config returns the same object
-# until config.json changes on disk, so comparing identity is enough to notice
-# an edit without re-parsing on every button.
+# The section the cache was built from.  The catalogue lives in config.json
+# and is parsed once per file signature, so this object stays the same one
+# until config.json itself changes on disk - a settings write to user.json
+# rebuilds the merged view around it but not the section itself.  Comparing
+# identity is therefore enough to notice an edit without re-parsing on every
+# button.
 _cache_source: object | None = None
 
 

@@ -16,6 +16,50 @@ import numpy as np
 import pandas as pd
 from matplotlib import colormaps, rcParams
 
+from app.charts import kwarg_spec
+from app.charts.kwarg_spec import (
+    ARTIST_ADVANCED_KWARGS,
+    ARTIST_KWARGS,
+    CMAP_KWARGS,
+    DEFAULT,
+    FIT_OPTIONS,
+    LEGEND_OPTIONS,
+    LINE_KWARGS,
+    PATCH_KWARGS,
+    RCPARAM,
+    VIEW_OPTIONS,
+    STYLE_DEFAULT,
+    merge,
+    pick,
+)
+
+# Re-exported deliberately.  Renderers are re-executed from disk by the
+# renderer scanner while ``app.charts.base`` stays cached in sys.modules, so a
+# renderer edited while the application runs can be newer than the base module
+# it imports; a missing name then fails as an ImportError that says which name
+# is missing.  Every renderer already imports from base, so the shared
+# vocabulary is reachable the same way rather than through a second import
+# line each of them would have to grow.
+__all__ = [
+    "ARTIST_ADVANCED_KWARGS",
+    "ARTIST_KWARGS",
+    "BaseAxisRenderer",
+    "CMAP_KWARGS",
+    "DEFAULT",
+    "ERROR_BAR_KWARGS",
+    "ERROR_BAR_ROLES",
+    "FIT_OPTIONS",
+    "LEGEND_OPTIONS",
+    "LINE_KWARGS",
+    "PATCH_KWARGS",
+    "RCPARAM",
+    "STYLE_DEFAULT",
+    "SeriesData",
+    "VIEW_OPTIONS",
+    "merge",
+    "pick",
+]
+
 
 @dataclass(slots=True)
 class SeriesData:
@@ -118,10 +162,20 @@ class BaseAxisRenderer(Protocol):
         Column names the series query must produce.  Roles *are* DataFrame
         column names: a series aliases its SQL to match (``SELECT t AS x``).
     ``Kwargs``
-        Editable Matplotlib keyword arguments, as ``{name: metadata}``.  The
-        metadata drives the generated editor UI - ``default``, ``type``,
-        ``min``/``max``, ``kind`` (``color``, ``marker``, ...), ``group`` and
-        ``description`` - so a new option needs no widget code.
+        Matplotlib keyword arguments forwarded verbatim to the plot call, as
+        ``{name: metadata}``.  The metadata drives the generated editor UI -
+        ``default``, ``type``, ``min``/``max``, ``kind`` (``color``,
+        ``marker``, ...), ``group`` and ``description`` - so a new keyword
+        needs no widget code.  A name in here *is* passed to Matplotlib, so
+        anything Matplotlib would reject belongs in ``Options`` instead.
+    ``Options``
+        Settings the renderer consumes itself and never forwards: whether to
+        draw a legend, how many tick labels to keep, which fit to overlay.
+        Same metadata, same editor, opposite destination.
+    ``MaxSeries``
+        How many series this renderer can draw on one axes, or None for any
+        number.  Read by the New plot dialog, which offers a new *axis* per
+        series rather than a second series the renderer would drop.
 
     Subclasses override :meth:`render_axis` and read their options through
     :meth:`opt` / :meth:`get_kwargs`, never from ``options`` directly, so that
@@ -151,6 +205,35 @@ class BaseAxisRenderer(Protocol):
     OptionalRoles: list[str] = []
     Kwargs: dict[str, object] = {}
 
+    #: Settings the renderer reads itself, never forwarded to Matplotlib.
+    #:
+    #: The two used to be one dict, and the boundary lived in a removal list
+    #: inside each renderer - ``bar`` dropped eleven names before calling
+    #: ``bar()``, ``area`` popped ``show_legend``, ``broken_bar`` popped
+    #: ``band_height``.  A name forgotten there did not fail in the editor
+    #: that offered it; it failed inside Matplotlib, at draw time, as an
+    #: unexpected keyword argument.  Declaring the destination makes it the
+    #: schema's job: :meth:`get_kwargs` only ever reads ``Kwargs``, so an
+    #: option cannot reach Matplotlib by being forgotten.
+    #:
+    #: A renderer still on the single dict keeps working - :meth:`opt` falls
+    #: back to ``Kwargs`` - so the conversion is one renderer at a time.
+    Options: dict[str, object] = {}
+
+    #: Series this renderer can draw on one axes; None means any number.
+    #:
+    #: Five renderers already enforce a limit of one - a surface, a table, a
+    #: pie and the two contour maps each keep the first drawable series and
+    #: log the rest away - but they only find out at render time, by which
+    #: point the series exist in the database and the person who added them
+    #: has been shown a chart that quietly lost most of them.  Declaring the
+    #: limit here lets the New plot dialog do the honest thing instead: put
+    #: each series on an axis of its own.  The renderer-side guard stays as
+    #: the last line of defence, because the dialog is not the only way a
+    #: series reaches an axis - the fit and statistics dialogs add derived
+    #: ones too.
+    MaxSeries: int | None = None
+
     def render_axis(self, ax, series: list[SeriesData]) -> None:
         """Draw *series* onto the Matplotlib axes *ax*.
 
@@ -159,17 +242,54 @@ class BaseAxisRenderer(Protocol):
         applied afterwards by ``render_figure._apply_axis_runtime_options``.
         """
 
-    def opt(self, name: str, options: dict) -> object:
-        """Resolve one option: per-axis ``axis_kwargs`` first, then the default.
+    #: Where a value may be found, most specific first.
+    #:
+    #: ``axis_kwargs`` is where the properties panel writes everything it
+    #: edits, options included, so it stays in the chain for both schemas -
+    #: a figure saved before the split keeps the settings it had.  The flat
+    #: options dict is the older location still, and is read last.
+    VALUE_SOURCES: tuple[str, ...] = ("renderer_options", "axis_kwargs")
 
-        Kept separate from :meth:`get_kwargs` for options that are consumed by
-        the renderer itself rather than forwarded to Matplotlib.
+    def _sources(self, options: dict) -> list[dict]:
+        """Return the places to look for a value, most specific first."""
+        found = [
+            options.get(name)
+            for name in self.VALUE_SOURCES
+            if isinstance(options.get(name), dict)
+        ]
+        found.append(options)
+        return found  # pyright: ignore[reportReturnType]
+
+    def opt(self, name: str, options: dict) -> object:
+        """Resolve one setting the renderer consumes itself.
+
+        Reads :attr:`Options` first and falls back to :attr:`Kwargs`, so a
+        renderer that has not been split yet resolves exactly as before.
+        Returns None for an unset value, which is what the callers that pass
+        the result straight to Matplotlib rely on.
         """
-        meta = self.Kwargs.get(name, {})
-        axis_kwargs = options.get("axis_kwargs", {})
-        if isinstance(axis_kwargs, dict) and name in axis_kwargs:
-            return axis_kwargs[name]
-        return options.get(name, meta.get("default"))  # pyright: ignore[reportAttributeAccessIssue]
+        spec = self.Options if name in self.Options else self.Kwargs
+        return kwarg_spec.resolve_one(spec, name, self._sources(options))
+
+    def merge_style(self, options: dict, style: dict) -> dict:
+        """Overlay one series' style on the axis options.
+
+        The sub-dicts are merged key by key rather than replaced, so a series
+        overriding its colour keeps the axis-wide alpha.  Seven renderers had
+        their own copy of this - ``bar``, ``contour``, ``broken_bar``,
+        ``text``, ``table`` and both surfaces - identical down to the
+        variable names.
+        """
+        merged = dict(options or {})
+        for name in self.VALUE_SOURCES:
+            nested = dict(merged.get(name, {}) or {})
+            nested.update(style.get(name, {}) or {})
+            if nested:
+                merged[name] = nested
+        for key, value in (style or {}).items():
+            if key not in self.VALUE_SOURCES:
+                merged[key] = value
+        return merged
 
     def ensure_required_roles(self,df:pd.DataFrame) ->bool:
         """Return True when *df* carries every column this renderer needs.
@@ -183,28 +303,21 @@ class BaseAxisRenderer(Protocol):
         return True
 
     def get_kwargs(self, options: dict) -> dict:
-        """Build the matplotlib keyword arguments for this renderer.
+        """Build the Matplotlib keyword arguments for this renderer.
 
-        Keys resolving to None are dropped rather than forwarded.  Why: for
-        Matplotlib "absent" and "None" are not the same thing — ``picker=None``
-        reaches ``Line2D.set_pickradius(None)`` and raises *"pick radius should
-        be a distance"*, while omitting the key simply uses the default.
+        Only :attr:`Kwargs` is read, so the result is forwardable as it
+        stands: there is no removal list to keep, and an option the renderer
+        consumes cannot arrive here by being forgotten.
+
+        Keys resolving to None, to an empty string or to ``DEFAULT`` are
+        dropped rather than forwarded.  For Matplotlib "absent" and "None" are
+        not the same thing - ``picker=None`` reaches
+        ``Line2D.set_pickradius(None)`` and raises *"pick radius should be a
+        distance"*, while omitting the key uses the default - and dropping is
+        also what lets the style sheet decide, which is the whole meaning of
+        ``DEFAULT``.
         """
-        kwargs = {}
-        axis_kwargs = options.get("axis_kwargs", {})
-        if not isinstance(axis_kwargs, dict):
-            axis_kwargs = {}
-
-        for name, meta in self.Kwargs.items():
-            if name in axis_kwargs:
-                value = axis_kwargs[name]
-            else:
-                value = options.get(name, meta.get("default"))  # pyright: ignore[reportAttributeAccessIssue]
-            if value is None:
-                continue
-            kwargs[name] = value
-
-        return kwargs
+        return kwarg_spec.resolve(self.Kwargs, self._sources(options))
 
     # ------------------------------------------------------------------
     # Axis annotations

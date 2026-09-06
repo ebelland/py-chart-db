@@ -18,9 +18,14 @@ from app.utils import dialog_state
 
 @pytest.fixture(autouse=True)
 def temp_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Point config.json at a throwaway file for every test in this module."""
-    path = tmp_path / "config.json"
-    monkeypatch.setattr(config, "CONFIG_PATH", path)
+    """Point both configuration files at throwaway ones for this module."""
+    monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.json")
+    path = tmp_path / "user.json"
+    monkeypatch.setattr(config, "USER_CONFIG_PATH", path)
+    monkeypatch.setattr(config, "_migrated_from", None)
+    config._cache.clear()
+    config._cache_stamp.clear()
+    config._merged = None
     return path
 
 

@@ -12,7 +12,18 @@ import math
 import numpy as np
 import pandas as pd
 
-from app.charts.base import BaseAxisRenderer, SeriesData
+from app.charts import kwarg_spec
+from app.charts.base import (
+    ARTIST_ADVANCED_KWARGS,
+    ARTIST_KWARGS,
+    LEGEND_OPTIONS,
+    LINE_KWARGS,
+    PATCH_KWARGS,
+    BaseAxisRenderer,
+    SeriesData,
+    merge,
+    pick,
+)
 
 
 Orientation = Literal["vertical", "horizontal"]
@@ -44,184 +55,150 @@ class BarAxisRenderer(BaseAxisRenderer):
     RequiredRoles: list[str] = ["Y"]
     OptionalRoles: list[str] = ["X", "color", "YError", "XError", "Bottom", "Left"]
 
-    Kwargs: dict[str, object] = {
-        # Geometry / placement
-        "width": {
-            "default": 0.8,
-            "type": float,
-            "min": 0.0,
-            "max": 10.0,
-            "step": 0.05,
-            "decimals": 4,
-            "group": "Geometry",
-            "description": "Total category width allocated to each vertical bar group.",
+    #: Forwarded verbatim to ``bar``/``barh``.  Everything here is a keyword
+    #: Matplotlib accepts, which is why there is nothing to remove before the
+    #: call: the removal list this renderer used to keep - eleven names, kept
+    #: in step with the schema by hand - is now the ``Options`` dict below.
+    #:
+    #: Note what is *not* here.  ``capthick``, ``elinewidth`` and
+    #: ``errorevery`` are in the shared ERROR_BAR_KWARGS but ``bar`` does not
+    #: take them: its error bars are configured through ``ecolor``,
+    #: ``capsize`` and nothing else, and the extra three would reach
+    #: ``Rectangle.set`` and raise.
+    Kwargs: dict[str, object] = merge(
+        # label is the renderer's own: it resolves the legend text from the
+        # series and passes it separately, so it is an Option, not a keyword.
+        pick(ARTIST_KWARGS, "alpha", "zorder", "visible", "rasterized", "picker"),
+        ARTIST_ADVANCED_KWARGS,
+        PATCH_KWARGS,
+        pick(LINE_KWARGS, "color"),
+        {
+            "color": {
+                "description": (
+                    "Bar face colour. Overridden by the color role column "
+                    "when the series provides one."
+                ),
+            },
+            "align": {
+                "default": "center",
+                "type": ["center", "edge"],
+                "group": "Geometry",
+                "description": "Whether a bar is centred on its category position or starts at it.",
+            },
+            "ecolor": {
+                "default": None,
+                "type": str,
+                "kind": "color",
+                "group": "Error bars",
+                "description": "Error bar colour. Defaults to the bar colour.",
+            },
+            "capsize": {
+                "default": None,
+                kwarg_spec.STYLE_DEFAULT: True,
+                kwarg_spec.RCPARAM: "errorbar.capsize",
+                "type": float,
+                "min": 0.0,
+                "max": 50.0,
+                "step": 0.5,
+                "decimals": 2,
+                "group": "Error bars",
+                "description": "Length of the error bar caps, in points. 0 draws no caps.",
+            },
+            "log": {
+                "default": False,
+                "type": bool,
+                "group": "Behaviour",
+                "description": "Use a logarithmic scale on the value axis.",
+            },
         },
-        "height": {
-            "default": 0.8,
-            "type": float,
-            "min": 0.0,
-            "max": 10.0,
-            "step": 0.05,
-            "decimals": 4,
-            "group": "Geometry",
-            "description": "Total category height allocated to each horizontal bar group.",
-        },
-        "bottom": {
-            "default": None,
-            "type": float,
-            "group": "Geometry",
-            "description": "Scalar baseline for vertical bars when no Bottom role column is present.",
-        },
-        "left": {
-            "default": None,
-            "type": float,
-            "group": "Geometry",
-            "description": "Scalar baseline for horizontal bars when no Left role column is present.",
-        },
-        "align": {
-            "default": "center",
-            "type": ["center", "edge"],
-            "group": "Geometry",
-            "description": "Alignment of bars to category positions.",
-        },
+    )
 
-        # Colors / patch styling
-        "color": {
-            "default": None,
-            "type": str,
-            "kind": "color",
-            "group": "Appearance",
-            "description": "Bar face color. Overridden by the color role column when provided.",
+    #: Read by this renderer and never forwarded.
+    #:
+    #: ``width``/``height`` look like the Matplotlib keywords of the same name
+    #: and are not: the declared value is the width of the whole category
+    #: group, which is divided by the number of series and passed as the width
+    #: of one bar.  Forwarding it would make every series as wide as the group
+    #: and draw them on top of each other.  That is the difference the single
+    #: dict could not express.
+    Options: dict[str, object] = merge(
+        LEGEND_OPTIONS,
+        {
+            "width": {
+                "default": 0.8,
+                "type": float,
+                "min": 0.0,
+                "max": 10.0,
+                "step": 0.05,
+                "decimals": 4,
+                "group": "Geometry",
+                "description": "Total category width allocated to each vertical bar group.",
+            },
+            "height": {
+                "default": 0.8,
+                "type": float,
+                "min": 0.0,
+                "max": 10.0,
+                "step": 0.05,
+                "decimals": 4,
+                "group": "Geometry",
+                "description": "Total category height allocated to each horizontal bar group.",
+            },
+            "bottom": {
+                "default": None,
+                "type": float,
+                "group": "Geometry",
+                "description": "Scalar baseline for vertical bars, when no Bottom role column is present.",
+            },
+            "left": {
+                "default": None,
+                "type": float,
+                "group": "Geometry",
+                "description": "Scalar baseline for horizontal bars, when no Left role column is present.",
+            },
+            "xerr": {
+                "default": None,
+                "type": float,
+                "min": 0.0,
+                "group": "Error bars",
+                "description": "Scalar horizontal error bar, when no XError role column is present.",
+            },
+            "yerr": {
+                "default": None,
+                "type": float,
+                "min": 0.0,
+                "group": "Error bars",
+                "description": "Scalar vertical error bar, when no YError role column is present.",
+            },
+            "label": {
+                "default": None,
+                "type": str,
+                "group": "Legend",
+                "description": "Legend label override. The series name is used when empty.",
+            },
+            "max_tick_labels": {
+                "default": 40,
+                "type": int,
+                "min": 1,
+                "max": 1000,
+                "step": 1,
+                "group": "Text",
+                "description": "Most category tick labels to draw. Every step-th one is kept beyond this.",
+            },
+            "tick_label_rotation": {
+                "default": "auto",
+                "type": ["auto", "0", "30", "45", "60", "90"],
+                "group": "Text",
+                "description": "Category label rotation. Auto rotates when there are many categories.",
+            },
+            "tick_label_fontsize": {
+                "default": "auto",
+                "type": ["auto", "6", "7", "8", "9", "10", "11", "12"],
+                "group": "Text",
+                "description": "Category label font size. Auto shrinks when there are many labels.",
+            },
         },
-        "facecolor": {
-            "default": None,
-            "type": str,
-            "kind": "color",
-            "group": "Appearance",
-            "description": "Explicit bar face color. Matplotlib gives this precedence over color.",
-        },
-        "edgecolor": {
-            "default": None,
-            "type": str,
-            "kind": "color",
-            "group": "Patch",
-            "description": "Bar edge color.",
-        },
-        "linewidth": {
-            "default": None,
-            "type": float,
-            "min": 0.0,
-            "max": 20.0,
-            "step": 0.25,
-            "decimals": 3,
-            "group": "Patch",
-            "description": "Bar edge line width. Use 0 to hide edges.",
-        },
-        "linestyle": {
-            "default": None,
-            "type": str,
-            "kind": "linestyle",
-            "group": "Patch",
-            "description": "Bar edge line style.",
-        },
-        "hatch": {
-            "default": None,
-            "type": str,
-            "group": "Patch",
-            "description": "Matplotlib hatch pattern for bar patches.",
-        },
-        "alpha": {
-            "default": 0.9,
-            "type": float,
-            "min": 0.0,
-            "max": 1.0,
-            "step": 0.05,
-            "decimals": 3,
-            "group": "Appearance",
-            "description": "Bar transparency from 0.0 transparent to 1.0 opaque.",
-        },
-        "fill": {
-            "default": True,
-            "type": bool,
-            "group": "Patch",
-            "description": "Whether bar patches are filled.",
-        },
-
-        # Labels / error bars
-        "label": {
-            "default": None,
-            "type": str,
-            "group": "Text",
-            "description": "Legend label override. If empty, the series name is used.",
-        },
-        "tick_label": {
-            "default": None,
-            "type": str,
-            "group": "Text",
-            "description": "Optional Matplotlib tick_label override. Usually leave empty.",
-        },
-        "xerr": {
-            "default": None,
-            "type": float,
-            "min": 0.0,
-            "group": "Error bars",
-            "description": "Scalar horizontal error bar when no XError role column is present.",
-        },
-        "yerr": {
-            "default": None,
-            "type": float,
-            "min": 0.0,
-            "group": "Error bars",
-            "description": "Scalar vertical error bar when no YError role column is present.",
-        },
-        "ecolor": {
-            "default": None,
-            "type": str,
-            "kind": "color",
-            "group": "Error bars",
-            "description": "Error bar line color.",
-        },
-        "capsize": {
-            "default": 0.0,
-            "type": float,
-            "min": 0.0,
-            "max": 50.0,
-            "step": 0.5,
-            "decimals": 2,
-            "group": "Error bars",
-            "description": "Length of error bar caps in points.",
-        },
-        "error_kw": {
-            "default": None,
-            "type": str,
-            "group": "Error bars",
-            "description": "Optional dictionary of keyword arguments passed to Matplotlib errorbar.",
-        },
-        "log": {
-            "default": False,
-            "type": bool,
-            "group": "Behavior",
-            "description": "Use logarithmic scale on the value axis.",
-        },
-
-        # Common Artist / Rectangle properties
-        "animated": {"default": False, "type": bool, "group": "Behavior", "description": "Enable Matplotlib animation flag."},
-        "clip_on": {"default": True, "type": bool, "group": "Behavior", "description": "Clip bars to the axes area."},
-        "gid": {"default": None, "type": str, "group": "Behavior", "description": "Matplotlib artist group id."},
-        "in_layout": {"default": True, "type": bool, "group": "Behavior", "description": "Include bar artists in layout calculations."},
-        "picker": {"default": None, "type": float, "min": 0.0, "group": "Behavior", "description": "Pick radius or picker tolerance."},
-        "rasterized": {"default": False, "type": bool, "group": "Behavior", "description": "Rasterize bar artists in vector outputs."},
-        "snap": {"default": None, "type": bool, "group": "Behavior", "description": "Snap artist positions to pixels."},
-        "url": {"default": None, "type": str, "group": "Text", "description": "URL associated with bar artists in supported backends."},
-        "visible": {"default": True, "type": bool, "group": "Behavior", "description": "Show or hide bars."},
-        "zorder": {"default": None, "type": float, "step": 1.0, "decimals": 2, "group": "Behavior", "description": "Drawing order of bar artists."},
-
-        # Renderer-level behavior
-        "show_legend": {"default": True, "type": bool, "group": "Behavior", "description": "Show the legend when labelled bars are present."},
-        "max_tick_labels": {"default": 40, "type": int, "min": 1, "max": 1000, "step": 1, "group": "Text", "description": "Maximum number of category tick labels to display."},
-        "tick_label_rotation": {"default": "auto", "type": ["auto", "0", "30", "45", "60", "90"], "group": "Text", "description": "Category label rotation. Auto rotates labels when there are many categories."},
-        "tick_label_fontsize": {"default": "auto", "type": ["auto", "6", "7", "8", "9", "10", "11", "12"], "group": "Text", "description": "Category label font size. Auto reduces font when there are many labels."},
-    }
+    )
 
     def render_axis(
         self,
@@ -260,7 +237,7 @@ class BarAxisRenderer(BaseAxisRenderer):
                 layer_count=layer_count,
             )
 
-        tick_options = self._merge_options(axis_options, valid_series[0].style or {})
+        tick_options = self.merge_style(axis_options, valid_series[0].style or {})
         self._apply_category_ticks(ax, categories, tick_options)
 
         # after the bars/ticks so they sit over the finished chart.
@@ -295,12 +272,12 @@ class BarAxisRenderer(BaseAxisRenderer):
         """
         df = sd.df.copy()
         style = sd.style or {}
-        merged_options = self._merge_options(axis_options, style)
+        merged_options = self.merge_style(axis_options, style)
 
         if "X" not in df.columns:
             df["X"] = list(range(len(df)))
 
-        kwargs = self._bar_kwargs(merged_options)
+        kwargs = self.get_kwargs(merged_options)
         series_label = self._series_label(
             sd=sd,
             style=style,
@@ -373,7 +350,6 @@ class BarAxisRenderer(BaseAxisRenderer):
         Integer color values are discrete category ids mapped to the rcParams
         palette, while continuous float values are mapped through a colormap.
         """
-        kwargs.pop("label", None)
         fallback_color = self.series_color(style, layer_index)
         if "color" in df.columns:
             colors = self.color_sequence_from_values(
@@ -451,51 +427,6 @@ class BarAxisRenderer(BaseAxisRenderer):
                 tick_label.set_ha("right" if rotation_value else "center")
                 if fontsize_value is not None:
                     tick_label.set_fontsize(fontsize_value)
-
-    def _bar_kwargs(self, options: dict[str, Any]) -> dict[str, Any]:
-        """Return the kwargs to forward to ``bar``/``barh``.
-
-        The options this renderer consumes itself - bar thickness, the error
-        columns, everything driving the ticks - are removed here, because
-        passing them on would raise an unexpected-keyword error inside
-        Matplotlib.
-        """
-        kwargs = self.get_kwargs(options)
-        for key in [
-            "width",
-            "height",
-            "bottom",
-            "left",
-            "xerr",
-            "yerr",
-            "tick_label",
-            "show_legend",
-            "max_tick_labels",
-            "tick_label_rotation",
-            "tick_label_fontsize",
-        ]:
-            kwargs.pop(key, None)
-
-        clean_kwargs = {key: value for key, value in kwargs.items() if value is not None and value != ""}
-        for key in ["alpha", "linewidth", "capsize", "zorder", "picker"]:
-            if key in clean_kwargs:
-                clean_kwargs[key] = float(str(clean_kwargs[key]))
-        return clean_kwargs
-
-    def _merge_options(self, axis_options: dict[str, Any], style: dict[str, Any]) -> dict[str, Any]:
-        """Overlay one series' style on the axis options.
-
-        ``axis_kwargs`` is merged key by key rather than replaced, so a series
-        overriding its colour keeps the axis-wide alpha.
-        """
-        merged = dict(axis_options or {})
-        axis_kwargs = dict(merged.get("axis_kwargs", {}) or {})
-        axis_kwargs.update(style.get("axis_kwargs", {}) or {})
-        for key, value in style.items():
-            if key != "axis_kwargs":
-                merged[key] = value
-        merged["axis_kwargs"] = axis_kwargs
-        return merged
 
 
 class HorizontalBarAxisRenderer(BarAxisRenderer, BaseAxisRenderer):

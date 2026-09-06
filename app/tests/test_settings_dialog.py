@@ -33,9 +33,15 @@ APP_DIR = Path(__file__).resolve().parent.parent
 
 @pytest.fixture(autouse=True)
 def temp_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Point config.json at a throwaway file so a test cannot rewrite the real one."""
-    path = tmp_path / "config.json"
-    monkeypatch.setattr(config, "CONFIG_PATH", path)
+    """Point both configuration files at throwaway ones, so a test cannot
+    rewrite the real ones."""
+    monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.json")
+    path = tmp_path / "user.json"
+    monkeypatch.setattr(config, "USER_CONFIG_PATH", path)
+    monkeypatch.setattr(config, "_migrated_from", None)
+    config._cache.clear()
+    config._cache_stamp.clear()
+    config._merged = None
     return path
 
 

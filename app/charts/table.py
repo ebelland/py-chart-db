@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.charts import kwarg_spec
 from app.charts.base import BaseAxisRenderer, SeriesData
 from app.logs.logger import applogger
 
@@ -62,6 +63,11 @@ class TableAxisRenderer(BaseAxisRenderer):
         "column_5", "column_6", "column_7", "column_8",
     ]
 
+    #: A table fills the axes; a second one would be drawn over it.
+    MaxSeries: int | None = 1
+
+    #: Forwarded verbatim to ``ax.table``.  Three keywords, where the schema
+    #: used to hold six and remove three again on the way out.
     Kwargs: dict[str, object] = {
         "loc": {
             "default": "center",
@@ -84,8 +90,17 @@ class TableAxisRenderer(BaseAxisRenderer):
             "group": "Layout",
             "description": "Text alignment inside the column header row.",
         },
+    }
+
+    #: Read here and never forwarded.  ``fontsize`` is the clearest case in
+    #: the application: ``ax.table`` has no such keyword, and the size is set
+    #: on the returned Table afterwards - together with switching off the
+    #: automatic sizing, which is the part that actually makes it take effect.
+    Options: dict[str, object] = {
         "fontsize": {
             "default": None,
+            kwarg_spec.RCPARAM: "font.size",
+            kwarg_spec.STYLE_DEFAULT: True,
             "type": float,
             "min": 4.0,
             "max": 48.0,
@@ -135,7 +150,7 @@ class TableAxisRenderer(BaseAxisRenderer):
             )
 
         sd = valid_series[0]
-        merged = self._merge_options(axis_options, sd.style or {})
+        merged = self.merge_style(axis_options, sd.style or {})
         df, headers = self._columns_to_draw(sd)
         if df.empty or not headers:
             return
@@ -219,10 +234,7 @@ class TableAxisRenderer(BaseAxisRenderer):
         )
 
         kwargs = self.get_kwargs(options)
-        kwargs.pop("row_labels_from_index", None)
-        kwargs.pop("max_rows", None)
-        fontsize = kwargs.pop("fontsize", None)
-        kwargs = {key: value for key, value in kwargs.items() if value is not None and value != ""}
+        fontsize = self.opt("fontsize", options)
 
         table = ax.table(
             cellText=cell_text,
@@ -235,12 +247,3 @@ class TableAxisRenderer(BaseAxisRenderer):
             table.set_fontsize(float(str(fontsize)))
         table.auto_set_column_width(col=list(range(len(col_labels))))
 
-    def _merge_options(self, axis_options: dict[str, Any], style: dict[str, Any]) -> dict[str, Any]:
-        merged = dict(axis_options or {})
-        axis_kwargs = dict(merged.get("axis_kwargs", {}) or {})
-        axis_kwargs.update(style.get("axis_kwargs", {}) or {})
-        for key, value in style.items():
-            if key != "axis_kwargs":
-                merged[key] = value
-        merged["axis_kwargs"] = axis_kwargs
-        return merged

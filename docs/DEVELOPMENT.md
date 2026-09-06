@@ -919,12 +919,32 @@ code needs a matching `msgid`/`msgstr` pair appended to
 order-sensitive, blank-line-separated blocks — see the existing entries for
 the exact format) to actually show translated, not just be translatable.
 
-## 10. `config.json`
+## 10. `config.json` and `user.json`
 
-Machine-level preferences and the action catalogue (label/tooltip/icon per
-`action_id`), read through `app/utils/config.py`'s `get_section`/`set_section`
+Two files, split by who writes them:
+
+- **`config.json`** ships with the application: the `actions` catalogue
+  (label/tooltip/icon per `action_id`) and the `messages` catalogue. Versioned,
+  reviewed, translated, and never written at runtime. `set_section` refuses to
+  write these two names.
+- **`user.json`** is written by the application as it runs, and by nothing
+  else: last database, window geometry, per-dialog remembered entries, chosen
+  style, language, save format. Gitignored — it describes one machine.
+
+Which file a key belongs to is not a list of user keys that has to be extended
+whenever a feature remembers something new. `APPLICATION_SECTIONS` is a closed
+set of two, and anything written while the application runs is a setting by
+definition.
+
+Both are read through `app/utils/config.py`'s `get_section`/`set_section`
 rather than one accessor per key — see that module's docstring for why.
-Anything that belongs to one figure/axis/series lives in its descriptor's
+`load_config()` returns the two merged, with `user.json` winning, so a reader
+never has to know which file a key came from. Settings still sitting in a
+pre-split `config.json` are moved across on the first load and config.json is
+rewritten with just the catalogues; a read-only install keeps working, reading
+them where they are until they can be moved.
+
+Anything belonging to one figure/axis/series lives in its descriptor's
 `options` instead (§3), so it travels with the `.dhub` file rather than with
 the machine.
 

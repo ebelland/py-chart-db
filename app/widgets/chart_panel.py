@@ -30,7 +30,7 @@ from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
 from app.utils.messages import ask, show_message
 from app.styles.style import SPLITTER_HANDLE_WIDTH, MenuItem, create_menu, create_toolbar_button
-from app.utils.config import get_value, load_config, save_config
+from app.utils.config import get_section, get_value, update_section
 from app.utils.figure_metrics import CM_PER_INCH, figure_metrics_from_options
 from app.utils.hidpi import (
     apply_configured_dpi,
@@ -152,13 +152,8 @@ class ChartPanel(QFrame):
         self._canvas_late_sync_timer.setSingleShot(True)
         self._canvas_late_sync_timer.timeout.connect(self._run_pending_canvas_geometry_sync)
 
-        self._config = load_config()
-        
-        chart_config_obj = self._config.setdefault(CONFIG_SECTION, {})
-        if not isinstance(chart_config_obj, dict):
-            chart_config_obj = {}
-            self._config[CONFIG_SECTION] = chart_config_obj
-        chart_config: dict[str, Any] = chart_config_obj
+        self._config = get_section(CONFIG_SECTION)
+        chart_config: dict[str, Any] = self._config
 
         self._min_zoom_percent:int = int(
             chart_config.get(CONFIG_MIN_ZOOM, 25)
@@ -1757,17 +1752,12 @@ class ChartPanel(QFrame):
     # Config and figure metrics
     # ------------------------------------------------------------------
     def _chart_config(self) -> dict[str, Any]:
-        """Return chart_panel config as a real dict."""
-        chart_config_obj = self._config.setdefault(CONFIG_SECTION, {})
-        if isinstance(chart_config_obj, dict):
-            return chart_config_obj
-        chart_config: dict[str, Any] = {}
-        self._config[CONFIG_SECTION] = chart_config
-        return chart_config
+        """Return this panel's own section as a real dict."""
+        return get_section(CONFIG_SECTION)
 
     def _refresh_config_from_source(self) -> None:
-        """Reload config through the app.utils.config API."""
-        self._config = load_config()
+        """Reload this panel's section through the app.utils.config API."""
+        self._config = self._chart_config()
 
     def _apply_persisted_figure_metrics_to_rcparams(self) -> None:
         """Apply this figure's own width, height and DPI to rcParams.
@@ -2206,9 +2196,19 @@ class ChartPanel(QFrame):
             )
 
     def _persist_chart_panel_config(self) -> None:
-        """Persist global defaults for newly-created figures."""
-        chart_config = self._chart_config()
-        chart_config[CONFIG_RESIZE_MODE] = self._resize_mode
-        chart_config[CONFIG_INITIAL_ZOOM] = int(self._zoom_percent)
-        chart_config[CONFIG_BACKGROUND_COLOR] = self._background_color
-        save_config(self._config)
+        """Persist global defaults for newly-created figures.
+
+        Three keys through ``update_section``, not the whole document through
+        ``save_config``.  This panel used to hold a copy of the entire
+        configuration from the moment it was built and write all of it back
+        here - so a settings change made in another window between those two
+        moments was reverted by whoever moved a zoom slider last.
+        """
+        update_section(
+            CONFIG_SECTION,
+            **{
+                CONFIG_RESIZE_MODE: self._resize_mode,
+                CONFIG_INITIAL_ZOOM: int(self._zoom_percent),
+                CONFIG_BACKGROUND_COLOR: self._background_color,
+            },
+        )

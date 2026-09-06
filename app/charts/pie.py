@@ -22,7 +22,13 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 
-from app.charts.base import BaseAxisRenderer, SeriesData
+from app.charts import kwarg_spec
+from app.charts.base import (
+    LEGEND_OPTIONS,
+    BaseAxisRenderer,
+    SeriesData,
+    merge,
+)
 from app.logs.logger import applogger
 
 # Where the percentage labels are placed, as a fraction of the radius.
@@ -39,6 +45,9 @@ class PieAxisRenderer(BaseAxisRenderer):
     RequiredRoles: list[str] = ["value"]
     OptionalRoles: list[str] = ["label", "explode"]
 
+    #: A pie's wedges have to sum to one whole.
+    MaxSeries: int | None = 1
+
     Name: str = "Pie Chart"
     Category: str = "Statistical distributions"
     Description: str = "Pie or donut chart of one series."
@@ -46,8 +55,14 @@ class PieAxisRenderer(BaseAxisRenderer):
         "https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.pie.html"
     )
 
+    #: Forwarded verbatim to ``ax.pie``.  These were already being assembled
+    #: one by one into a dict of the same names; the schema now says so, and
+    #: the assembly is a single call.
     Kwargs: dict[str, object] = {
         "autopct": {
+            # A deliberate deviation from Matplotlib, which draws no
+            # percentages at all: a pie without them is a picture of a ratio
+            # nobody can read off.
             "default": "%1.1f%%",
             "type": str,
             "group": "Labels",
@@ -57,6 +72,7 @@ class PieAxisRenderer(BaseAxisRenderer):
             ),
         },
         "startangle": {
+            # Also deliberate: Matplotlib starts at 3 o'clock.
             "default": 90.0,
             "type": float,
             "min": -360.0,
@@ -72,17 +88,6 @@ class PieAxisRenderer(BaseAxisRenderer):
             "type": bool,
             "group": "Layout",
             "description": "Lay the wedges out counter-clockwise.",
-        },
-        "wedge_width": {
-            "default": 1.0,
-            "type": float,
-            "min": 0.05,
-            "max": 1.0,
-            "group": "Layout",
-            "description": (
-                "Wedge thickness as a fraction of the radius. Below 1 the pie "
-                "becomes a donut."
-            ),
         },
         "radius": {
             "default": 1.0,
@@ -124,43 +129,67 @@ class PieAxisRenderer(BaseAxisRenderer):
                 "whole that is not all present."
             ),
         },
-        "colormap": {
-            "default": None,
-            "type": str,
-            "group": "Appearance",
-            "description": (
-                "Matplotlib colormap used to colour the wedges, e.g. 'tab20'. "
-                "Empty uses the current style's colour cycle."
-            ),
-        },
-        "edge_color": {
-            "default": "white",
-            "type": str,
-            "kind": "color",
-            "group": "Appearance",
-            "description": (
-                "Colour of the line between wedges. A light edge is what keeps "
-                "adjacent wedges of similar colour readable."
-            ),
-        },
-        "edge_width": {
-            "default": 1.0,
-            "type": float,
-            "min": 0.0,
-            "max": 10.0,
-            "group": "Appearance",
-            "description": "Width of the line between wedges.",
-        },
-        "show_legend": {
-            "default": False,
-            "type": bool,
-            "group": "Appearance",
-            "description": (
-                "Show a legend instead of relying on the labels around the "
-                "pie. Useful when the labels are long."
-            ),
-        },
     }
+
+    #: Read here and translated into something else entirely.  Not one of
+    #: these names is a keyword ``ax.pie`` accepts: the first three become
+    #: entries in ``wedgeprops``, the colormap becomes an explicit list of
+    #: colours, and the legend is drawn afterwards from the returned wedges.
+    Options: dict[str, object] = merge(
+        LEGEND_OPTIONS,
+        {
+            "show_legend": {
+                # False, against the shared default: a pie already labels its
+                # own wedges, so a legend is the exception here.
+                "default": False,
+                "description": (
+                    "Show a legend instead of relying on the labels around "
+                    "the pie. Useful when the labels are long."
+                ),
+            },
+            "wedge_width": {
+                "default": 1.0,
+                "type": float,
+                "min": 0.05,
+                "max": 1.0,
+                "group": "Layout",
+                "description": (
+                    "Wedge thickness as a fraction of the radius. Below 1 the "
+                    "pie becomes a donut."
+                ),
+            },
+            "colormap": {
+                "default": None,
+                kwarg_spec.RCPARAM: "image.cmap",
+                kwarg_spec.STYLE_DEFAULT: True,
+                "type": str,
+                "kind": "colormap",
+                "group": "Appearance",
+                "description": (
+                    "Colormap used to colour the wedges, e.g. 'tab20'. Empty "
+                    "uses the current style's colour cycle."
+                ),
+            },
+            "edge_color": {
+                "default": "white",
+                "type": str,
+                "kind": "color",
+                "group": "Appearance",
+                "description": (
+                    "Colour of the line between wedges. A light edge is what "
+                    "keeps adjacent wedges of similar colour readable."
+                ),
+            },
+            "edge_width": {
+                "default": 1.0,
+                "type": float,
+                "min": 0.0,
+                "max": 10.0,
+                "group": "Appearance",
+                "description": "Width of the line between wedges.",
+            },
+        },
+    )
 
     def render_axis(self, ax: Any, series: list[SeriesData], options: dict) -> None:
         """Draw the first visible series as a pie."""
@@ -272,26 +301,15 @@ class PieAxisRenderer(BaseAxisRenderer):
 
     def _pie_kwargs(self, options: dict, *, wedge_count: int) -> dict[str, Any]:
         """Translate this renderer's options into ``ax.pie`` keywords."""
-        kwargs: dict[str, Any] = {
-            "startangle": self._float_option("startangle", options, 0.0),
-            "counterclock": bool(self.opt("counterclock", options)),
-            "radius": self._float_option("radius", options, 1.0),
-            "pctdistance": self._float_option("pctdistance", options, _DEFAULT_PCT_DISTANCE),
-            "labeldistance": self._float_option("labeldistance", options, _DEFAULT_LABEL_DISTANCE),
-            "shadow": bool(self.opt("shadow", options)),
-            "normalize": bool(self.opt("normalize", options)),
-        }
-
-        autopct = str(self.opt("autopct", options) or "").strip()
-        if autopct:
-            kwargs["autopct"] = autopct
+        kwargs = self.get_kwargs(options)
+        radius = self._float_option("radius", options, 1.0)
 
         # A donut is a pie whose wedges are drawn as annuli; anything below 1
         # has to reach Matplotlib through wedgeprops, not through a keyword.
         wedge_props: dict[str, Any] = {}
         width = self._float_option("wedge_width", options, 1.0)
         if 0.0 < width < 1.0:
-            wedge_props["width"] = width * kwargs["radius"]
+            wedge_props["width"] = width * radius
 
         edge_color = str(self.opt("edge_color", options) or "").strip()
         if edge_color:

@@ -40,3 +40,8 @@ _to_delete/
 
 # Screenshots are committed; anything else generated under docs is not.
 docs/**/*.tmp
+
+# Written by the application as it runs: last database, window geometry,
+# per-dialog entries, chosen style and language. One machine's settings, not
+# the project's - config.json is the versioned half of that pair.
+user.json
