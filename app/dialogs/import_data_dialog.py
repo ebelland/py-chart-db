@@ -9,12 +9,16 @@ from __future__ import annotations
 
 import csv
 import re
+import tempfile
 
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
 from collections.abc import Callable
 from typing import Optional
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 import pandas as pd
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QPersistentModelIndex, Qt, QTimer
@@ -61,6 +65,166 @@ from app.utils.i18n import _
 #: wherever one is expected.  Named once: it is both what the table is called
 #: and what _safe_table_name_from_filename has to recognise as "not a path".
 CLIPBOARD_SOURCE_NAME: str = "from_clipboard"
+
+
+# -----------------------------------------------------------------------------
+# Web data sources
+# -----------------------------------------------------------------------------
+@dataclass(frozen=True, slots=True)
+class WebDataSource:
+    """One quick-pick entry in the "Web source" dropdown.
+
+    A name and a direct URL, nothing else is fetched or negotiated: every
+    entry here is a plain file - CSV, JSON - a browser could download on its
+    own, so the same reader that already handles a local file handles this
+    one, once it has been downloaded.
+    """
+
+    name: str
+    url: str
+    category: str
+    description: str
+
+
+#: A small, curated set of stable, no-authentication, directly downloadable
+#: reference datasets - one file per URL, no API key and no pagination -
+#: spanning the subjects asked for: statistics, chemistry, and a couple of
+#: the classic datasets mathematics/statistics teaching uses to make a point
+#: about a technique rather than about the numbers themselves.
+#:
+#: Chosen for stability over novelty: raw.githubusercontent.com and PubChem
+#: are both long-lived, unauthenticated endpoints that are unlikely to move
+#: or start requiring a key.  This list is a starting point, not a directory
+#: - Fetch works for any direct CSV/JSON URL, typed in by hand.
+WEB_DATA_SOURCES: tuple[WebDataSource, ...] = (
+    WebDataSource(
+        "Iris flower measurements",
+        "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv",
+        "Statistics",
+        "150 rows of petal/sepal measurements across three iris species - "
+        "the classic dataset for a first scatter or box plot by category.",
+    ),
+    WebDataSource(
+        "Anscombe's quartet",
+        "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/anscombe.csv",
+        "Mathematics",
+        "Four x/y datasets with nearly identical summary statistics but "
+        "very different shapes - plot them to see why a fit needs a chart, "
+        "not just the numbers.",
+    ),
+    WebDataSource(
+        "Periodic table of elements",
+        "https://raw.githubusercontent.com/Bowserinator/Periodic-Table-JSON/master/PeriodicTableJSON.json",
+        "Chemistry",
+        "Atomic number, mass, symbol, and other properties for all 118 "
+        "elements.",
+    ),
+    WebDataSource(
+        "Aspirin: computed properties (PubChem)",
+        "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/2244/property/"
+        "MolecularFormula,MolecularWeight,CanonicalSMILES,IUPACName/CSV",
+        "Chemistry",
+        "One compound (CID 2244) from PubChem's public REST API - change "
+        "the CID or the property list in the URL for a different one.",
+    ),
+    WebDataSource(
+        "World population by country",
+        "https://ourworldindata.org/grapher/population.csv",
+        "Statistics",
+        "Annual population estimates per country and region, from Our "
+        "World in Data.",
+    ),
+)
+
+#: How long a web fetch is allowed to hang before this treats the source as
+#: unreachable, in seconds.  Long enough for a slow public API to respond,
+#: short enough that a dead host does not freeze the dialog indefinitely -
+#: urlopen has no default timeout at all.
+WEB_FETCH_TIMEOUT_SECONDS: float = 20.0
+
+#: Bytes read from a URL before this gives up.  This is a dataset importer,
+#: not a general-purpose downloader: refusing a multi-gigabyte reply is
+#: safer than filling the machine's memory with one.
+WEB_FETCH_MAX_BYTES: int = 200 * 1024 * 1024
+
+#: Response Content-Type prefixes, mapped to the suffix the readers below
+#: dispatch on.  Consulted only when the URL's own path carries no extension
+#: IMPORTABLE_SUFFIXES recognises - an API endpoint routinely has none, e.g.
+#: PubChem's .../CSV path.
+_CONTENT_TYPE_SUFFIXES: tuple[tuple[str, str], ...] = (
+    ("text/csv", ".csv"),
+    ("application/json", ".json"),
+    ("text/json", ".json"),
+    ("application/xml", ".xml"),
+    ("text/xml", ".xml"),
+    (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml",
+        ".xlsx",
+    ),
+    ("application/vnd.ms-excel", ".xls"),
+)
+
+
+def is_web_url(text: str) -> bool:
+    """True when *text* names something to download rather than a local path."""
+    return urlparse(str(text or "").strip()).scheme.lower() in ("http", "https")
+
+
+def _url_suffix(url: str, content_type: str) -> str:
+    """Return the file suffix *url*'s response should be treated as.
+
+    The URL's own path is tried first - an ordinary file link ends in .csv
+    or .json - and the response's Content-Type only when that gives nothing
+    IMPORTABLE_SUFFIXES recognises.
+    """
+    path_suffix = (Path(urlparse(url).path).suffix or "").lower()
+    if path_suffix in IMPORTABLE_SUFFIXES:
+        return path_suffix
+
+    header = content_type.split(";", 1)[0].strip().lower()
+    for prefix, suffix in _CONTENT_TYPE_SUFFIXES:
+        if header.startswith(prefix):
+            return suffix
+
+    # Default to delimited text: read_text_file's own sniffer copes with
+    # whatever delimiter the response turns out to use, which is the safest
+    # guess for a plain-text reference file that carries no extension at all.
+    return ".csv"
+
+
+def fetch_url_to_temp_file(url: str, *, timeout: float = WEB_FETCH_TIMEOUT_SECONDS) -> Path:
+    """Download *url* and return the local temp file it was saved to.
+
+    A real download to a real file, rather than handing pandas the URL
+    directly: every reader below already knows how to read a *file*, sniff
+    its delimiter and encoding, and report a clear error on a bad one -
+    duplicating that per format for a file-like object would be the same
+    logic written twice. The temp file's suffix is chosen so read_any_file
+    dispatches to the same reader it would for a file picked with Browse.
+
+    Raises ``URLError``/``HTTPError`` for a network or HTTP failure, and
+    ``ValueError`` for a response over WEB_FETCH_MAX_BYTES; the caller turns
+    both into a message box rather than an unhandled exception, since the
+    one thing certain about a URL typed or pasted in is that it can be wrong.
+    """
+    request = Request(str(url), headers={"User-Agent": "py-chart-db/1.0"})
+    with urlopen(request, timeout=timeout) as response:  # noqa: S310 - fetching what the user asked for is the feature
+        content_type = response.headers.get("Content-Type", "")
+        data = response.read(WEB_FETCH_MAX_BYTES + 1)
+
+    if len(data) > WEB_FETCH_MAX_BYTES:
+        raise ValueError(
+            f"Response exceeds the {WEB_FETCH_MAX_BYTES // (1024 * 1024)} MB "
+            "limit for a web import."
+        )
+
+    suffix = _url_suffix(str(url), content_type)
+    handle = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+    try:
+        handle.write(data)
+    finally:
+        handle.close()
+    return Path(handle.name)
 
 
 def sniff_delimiter(sample: str) -> str:
@@ -330,6 +494,11 @@ class ImportDataDialog(QDialog):
         self._clipboard_text: str = ""
         self._path: str = ""
         self._last_auto_table: str = ""
+        # The URL a fetched source came from, kept separately from _path (a
+        # temp file the download was saved to): a saved import link points a
+        # future Refresh at the URL, not at a temp file the OS may already
+        # have cleaned up by then.
+        self._source_url: str = ""
 
         self.setWindowTitle(_("Import data"))
         self.setWindowIcon(load_icon("import"))
@@ -368,6 +537,44 @@ class ImportDataDialog(QDialog):
                              layout=src_top_lay,
                          )
         src_lay.addWidget(src_top)
+
+        # Web row: a quick-pick source (fills the URL field below), the URL
+        # itself, and Fetch. A separate row rather than more buttons on
+        # src_top: Browse and Clipboard are one click, a URL needs to be
+        # typed, pasted or picked and then reviewed before it is fetched.
+        src_web = QWidget(src_row)
+        src_web_lay = QHBoxLayout(src_web)
+        stdSizeAndlayout(src_web_lay)
+
+        self._web_source_combo = QComboBox(src_web)
+        self._web_source_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self._web_source_combo.addItem(_("Web source..."), None)
+        for source in WEB_DATA_SOURCES:
+            # Not run through _(): the scanner that checks translation
+            # coverage only sees string literals passed to _(), and these
+            # dataset names/categories are data, not source text - wrapping
+            # a variable in _() here would look translated without being
+            # checked at all.
+            self._web_source_combo.addItem(f"{source.name} ({source.category})", source)
+        self._web_source_combo.setToolTip(
+            _("A few ready-made web sources to try - pick one to fill the URL below.")
+        )
+        self._web_source_combo.currentIndexChanged.connect(self._on_web_source_selected)
+        stdSizeAndlayout(self._web_source_combo)
+        src_web_lay.addWidget(self._web_source_combo)
+
+        self._url = QLineEdit(src_web)
+        self._url.setPlaceholderText(_("https://example.com/data.csv"))
+        stdSizeAndlayout(self._url)
+        src_web_lay.addWidget(self._url, 1)
+
+        self._btn_fetch = create_action_button(
+                               parent=src_web,
+                               action_id="fetch_url",
+                               action=self._on_fetch_url,
+                               layout=src_web_lay,
+                           )
+        src_lay.addWidget(src_web)
 
         form.addRow(_("Source"), src_row)
 
@@ -855,12 +1062,68 @@ class ImportDataDialog(QDialog):
         """
         name = str(path)
         self._source_mode = "file"
+        self._source_url = ""
         self._set_file_name_label(name)
         self._set_default_table_name(name)
         self._path = name
         self._update_sheet_choices(name)
 
         # Auto preview immediately: the file was chosen, not typed.
+        self._refresh_preview()
+
+    def _on_web_source_selected(self, _index: int) -> None:
+        """Fill the URL field from the chosen quick-pick source.
+
+        Fills the field rather than fetching immediately: a URL from a
+        catalogue is still a URL, and the person picking it should see it -
+        and be free to edit it, e.g. PubChem's CID - before anything is
+        downloaded.
+        """
+        source = self._web_source_combo.currentData()
+        if source is None:
+            return
+        self._url.setText(source.url)
+        self._url.setToolTip(source.description)
+
+    def _on_fetch_url(self) -> None:
+        """Download the URL in the web-source field and load it like a file.
+
+        A real download to a temp file, then handed off exactly as Browse
+        would: every reader, the sheet list, the default table name and the
+        preview all already know how to work from a file - a URL is just
+        another way to get one.  The URL itself, not the temp file, is what
+        gets remembered as the source: see _source_url.
+        """
+        url = (self._url.text() or "").strip()
+        if not url:
+            return
+        if not is_web_url(url):
+            show_message(self, "import.fetch_invalid_url", url=url)
+            return
+
+        applogger.info("Fetching web data source: %s", url)
+        try:
+            temp_path = fetch_url_to_temp_file(url)
+        except (URLError, HTTPError, ValueError, OSError) as exc:
+            applogger.exception("Failed to fetch %s: %s", url, exc)
+            show_message(self, "import.fetch_failed", url=url, error=exc)
+            return
+
+        self._source_mode = "file"
+        self._source_url = url
+        self._path = str(temp_path)
+        # file_name is what _refresh_preview actually reads, so it has to
+        # stay the real (temp) file - the URL is shown by overriding the
+        # window title afterwards instead, exactly the way _set_file_name_label
+        # would title it for a local file.
+        self._set_file_name_label(self._path)
+        self.setWindowTitle(f"{_('Import data')}: {url}")
+        self._update_sheet_choices(str(temp_path))
+
+        source = self._web_source_combo.currentData()
+        table_name_seed = source.name if source is not None and source.url == url else url
+        self._set_default_table_name(table_name_seed)
+
         self._refresh_preview()
 
     def _on_load_clipboard(self) -> None:
@@ -898,6 +1161,7 @@ class ImportDataDialog(QDialog):
             return
 
         self._source_mode = "clipboard"
+        self._source_url = ""
         self._clipboard_text = text
         self._path = ""
         self._set_file_name_label("")
@@ -947,7 +1211,12 @@ class ImportDataDialog(QDialog):
             self._repo.import_into_sqlite(table_name, df2, types)
             if self._source_mode == "file":
                 cfg=get_import_data_dialog_config()
-                if not self._repo.upsert_link(table_name= table_name, source_path=self._path, settings=cfg):
+                # A fetched source is linked by its URL, not by the temp file
+                # it was downloaded to: the OS may already have cleaned that
+                # up by the time Refresh runs, and pandas reads a CSV/Excel
+                # URL directly, so refreshing just re-downloads it.
+                link_path = self._source_url or self._path
+                if not self._repo.upsert_link(table_name= table_name, source_path=link_path, settings=cfg):
                     applogger.warning("Failed to create link for imported table '%s'", table_name)
         except Exception as exc:  # noqa: BLE001
             applogger.exception("Import failed: %s", exc)

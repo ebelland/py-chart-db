@@ -101,6 +101,13 @@
       "SegoeFluent": "f232",
       "ThemeIcon": "document-save-as"
     },
+    "fetch_url": {
+      "text": "Fetch",
+      "description": "Download the data at this web address",
+      "SFSymbol": "arrow.down.circle",
+      "SegoeFluent": "E896",
+      "ThemeIcon": "emblem-downloads"
+    },
     "import": {
       "text": "Import",
       "description": "Import data into the database",
@@ -460,6 +467,16 @@
       "level": "error",
       "title": "Import",
       "text": "Import failed:\n{error}"
+    },
+    "import.fetch_failed": {
+      "level": "error",
+      "title": "Web import",
+      "text": "Could not fetch {url}:\n{error}"
+    },
+    "import.fetch_invalid_url": {
+      "level": "warning",
+      "title": "Web import",
+      "text": "{url} does not look like a web address. It should start with http:// or https://."
     },
     "import.no_columns_selected": {
       "level": "warning",

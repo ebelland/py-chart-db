@@ -306,6 +306,11 @@ EXTRA_THEME_ICON_NAMES: frozenset[str] = frozenset(
         "accessories-calculator",
         "applications-system",
         "document-edit",
+        # No Qt ThemeIcon enum member covers "fetch this from the web" -
+        # GoDown is a plain navigation arrow, not a download. Breeze,
+        # Papirus and Adwaita all ship this Icon Naming Specification
+        # emblem, originally for a downloads folder.
+        "emblem-downloads",
         "object-select",
         # No icon theme has a chart, and a plotting application's Plot button
         # is the one place a drawing of our own is the honest answer. Breeze
