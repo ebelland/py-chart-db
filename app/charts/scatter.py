@@ -307,21 +307,10 @@ class ScatterAxisRenderer(BaseAxisRenderer):
                 else:
                     series_label = sd.name.strip()
 
-            marker_style = str(style.get("marker", "") or "").strip()
-            line_style = str(style.get("linestyle", "") or "").strip()
-
-            if not marker_style:
-                marker_option = options.get("marker")
-                if isinstance(marker_option, str):
-                    marker_style = marker_option.strip()
-
-            if not line_style:
-                line_option = options.get("linestyle")
-                if isinstance(line_option, str):
-                    line_style = line_option.strip()
-
-            has_marker = marker_style and marker_style!= ""
-            has_line = line_style and line_style.lower() != ""
+            marker_style, has_marker = self.series_marker(
+                style, options, rcparam="scatter.marker"
+            )
+            line_style, has_line = self.series_linestyle(style, options)
 
             # Nothing to draw for this series.
             if not has_marker and not has_line:

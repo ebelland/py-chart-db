@@ -511,6 +511,72 @@ class BaseAxisRenderer(Protocol):
         palette = self.palette_colors()
         return palette[int(layer_index) % len(palette)]
 
+    def series_linestyle(
+        self, style: dict[str, Any], options: dict[str, Any]
+    ) -> tuple[str | None, bool]:
+        """Resolve a series' effective line style: value, and whether to draw one.
+
+        A concrete style value - including "none", the explicit no-line
+        choice - wins outright and is returned unchanged, exactly as before
+        this method existed. A key that is simply absent keeps meaning "no
+        line" too, for the same reason: two chart types (Scatter's marker-only
+        default, in particular) already depend on that as their shape, and a
+        long-missing key is not a person asking for anything.
+
+        Only the DEFAULT sentinel - the "Default" entry in the Line style
+        combo - means "I want whatever the axis or the style sheet says".
+        That falls back to the axis' own ``linestyle`` option (set by the
+        Function/Fit-style series operations, which want every series they
+        add using the same linestyle) and finally to the active style
+        sheet's ``lines.linestyle``, returned as ``(None, ...)`` so the
+        caller omits the keyword rather than restating whatever rcParams
+        says right now - a later style change should still take effect.
+        """
+        raw = style.get("linestyle")
+        if isinstance(raw, str) and raw.strip().lower() == DEFAULT:
+            axis_value = options.get("linestyle")
+            if isinstance(axis_value, str) and axis_value.strip():
+                value = axis_value.strip()
+                return value, value.lower() not in ("", "none")
+            rc_value = str(rcParams.get("lines.linestyle", "-") or "").strip().lower()
+            return None, rc_value not in ("", "none")
+
+        value = str(raw or "").strip()
+        return value, value.lower() not in ("", "none")
+
+    def series_marker(
+        self,
+        style: dict[str, Any],
+        options: dict[str, Any],
+        *,
+        rcparam: str = "lines.marker",
+    ) -> tuple[str | None, bool]:
+        """Resolve a series' effective marker: value, and whether to draw one.
+
+        Mirrors :meth:`series_linestyle`. The Marker combo's "None" entry is
+        the empty string, which is also what an absent key already reads as
+        - both keep meaning "no marker", unchanged. Only the DEFAULT
+        sentinel cascades through the axis' own ``marker`` option to the
+        active style sheet.
+
+        ``rcparam`` names which rcParam that last step reads: Matplotlib
+        gives ``ax.scatter`` its own default, ``scatter.marker`` (usually
+        ``"o"``), separate from the plain-line default ``lines.marker``
+        (usually ``"None"``) - a caller drawing markers with ``scatter``
+        rather than ``plot`` should pass ``"scatter.marker"`` so "Default"
+        means what that call would draw on its own.
+        """
+        raw = style.get("marker")
+        if isinstance(raw, str) and raw.strip().lower() == DEFAULT:
+            axis_value = options.get("marker")
+            if isinstance(axis_value, str) and axis_value.strip():
+                return axis_value.strip(), True
+            rc_value = str(rcParams.get(rcparam, "") or "").strip()
+            return (None, False) if rc_value.lower() in ("", "none") else (None, True)
+
+        value = str(raw or "").strip()
+        return value, value != ""
+
     def is_discrete_integer_color(self, values: Any) -> bool:
         """True only when the color field dtype is integer.
 

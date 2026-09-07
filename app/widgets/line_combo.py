@@ -23,6 +23,7 @@ from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QColor, QIcon, QPainter, QPen
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
+from app.charts.kwarg_spec import DEFAULT
 from app.styles.style import create_hidpi_pixmap
 from app.widgets.icon_combo import ComboEntry, IconComboBox
 
@@ -31,8 +32,13 @@ _LINE_COLOR = "#3a3a3a"
 _LINE_WIDTH = 2
 
 #: (label, Matplotlib linestyle code) — same entries as the original
-#: hand-rolled combo, now paired with a preview icon.
+#: hand-rolled combo, now paired with a preview icon. "Default" is first
+#: since it is what a brand-new series should start on: it defers to
+#: whatever the active style sheet's ``lines.linestyle`` says, rather than
+#: this combo silently overriding it with a hard-coded "Solid" the moment a
+#: series exists - see app.charts.base.BaseAxisRenderer.series_linestyle.
 _ENTRIES: tuple[ComboEntry, ...] = (
+    ("Default", DEFAULT),
     ("Solid", "-"),
     ("Dashed", "--"),
     ("Dash-dot", "-."),
@@ -41,7 +47,8 @@ _ENTRIES: tuple[ComboEntry, ...] = (
 )
 
 #: Matplotlib linestyle code -> Qt pen style. ``None`` means "draw nothing"
-#: (used for the "None" / no-line entry).
+#: (used for the "None" / no-line entry). "Default" has no fixed pen of its
+#: own - see _line_icon, which draws it as a faint solid line instead.
 _PEN_STYLES: dict[str, Qt.PenStyle | None] = {
     "-": Qt.PenStyle.SolidLine,
     "--": Qt.PenStyle.DashLine,
@@ -58,7 +65,11 @@ def _line_icon(linestyle: str) -> QIcon:
     # logical, but the bitmap has the pixels to be sharp on a Retina screen.
     pixmap = create_hidpi_pixmap(_ICON_W, _ICON_H)
 
-    pen_style = _PEN_STYLES.get(linestyle)
+    # "Default" draws no fixed style of its own - a faint dashed line reads
+    # as "unset/inherited" without being mistaken for the concrete "Dashed"
+    # entry, which is drawn solid-strength above.
+    is_default = linestyle == DEFAULT
+    pen_style = Qt.PenStyle.DashLine if is_default else _PEN_STYLES.get(linestyle)
     if pen_style is not None:
         painter = QPainter(pixmap)
         try:
@@ -66,6 +77,10 @@ def _line_icon(linestyle: str) -> QIcon:
             pen = QPen(QColor(_LINE_COLOR))
             pen.setWidth(_LINE_WIDTH)
             pen.setStyle(pen_style)
+            if is_default:
+                color = QColor(_LINE_COLOR)
+                color.setAlpha(110)
+                pen.setColor(color)
             painter.setPen(pen)
             mid_y = _ICON_H // 2
             painter.drawLine(2, mid_y, _ICON_W - 2, mid_y)

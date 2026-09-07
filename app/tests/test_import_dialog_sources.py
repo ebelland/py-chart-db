@@ -457,9 +457,12 @@ def test_an_invalid_url_is_rejected_without_touching_the_source(
 
 
 def test_picking_a_quick_source_fills_the_url_field(dialog) -> None:
-    dialog._web_source_combo.setCurrentIndex(1)
+    import app.dialogs.import_data_dialog as module
 
-    assert dialog._url.text() == dialog._web_source_combo.itemData(1).url
+    source = module.WEB_DATA_SOURCES[0]
+    dialog._on_web_source_picked(source)
+
+    assert dialog._url.text() == source.url
 
 
 def test_opening_a_file_after_a_url_hides_the_table_picker(

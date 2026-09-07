@@ -4126,8 +4126,8 @@ msgstr "Lo stesso tipo di superficie nei due formati richiesti dai renderer di s
 msgid "Getting started - real data across every chart type"
 msgstr "Per iniziare - dati reali per ogni tipo di grafico"
 
-msgid "Twelve real datasets, sixteen figures across every chart type, and one saved query."
-msgstr "Dodici dataset reali, sedici figure per ogni tipo di grafico e una query salvata."
+msgid "Twelve real datasets, nineteen figures across every chart type and three multi-axis layouts, and one saved query."
+msgstr "Dodici dataset reali, diciannove figure per ogni tipo di grafico e tre layout multi-asse, e una query salvata."
 
 msgid "Antibiotics - grouped bars from a classic dataset"
 msgstr "Antibiotici - barre raggruppate da un dataset classico"
@@ -4188,6 +4188,12 @@ msgstr "Curva parametrica - un'elica in proiezione"
 
 msgid "A helix seen end-on: a circle, coloured by how far along the curve each point is."
 msgstr "Un'elica vista di taglio: un cerchio, colorato in base a quanto ogni punto è avanzato lungo la curva."
+
+msgid "Figure layouts - shared scale, main+secondary, overlapping axes"
+msgstr "Layout delle figure - scala condivisa, principale+secondari, assi sovrapposti"
+
+msgid "Three real datasets, each arranged with a different multi-axis layout preset: three price series sharing one main chart, three histograms panning and zooming together, and force paired with potential energy on a second y-axis."
+msgstr "Tre dataset reali, ciascuno disposto con un preset di layout multi-asse diverso: tre serie di prezzi che condividono un grafico principale, tre istogrammi che si spostano e ingrandiscono insieme, e la forza abbinata all'energia potenziale su un secondo asse y."
 
 msgid "Contour maps - the same fields drawn flat"
 msgstr "Mappe di contorno - gli stessi campi disegnati in piano"
@@ -4255,11 +4261,11 @@ msgstr "Salva database con nome"
 msgid "Could not save the database as a new file:\n{error}"
 msgstr "Impossibile salvare il database come nuovo file:\n{error}"
 
-msgid "Web source..."
-msgstr "Fonte web..."
+msgid "Web source"
+msgstr "Fonte web"
 
-msgid "A few ready-made web sources to try - pick one to fill the URL below."
-msgstr "Alcune fonti web pronte all'uso: scegline una per compilare l'URL qui sotto."
+msgid "A few ready-made web sources to try - pick one to fill the URL below"
+msgstr "Alcune fonti web pronte all'uso: scegline una per compilare l'URL qui sotto"
 
 msgid "https://example.com/data.csv"
 msgstr "https://esempio.it/dati.csv"

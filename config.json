@@ -407,6 +407,13 @@
       "SegoeFluent": "E897",
       "ThemeIcon": "help-contents"
     },
+    "web_sources": {
+      "text": "Web source",
+      "description": "A few ready-made web sources to try - pick one to fill the URL below",
+      "SFSymbol": "chevron.down",
+      "SegoeFluent": "e70d",
+      "ThemeIcon": "go-down"
+    },
     "zoom_fit": {
       "text": "Zoom to fit",
       "description": "Fit the whole chart in the panel",

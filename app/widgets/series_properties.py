@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.charts.kwarg_spec import DEFAULT
 from app.styles.style import (
     MARGIN_PANEL,
     create_action_button,
@@ -459,11 +460,11 @@ class SeriesPropertiesWidget(QWidget):
 
         self._set_combo_value(
             self._linestyle_combo,
-            str(style.get("linestyle", "-") or "-"),
+            str(style.get("linestyle", DEFAULT) or DEFAULT),
         )
         self._set_combo_value(
             self._marker_combo,
-            str(style.get("marker", "") or ""),
+            str(style.get("marker", DEFAULT) or DEFAULT),
         )
         self._set_color_value(str(style.get("color", "") or ""))
 

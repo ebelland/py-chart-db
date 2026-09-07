@@ -26,11 +26,13 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QLineEdit,
+    QMenu,
     QScrollArea,
     QSpinBox,
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -40,6 +42,7 @@ from app.widgets.table_preview import TablePreviewPanel
 from app.logs.logger import applogger
 from app.utils.messages import show_message
 from app.styles.style import (
+    action_presentation,
     apply_dialog_shell,
     create_card_widget,
     create_action_button,
@@ -68,12 +71,14 @@ from app.utils.data_sources import (  # noqa: E402
     IMPORTABLE_SUFFIXES,
     IMPORT_FILE_FILTER,
     DatabaseConnection,
+    WebDataSource,
     filename_from_url,
     is_importable,
     is_valid_web_url,
     list_mysql_tables,
     list_postgres_tables,
     list_sqlite_tables,
+    load_web_data_sources,
     read_any_file,
     read_clipboard_text,
     read_mysql_table,
@@ -86,73 +91,12 @@ from app.utils.data_sources import (  # noqa: E402
 from app.dialogs.connect_database_dialog import ConnectDatabaseDialog
 
 
-# -----------------------------------------------------------------------------
-# A curated "Web source" quick-pick, on top of a free-typed URL
-# -----------------------------------------------------------------------------
-@dataclass(frozen=True, slots=True)
-class WebDataSource:
-    """One quick-pick entry in the "Web source" dropdown.
-
-    A name and a direct URL, nothing else is fetched or negotiated: every
-    entry here is a plain file - CSV, JSON - the same read_web_url() any
-    typed-in URL goes through handles once it has been downloaded.
-    """
-
-    name: str
-    url: str
-    category: str
-    description: str
-
-
-#: A small, curated set of stable, no-authentication, directly downloadable
-#: reference datasets - one file per URL, no API key and no pagination -
-#: spanning the subjects asked for: statistics, chemistry, and a couple of
-#: the classic datasets mathematics/statistics teaching uses to make a point
-#: about a technique rather than about the numbers themselves.
-#:
-#: Chosen for stability over novelty: raw.githubusercontent.com and PubChem
-#: are both long-lived, unauthenticated endpoints that are unlikely to move
-#: or start requiring a key.  This list is a starting point, not a directory
-#: - the URL prompt still takes any direct CSV/JSON link, typed in by hand.
-WEB_DATA_SOURCES: tuple[WebDataSource, ...] = (
-    WebDataSource(
-        "Iris flower measurements",
-        "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv",
-        "Statistics",
-        "150 rows of petal/sepal measurements across three iris species - "
-        "the classic dataset for a first scatter or box plot by category.",
-    ),
-    WebDataSource(
-        "Anscombe's quartet",
-        "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/anscombe.csv",
-        "Mathematics",
-        "Four x/y datasets with nearly identical summary statistics but "
-        "very different shapes - plot them to see why a fit needs a chart, "
-        "not just the numbers.",
-    ),
-    WebDataSource(
-        "Periodic table of elements",
-        "https://raw.githubusercontent.com/Bowserinator/Periodic-Table-JSON/master/PeriodicTableJSON.json",
-        "Chemistry",
-        "Atomic number, mass, symbol, and other properties for all 118 "
-        "elements.",
-    ),
-    WebDataSource(
-        "Aspirin: computed properties (PubChem)",
-        "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/2244/property/"
-        "MolecularFormula,MolecularWeight,CanonicalSMILES,IUPACName/CSV",
-        "Chemistry",
-        "One compound (CID 2244) from PubChem's public REST API - change "
-        "the CID or the property list in the URL for a different one.",
-    ),
-    WebDataSource(
-        "World population by country",
-        "https://ourworldindata.org/grapher/population.csv",
-        "Statistics",
-        "Annual population estimates per country and region, from Our "
-        "World in Data.",
-    ),
-)
+#: The curated "Web source" quick-pick catalogue - see
+#: app/data/web_sources.json for the actual entries and
+#: app.utils.data_sources.WebDataSource for the shape of one.  Kept as a
+#: module-level name here too since the test suite and (previously) this
+#: dialog both import it from this module.
+WEB_DATA_SOURCES: tuple[WebDataSource, ...] = load_web_data_sources()
 
 
 # -----------------------------------------------------------------------------
@@ -246,6 +190,7 @@ class ImportDataDialog(QDialog):
         self._db_connection: DatabaseConnection | None = None
         self._db_table_name: str = ""
         self._last_auto_table: str = ""
+        self._picked_web_source: WebDataSource | None = None
 
         self.setWindowTitle(_("Import data"))
         self.setWindowIcon(load_icon("import"))
@@ -308,22 +253,36 @@ class ImportDataDialog(QDialog):
         src_web_lay = QHBoxLayout(src_web)
         stdSizeAndlayout(src_web_lay)
 
-        self._web_source_combo = QComboBox(src_web)
-        self._web_source_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
-        self._web_source_combo.addItem(_("Web source..."), None)
+        # A chevron-down button rather than a combo box: a combo shows one
+        # flat list in a fixed-height popup, which is what made the earlier
+        # catalogue feel cramped as it grew. A QToolButton's menu has no such
+        # limit, and QMenu.addSection groups entries by category with a
+        # visible heading instead of the "(Category)" suffix a combo needed.
+        icon, text, tooltip = action_presentation("web_sources")
+        self._web_source_button = QToolButton(src_web)
+        self._web_source_button.setObjectName("webSourceButton")
+        self._web_source_button.setText(text)
+        self._web_source_button.setIcon(icon)
+        self._web_source_button.setToolTip(tooltip)
+        self._web_source_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+
+        self._web_source_menu = QMenu(self._web_source_button)
+        by_category: dict[str, list[WebDataSource]] = {}
         for source in WEB_DATA_SOURCES:
-            # Not run through _(): the scanner that checks translation
-            # coverage only sees string literals passed to _(), and these
-            # dataset names/categories are data, not source text - wrapping
-            # a variable in _() here would look translated without being
-            # checked at all.
-            self._web_source_combo.addItem(f"{source.name} ({source.category})", source)
-        self._web_source_combo.setToolTip(
-            _("A few ready-made web sources to try - pick one to fill the URL below.")
-        )
-        self._web_source_combo.currentIndexChanged.connect(self._on_web_source_selected)
-        stdSizeAndlayout(self._web_source_combo)
-        src_web_lay.addWidget(self._web_source_combo)
+            by_category.setdefault(source.category, []).append(source)
+        for category, sources in by_category.items():
+            # Categories and dataset names are data, not source text - see
+            # the note above on _(): they are deliberately not translated.
+            self._web_source_menu.addSection(category)
+            for source in sources:
+                menu_action = self._web_source_menu.addAction(source.name)
+                menu_action.setToolTip(source.description)
+                menu_action.triggered.connect(
+                    lambda _checked=False, s=source: self._on_web_source_picked(s)
+                )
+        self._web_source_button.setMenu(self._web_source_menu)
+        stdSizeAndlayout(self._web_source_button)
+        src_web_lay.addWidget(self._web_source_button)
 
         self._url = QLineEdit(src_web)
         self._url.setPlaceholderText(_("https://example.com/data.csv"))
@@ -937,7 +896,7 @@ class ImportDataDialog(QDialog):
         self._set_default_table_name(picker.table)
         self._refresh_preview()
 
-    def _on_web_source_selected(self, _index: int) -> None:
+    def _on_web_source_picked(self, source: WebDataSource) -> None:
         """Fill the URL field from the chosen quick-pick source.
 
         Fills the field rather than fetching immediately: a URL from the
@@ -945,9 +904,7 @@ class ImportDataDialog(QDialog):
         and be free to edit it, e.g. PubChem's CID - before anything is
         downloaded.
         """
-        source = self._web_source_combo.currentData()
-        if source is None:
-            return
+        self._picked_web_source = source
         self._url.setText(source.url)
         self._url.setToolTip(source.description)
 
@@ -995,7 +952,7 @@ class ImportDataDialog(QDialog):
 
         # A quick-pick source names the table for what it is; a typed-in URL
         # falls back to its own file name.
-        picked = self._web_source_combo.currentData()
+        picked = self._picked_web_source
         table_name_seed = picked.name if picked is not None and picked.url == url else filename_from_url(url)
         self._set_default_table_name(table_name_seed)
 

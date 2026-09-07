@@ -13,6 +13,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from app.charts import layout_presets
 from app.data.demo_project import (
     DEMO_PROJECTS,
     QUERY_SOURCES,
@@ -21,8 +22,14 @@ from app.data.demo_project import (
     build_demo_projects,
     copy_demo_project,
     _figure_specs,
+    _multi_axis_figure_specs,
 )
 from app.data.sqlite_repo import SqliteRepo
+
+
+def _all_specs():
+    """Every figure spec, single- and multi-axis alike."""
+    return [*_figure_specs(), *_multi_axis_figure_specs()]
 
 
 @pytest.fixture(scope="module")
@@ -66,7 +73,7 @@ def test_the_complete_project_comes_first() -> None:
 
 def test_every_demo_names_figures_that_exist() -> None:
     """A typo in a figure key would give a demo file with no charts at all."""
-    known = {spec.key for spec in _figure_specs()}
+    known = {spec.key for spec in _all_specs()}
 
     for demo in DEMO_PROJECTS:
         unknown = sorted(set(demo.figures) - known)
@@ -76,14 +83,14 @@ def test_every_demo_names_figures_that_exist() -> None:
 def test_every_figure_appears_in_some_demo() -> None:
     """A figure nothing ships is a figure nobody sees."""
     shipped = {key for demo in DEMO_PROJECTS for key in demo.figures}
-    defined = {spec.key for spec in _figure_specs()}
+    defined = {spec.key for spec in _all_specs()}
 
     assert defined - shipped == set()
 
 
 def test_every_figure_declares_the_tables_it_reads() -> None:
     """That declaration is what lets a one-subject file carry one table."""
-    for spec in _figure_specs():
+    for spec in _all_specs():
         assert spec.key, spec.name
         assert spec.tables, spec.name
         unknown = sorted(set(spec.tables) - set(TABLE_SOURCES))
@@ -159,7 +166,7 @@ def test_the_complete_project_carries_every_table_and_query(tmp_path: Path) -> N
     path = build_demo_project(tmp_path / "all.dhub")
     figures, tables, queries = _open(path)
 
-    assert len(figures) == len(_figure_specs())
+    assert len(figures) == len(_all_specs())
     assert set(tables) == set(TABLE_SOURCES)
     assert set(queries) == set(QUERY_SOURCES)
 
@@ -218,6 +225,56 @@ def test_the_employee_dataset_has_a_real_outlier(tmp_path: Path) -> None:
 
     median = float(np.median(salaries))
     assert salaries.max() > median * 4, "no salary far enough above the median"
+
+
+# ----------------------------------------------------------------------
+# Multi-axis figures: one demo per layout preset
+# ----------------------------------------------------------------------
+def _load_axes(path: Path, figure_name: str):
+    repo = SqliteRepo(db_path=path)
+    try:
+        figure_id = next(fid for fid, name in repo.get_figures() if name == figure_name)
+        return repo.load_figure_descriptor(figure_id=int(figure_id))
+    finally:
+        repo.close()
+
+
+def test_every_multi_axis_figure_actually_has_more_than_one_axis() -> None:
+    """The whole point: a demo of a multi-axis layout with one axis in it
+    would not show what the layout does at all."""
+    for spec in _multi_axis_figure_specs():
+        assert len(spec.axes) > 1, spec.name
+        assert spec.layout in layout_presets.PRESETS, spec.name
+
+
+def test_the_main_and_secondary_figure_spans_the_main_axis(tmp_path: Path) -> None:
+    path = build_demo_project(tmp_path / "layouts.dhub", ("stock_main_secondary",))
+    descriptor = _load_axes(path, "17 · Stock prices - main and secondary")
+
+    assert descriptor.nrows > 1
+    main_axis = next(a for a in descriptor.axes if a.title.startswith("AAPL"))
+    assert main_axis.options.get("col_span") == descriptor.ncols
+
+
+def test_the_shared_grid_figure_shares_scale_past_the_first_axis(tmp_path: Path) -> None:
+    path = build_demo_project(tmp_path / "layouts.dhub", ("penguin_shared_grid",))
+    descriptor = _load_axes(path, "18 · Penguins - shared scale grid")
+
+    axes_by_index = sorted(descriptor.axes, key=lambda a: a.axis_index)
+    assert not axes_by_index[0].options.get("sharex")
+    for axis in axes_by_index[1:]:
+        assert axis.options.get("sharex")
+        assert axis.options.get("sharey")
+
+
+def test_the_overlapping_figure_twins_its_second_axis(tmp_path: Path) -> None:
+    path = build_demo_project(tmp_path / "layouts.dhub", ("dlvo_overlapping",))
+    descriptor = _load_axes(path, "19 · DLVO force and potential - overlapping axes")
+
+    assert len(descriptor.axes) == 2
+    primary = next(a for a in descriptor.axes if not a.options.get("twin_of"))
+    twin = next(a for a in descriptor.axes if a.options.get("twin_of"))
+    assert twin.options["twin_of"] == primary.id
 
 
 # ----------------------------------------------------------------------

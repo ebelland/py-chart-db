@@ -30,6 +30,7 @@ from typing import Any, Callable
 
 import pandas as pd
 
+from app.charts import layout_presets
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
 
@@ -100,6 +101,38 @@ class FigureSpec:
     axis_options: dict[str, Any]
     key: str = ""
     tables: tuple[str, ...] = ()
+    queries: tuple[str, ...] = ()
+
+
+@dataclass(slots=True)
+class AxisSpec:
+    """One axis within a MultiAxisFigureSpec - the same shape a FigureSpec's
+    own fields describe, just not flattened into it: a multi-axis figure has
+    several of these instead of one chart_type/title/x_label/y_label/series."""
+
+    chart_type: str
+    title: str
+    x_label: str
+    y_label: str
+    series: list[SeriesSpec]
+    axis_options: dict[str, Any]
+
+
+@dataclass(slots=True)
+class MultiAxisFigureSpec:
+    """A figure with more than one axis, arranged by a layout preset.
+
+    ``layout`` is one of app.charts.layout_presets.PRESETS - the same
+    one-click arrangements Figure Properties offers, applied here through
+    SqliteRepo.apply_axis_layout once every axis exists, so a demo figure is
+    built by exactly the code path a user picking a preset would run.
+    """
+
+    name: str
+    key: str
+    tables: tuple[str, ...]
+    layout: str
+    axes: list[AxisSpec]
     queries: tuple[str, ...] = ()
 
 
@@ -392,7 +425,7 @@ def _figure_specs() -> list[FigureSpec]:
             title="Daily closing price",
             x_label="date",
             y_label="close (USD)",
-            axis_options={"grid": True, "show_rolling": False},
+            axis_options={"grid": True, "show_rolling": False, "gap_threshold": "5D"},
             series=[
                 SeriesSpec(
                     name=ticker,
@@ -567,6 +600,128 @@ def _figure_specs() -> list[FigureSpec]:
     ]
 
 
+def _multi_axis_figure_specs() -> list[MultiAxisFigureSpec]:
+    """Return every demo figure with more than one axis, one per layout
+    preset - each reusing a table a single-axis figure above already needs,
+    so showing the layout costs no new data."""
+    return [
+        MultiAxisFigureSpec(
+            name="17 · Stock prices - main and secondary",
+            key="stock_main_secondary",
+            tables=("stock_prices",),
+            queries=(),
+            layout=layout_presets.MAIN_AND_SECONDARY,
+            axes=[
+                AxisSpec(
+                    chart_type="Time Series",
+                    title="AAPL - daily close",
+                    x_label="date",
+                    y_label="close (USD)",
+                    axis_options={"grid": True, "show_rolling": False, "gap_threshold": "5D"},
+                    series=[
+                        SeriesSpec(
+                            name="AAPL",
+                            sql="SELECT date AS x, close AS y FROM stock_prices "
+                            "WHERE stock = 'AAPL' ORDER BY date",
+                            roles={"x": "x", "y": "y"},
+                            style={"linestyle": "-", "marker": ""},
+                        ),
+                    ],
+                ),
+                *[
+                    AxisSpec(
+                        chart_type="Time Series",
+                        title=ticker,
+                        x_label="date",
+                        y_label="close (USD)",
+                        axis_options={"grid": True, "show_rolling": False, "gap_threshold": "5D"},
+                        series=[
+                            SeriesSpec(
+                                name=ticker,
+                                sql="SELECT date AS x, close AS y FROM stock_prices "
+                                f"WHERE stock = '{ticker}' ORDER BY date",
+                                roles={"x": "x", "y": "y"},
+                                style={"linestyle": "-", "marker": ""},
+                            ),
+                        ],
+                    )
+                    for ticker in ("TSLA", "COKE")
+                ],
+            ],
+        ),
+        MultiAxisFigureSpec(
+            name="18 · Penguins - shared scale grid",
+            key="penguin_shared_grid",
+            tables=("penguins",),
+            queries=(),
+            layout=layout_presets.SHARED_GRID,
+            axes=[
+                AxisSpec(
+                    chart_type="Histogram",
+                    title=species,
+                    x_label="body mass (g)",
+                    y_label="",
+                    axis_options={"bins": 20, "alpha": 0.8, "grid": True, "grid_axis": "y"},
+                    series=[
+                        SeriesSpec(
+                            name=species,
+                            sql="SELECT body_mass_g AS value FROM penguins "
+                            f"WHERE species = '{species}'",
+                            roles={"value": "value"},
+                            style={},
+                        ),
+                    ],
+                )
+                for species in ("Adelie", "Chinstrap", "Gentoo")
+            ],
+        ),
+        MultiAxisFigureSpec(
+            name="19 · DLVO force and potential - overlapping axes",
+            key="dlvo_overlapping",
+            tables=("dlvo_curve",),
+            queries=(),
+            layout=layout_presets.OVERLAPPING,
+            axes=[
+                AxisSpec(
+                    chart_type="Scatter Plot",
+                    title="Force and potential energy against separation",
+                    x_label="separation (nm)",
+                    y_label="force (nN)",
+                    axis_options={"grid": True},
+                    series=[
+                        SeriesSpec(
+                            name="Force",
+                            sql="SELECT separation_nm AS x, F_total_nN AS y "
+                            "FROM dlvo_curve ORDER BY separation_nm",
+                            roles={"x": "x", "y": "y"},
+                            style={"marker": "", "linestyle": "-"},
+                        ),
+                    ],
+                ),
+                AxisSpec(
+                    chart_type="Scatter Plot",
+                    # Left blank on purpose: a twin shares its target's grid
+                    # cell, so a second title here would draw on top of the
+                    # primary axis's - see render_figure's twin handling.
+                    title="",
+                    x_label="separation (nm)",
+                    y_label="potential energy (aJ)",
+                    axis_options={"grid": False},
+                    series=[
+                        SeriesSpec(
+                            name="Potential energy",
+                            sql="SELECT separation_nm AS x, U_total_aJ AS y "
+                            "FROM dlvo_curve ORDER BY separation_nm",
+                            roles={"x": "x", "y": "y"},
+                            style={"marker": "", "linestyle": "--", "color": "#E45756"},
+                        ),
+                    ],
+                ),
+            ],
+        ),
+    ]
+
+
 # ----------------------------------------------------------------------
 # The demo set
 # ----------------------------------------------------------------------
@@ -604,8 +759,8 @@ class DemoProject:
 DEMO_PROJECTS: tuple[DemoProject, ...] = (
     DemoProject(
         "Getting started - real data across every chart type",
-        "Twelve real datasets, sixteen figures across every chart type, and "
-        "one saved query.",
+        "Twelve real datasets, nineteen figures across every chart type and "
+        "three multi-axis layouts, and one saved query.",
         (),
     ),
     DemoProject(
@@ -675,6 +830,14 @@ DEMO_PROJECTS: tuple[DemoProject, ...] = (
         "each point is.",
         ("parametric_scatter",),
     ),
+    DemoProject(
+        "Figure layouts - shared scale, main+secondary, overlapping axes",
+        "Three real datasets, each arranged with a different multi-axis "
+        "layout preset: three price series sharing one main chart, three "
+        "histograms panning and zooming together, and force paired with "
+        "potential energy on a second y-axis.",
+        ("stock_main_secondary", "penguin_shared_grid", "dlvo_overlapping"),
+    ),
 )
 
 
@@ -692,12 +855,15 @@ def build_demo_project(db_path: Path, figures: tuple[str, ...] = ()) -> Path:
         db_path.unlink()
 
     specs = _figure_specs()
+    multi_specs = _multi_axis_figure_specs()
     if figures:
         wanted = tuple(figures)
         specs = [spec for spec in specs if spec.key in wanted]
+        multi_specs = [spec for spec in multi_specs if spec.key in wanted]
 
-    wanted_queries = {name for spec in specs for name in spec.queries}
-    wanted_tables = {name for spec in specs for name in spec.tables}
+    all_specs: list[FigureSpec | MultiAxisFigureSpec] = [*specs, *multi_specs]
+    wanted_queries = {name for spec in all_specs for name in spec.queries}
+    wanted_tables = {name for spec in all_specs for name in spec.tables}
     # A saved query needs its own source table even when no figure reads that
     # table directly.
     wanted_tables.update(
@@ -737,6 +903,8 @@ def build_demo_project(db_path: Path, figures: tuple[str, ...] = ()) -> Path:
 
     for spec in specs:
         _create_figure(repo, spec)
+    for multi_spec in multi_specs:
+        _create_multi_axis_figure(repo, multi_spec)
 
     report = repo.optimize_db()
     applogger.info("Demo project check: %s", report.summary())
@@ -816,6 +984,58 @@ def _create_figure(repo: SqliteRepo, spec: FigureSpec) -> int:
         )
 
     applogger.info("Demo: created figure '%s' (%s)", spec.name, spec.chart_type)
+    return int(figure_id)
+
+
+def _create_multi_axis_figure(repo: SqliteRepo, spec: MultiAxisFigureSpec) -> int:
+    """Create one figure, all of its axes, and lay them out with a preset.
+
+    Every axis is created first, as an ordinary 1x1-grid-worth of a figure -
+    what row/column it ends up in is the layout preset's job, applied
+    afterwards through apply_axis_layout exactly as Figure Properties would
+    when a person picks that same preset.
+    """
+    figure_id = repo.create_figure_descriptor(
+        name=spec.name,
+        nrows=1,
+        ncols=1,
+        options={"mpl_style": DEMO_STYLE, "layout_mode": "constrained"},
+    )
+
+    axis_ids: list[int] = []
+    for index, axis_spec in enumerate(spec.axes):
+        axis_id = repo.create_axis_descriptor(
+            figure_id=figure_id,
+            axis_index=index,
+            chart_type=axis_spec.chart_type,
+            title=axis_spec.title,
+            x_label=axis_spec.x_label,
+            y_label=axis_spec.y_label,
+            options={"title": axis_spec.title, **axis_spec.axis_options},
+        )
+        axis_ids.append(int(axis_id))
+        for series_index, series in enumerate(axis_spec.series):
+            repo.create_series_descriptor(
+                axis_id=axis_id,
+                series_index=series_index,
+                name=series.name,
+                sql_query=series.sql,
+                roles=series.roles,
+                style=series.style,
+            )
+
+    plan = layout_presets.plan_layout(spec.layout, axis_ids)
+    repo.apply_axis_layout(
+        figure_id=figure_id,
+        nrows=plan.nrows,
+        ncols=plan.ncols,
+        placements=[(p.axis_id, p.axis_index, p.options) for p in plan.axes],
+    )
+
+    applogger.info(
+        "Demo: created multi-axis figure '%s' (%s, %d axes)",
+        spec.name, spec.layout, len(spec.axes),
+    )
     return int(figure_id)
 
 

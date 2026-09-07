@@ -31,146 +31,9 @@ P0-6  style pickers: an "auto" option that defers to rcParams
      sheet says" rather than forcing a concrete value. Default to it, so a
      .mplstyle actually governs the look of a new series.
 
-P0-10 global: locale must follow the platform locale. Add Auto to settings
-      [DONE: i18n.AUTO_LANGUAGE is the stored sentinel and
-      i18n.platform_language() resolves it through QLocale.system() - not
-      locale.getlocale(), which reports the C locale until someone calls
-      setlocale, and not $LANG, which is a Unix convention Windows and macOS
-      do not follow. Only the language half of it_CH is kept, so a regional
-      variant finds its catalogue. Settings lists Auto first, labelled with
-      the language it currently resolves to, and stores the sentinel rather
-      than the resolved code so a machine that changes its locale follows it.
-      config.get_language() now defaults to auto for a config.json with no
-      language key, which is what a fresh installation has.]
-
 ================================================================
 NEW - requested after the review
 ================================================================
-
-N-14  Auto locale picked the wrong one [DONE]
-      "Auto" read English on a Mac set to Italian. platform_language() asked
-      QLocale.system().name(), which is the *format* locale and follows the
-      region - an Italian in Ireland reads en_IE there. The interface
-      language is uiLanguages(), the ordered list the user actually chose to
-      read in, and macOS keeps the two settings apart. Now: uiLanguages()
-      first, in preference order, taking the first whose language has a
-      catalogue; then name(); then LANGUAGE/LC_ALL/LC_MESSAGES/LANG, which
-      are last because they are a Unix convention Windows and macOS ignore -
-      but which are the only thing that knows better when a Linux session
-      leaves Qt reporting the C locale. it-Latn-IT, it_IT.UTF-8 and it all
-      answer "it"; C and POSIX answer nothing.
-
-N-13  Four more from the field [DONE]
-      Message boxes answered in English. QMessageBox builds Yes and No from
-      Qt's own catalogue, not ours - the text never passes through tr(), so
-      no amount of translating this application reached it. i18n
-      .install_qt_translations loads qtbase_<lang>.qm at startup, which fixes
-      every standard button (Save, Cancel, Open) rather than just those two.
-      The QTranslator objects are kept in a module list: installTranslator
-      does not take ownership, and a collected one reverts silently.
-
-      "Contour plot rallenta il sistema", and it was not the contour.
-      pivot_to_grid called pivot_table before knowing anything about the
-      shape, so scattered x/y/z - every coordinate distinct - built an NxN
-      frame and then found holes in it: 10 000 points took 3.5 seconds and a
-      gigabyte, 30 000 took the machine. A complete Cartesian product needs
-      one row per cell, so counting refuses it in O(n): 10 000 points now
-      cost 2.3ms and 94MB, 200 000 cost 33ms. MAX_GRID_CELLS additionally
-      refuses a grid too large to draw, with a message naming the way out.
-      Measured, both before and after - see test_contour_axis.py.
-
-      Table was dangerous on a big table, and it was: Matplotlib lays out one
-      Text artist per cell in Python, so 5 000 rows was 15 000 artists and
-      over a second on every redraw, and an imported file was a hung window.
-      MAX_TABLE_ROWS draws the first 200 and logs what it cut; the cap is an
-      option, and the log names LIMIT in the series SQL as the real answer
-      for a big source. 100 000 rows: ~24s -> 42ms.
-
-      Booleans in the kwargs grid were text until clicked, and on macOS the
-      editor's checkbox was placed by the delegate rather than by the row, so
-      clicks missed it and the setting looked broken. They are check items
-      now - drawn by the view, present whether or not anything is being
-      edited, one click to toggle - and the delegate builds no editor for
-      them at all.
-
-
-N-12  Six reported bugs, and the Table renderer's roles [DONE]
-      Axis properties had no Z anything. The manual range, the scale and the
-      direction are now per axis for x, y AND z (axis_options.LIMIT_AXES,
-      separate from AXES, which stays 2D because it drives the grid and tick
-      controls). A 2D axes has no set_zlim, so the renderer skips what it
-      cannot set and keeps the value: switching the projection to 3d later
-      finds the range still there. The limit modes are relabelled - "Manual
-      (all axes)" - and z is manual in every mode but Automatic, because a
-      mode per combination of three axes is eight entries in a combo and buys
-      nothing over an empty box already meaning "leave this end alone".
-
-      Query builder: New query asked for a name, and asked whether to replace
-      an existing query of that name, before there was any statement to store
-      - and then Save could still refuse it. New query now makes an empty
-      draft and asks nothing; the name is asked for once, at Save, after the
-      statement validates. Nothing was ever written early (new_query returns
-      an unstored descriptor), so this is about the order of the questions,
-      not about stray rows.
-
-      Optimize Database showed its findings as extra lines of the message
-      box's main text, cut off at twenty. Now: the problems inline, the whole
-      grouped report - unreferenced tables included - behind Show Details,
-      where it scrolls and can be copied, and nothing truncated.
-      show_message grew a details= parameter for it, and both it and ask()
-      now set Qt.PlainText: AutoText guesses at rich text, and one table
-      named <old> would have collapsed every newline in a report to a space.
-
-      Import dialog: pasting after opening a file put the file's rows back
-      under the clipboard's table name. The paste handler's last line called
-      _refresh_preview, which read self.file_name and nothing else. The
-      preview now dispatches on the source mode, pasting clears the file
-      source, and the clipboard text is kept - so header, delimiter and the
-      skip counts re-apply to pasted data, which they never did.
-
-      Startup no longer offers to build the demo set on a first run and then
-      fall back to an open dialog with nothing in it to open. It creates (or
-      reopens) "Data Hub.dhub" in the home directory and says nothing. The
-      demo is still File, Create demo. startup.offer_demo/demo_failed are
-      gone from the catalogue; startup.default_database_failed replaces them
-      for the one case a file cannot solve, an unwritable home.
-
-      Table renderer: the chart picker's role panel said "No renderer roles
-      declared." It now declares column_1..column_8 as optional slots. The
-      headers stay the source columns' own names, which is why SeriesData
-      carries the series' role map - the SQL aliases region AS column_1, so
-      the frame no longer knows what the column was called. Mapping none of
-      them still draws every column, which is what SELECT * produces and what
-      every Table figure already saved carries.
-
-
-N-4   Gridded-data renderers
-      [CONTOUR half is DONE: app/charts/contour.py. ContourAxisRenderer
-      (contourf/contour) pivots x/y/z rows into a grid;
-      ContourScatteredAxisRenderer (tricontourf/tricontour) triangulates the
-      raw points, so the map covers the hull of what was measured and stops
-      there - griddata was the other option and was not taken, because a grid
-      fills the corners with numbers that look like measurements.
-      The grid check itself moved to app/charts/grids.pivot_to_grid and is
-      now shared with the surface renderers rather than duplicated;
-      finite_xyz is the scattered half, shared the same way. The two new
-      categories put "Gridded data" and "Irregularly gridded data" in the
-      chart picker for the first time. Demo project "Contour maps - the same
-      fields drawn flat" reuses the wafer and survey tables, so the surface
-      and contour readings of one dataset sit side by side.
-      Found on the way: a colorbar built while the layout engine is still
-      "none" - which is when every renderer draws - makes a gridspec with
-      zero-height rows, and a constrained engine applied afterwards divides
-      by it and the figure will not draw at all. contour.py's _colorbar
-      passes use_gridspec=False for that reason; regression test in
-      test_contour_axis.py. Any future renderer that adds a colorbar needs
-      the same, or the pipeline needs to set the layout engine before the
-      renderers run instead of after.]
-      What is left is the rest of the "Gridded data" family, per
-      matplotlib.org/stable/plot_types: pcolormesh, imshow/matshow and the
-      streamplot/quiver family on a regular grid - the same "is this actually
-      a grid" decision, which now has one implementation to call.
-      Pairs with the heatmap/imshow line under P2-1.
 
 N-5   sqlite_repo: 3048 lines in one module
       Contesto misurato 2026-08: 50.837 righe di codice applicativo, e i
@@ -185,47 +48,11 @@ N-5   sqlite_repo: 3048 lines in one module
       changes. The dataclass with a mutable OrderedDict field and the series
       cache belong with the connection, not with the descriptors.
 
-N-6   icons: finish the SFSymbol / Segoe Fluent migration [DONE]
-      The migration had a hole the size of Linux: SF Symbols are macOS's and
-      Segoe Fluent is Windows's, so every other desktop fell through to the
-      SVGs in app/icons - and three actions named no SVG at all, so they were
-      blank buttons. QIcon.fromTheme is now the third step, from a ThemeIcon
-      field on all 51 actions, validated against QIcon.ThemeIcon plus an
-      explicit extras list because a typo fails silently. A ThemeIcon may be
-      a list, tried best-first: no one freedesktop name is in every theme.
-      Adwaita 45 dropped the full-colour action icons, so the plain name is
-      tried and then the -symbolic one, covering Adwaita and Breeze together.
-      ensure_icon_theme() names an installed theme when the desktop names
-      none, which is what a bare window manager leaves.
-
-      And then the deleting, in full: app/icons is gone, all 67 files.
-      They were reached only by a Mac with no pyobjc, a PC with no Fluent
-      font or a Linux box with no theme, and were a drawing of the same
-      thing the three real icon sets already have. With that gone,
-      ICON_PLATFORM_DIRS, _icon_search_dirs, resolve_icon_path,
-      get_icon_file_name, _svg_icon, _svg_icon_or_empty, _icon_url and the
-      SVG caches went with them, and the "icon" field left the catalogue.
-      The QSS chevrons were the last holdout - a stylesheet takes url(file)
-      and cannot be handed a QIcon - and their rules were removed, so Qt
-      draws the platform's own arrow.
-      Measured on GNOME/Adwaita: 51 of 51 actions from the theme, none
-      blank. The test that requires all three names per action found two
-      gaps the SVG had been hiding (create_demo had no Fluent glyph,
-      export_xlsx had neither) - both filled.
-      Note: icon_from_svg_source is untouched. That is inline SVG source
-      carried by series operations on the class, not a file.
-
 N-8   ChartPanel: "Add vertical line" / "Add horizontal line"
       Same context menu, with a small dialog for the line style, persisted in
       the axis options like the annotations are - so they survive a reload and
       can be edited from the properties panel afterwards. A new options key
       ("lines") drawn by the base renderer beside apply_annotations.
-
-N-9   documentation
-      docs/DEVELOPMENT.md is behind the renames, the fit rework and the new
-      startup path; and there is no user manual at all. The manual should be
-      one HTML file, built from the same catalogue the UI reads so the two
-      cannot drift.
 
 N-3   attribute control charts (p, np, c, u)
       The half of SPC N-1 does not cover. These plot a proportion or a count
@@ -250,15 +77,6 @@ P2-14 renderer: il boilerplate duplicato appartiene a BaseAxisRenderer
       renderer su 23. Sono ~55 righe che vanno sulla base come
       merge_options() e valid_series(), lasciando a ogni renderer solo cio'
       che disegna davvero. Due ore, e ogni renderer nuovo parte piu' corto.
-
-P2-15 avvio: gli scanner importano scipy al primo click, non all'avvio
-      La prima apertura del dialogo Fit costa ~900ms perche'
-      FunctionScanner().catalog() importa allora tutti i moduli funzione, e
-      con loro scipy. Le chiamate successive sono 20ms, quindi e' un costo
-      una tantum speso nel momento peggiore. Precaricarlo in background
-      dopo che la finestra e' su, o all'avvio dietro lo splash.
-      Nota: import di app.dialogs.main_window = 1.2s, di cui pandas 301ms e
-      matplotlib ~200ms - quelli sono incomprimibili.
 
 P2-3  series operation: baseline correction (ALS or rubber-band)
       Pure numpy/scipy. Prerequisite for meaningful peak areas.
@@ -286,8 +104,6 @@ P2-5  ChartPanel: downsample large series for display (LTTB) above ~50k points
 
 P2-8  table view: colour data by value
 
-P2-9  global: split config.json into user settings and application config
-
 P2-11 undo for descriptor edits
       Operations write generated tables and deletes are final. Even a simple
       command stack limited to descriptor edits is cheap insurance.
@@ -295,9 +111,6 @@ P2-11 undo for descriptor edits
 P2-12 series operations: inline preview plot beside the numeric results
       publish_results emits text/HTML only; a fit or a peak-find is far more
       legible with a small plot next to it.
-
-P2-13 style.py: read presentation straight from config.json
-
 
 ================================================================
 P3 - LATER
@@ -312,30 +125,11 @@ P3-1  figure: mosaic layouts (subplot_mosaic-style named regions)
       gives an axis its row_span/col_span - both already have UI. The genuinely
       missing thing is naming regions and letting axes claim them.
 
-P3-2  external database link
-      [was: "external database link"]
-
 P3-4  custom function table generation
-      [was: "custom function table generation"]
 
 P3-5  localization helper dialog
-      [was: "localization helper dialog"]
 
-P3-6  axis_properties: make Axis options and drawing kwargs homogeneous
-      [was: "Axis options and drawings kwargs: make more homogeneous"]
-
-P3-9  plot: default to scatterplot
-      [was: "plot: default to scatterplot"]
-
-P3-10 series operations: spectral/plot inconsistency; after Apply, move to the
-      new ChartPanel
-      [was: "change spectral and plot incons" / "plot: after apply move to new
-      ChartPanel"]
-
-P3-11 requirements.txt: declare scikit-learn as an optional dependency
-      The cluster dialog imports it behind a guarded try/except with a clear
-      "install this" message, so the behaviour is right - it is just
-      undeclared, so nobody knows the feature exists.
+P3-6  axis_properties: make Axis options and drawing kwargs homogeneous]
 
 P3-12 note: statsmodels, scikit-image and PyWavelets are each used by exactly
       one file (smoothing_dialog.py). Three heavy dependencies for one

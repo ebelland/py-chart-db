@@ -25,11 +25,13 @@ a saved link's ``settings["source"]["kind"]``:
 from __future__ import annotations
 
 import csv
+import json
 import os
 import sqlite3
 import tempfile
 import urllib.request
 from dataclasses import dataclass
+from functools import lru_cache
 from io import StringIO
 from pathlib import Path
 from typing import Optional
@@ -487,6 +489,47 @@ _CONTENT_TYPE_EXTENSIONS: dict[str, str] = {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
     "application/vnd.ms-excel": ".xls",
 }
+
+
+#: The curated quick-pick catalogue, as a JSON array of {name, url, category,
+#: description} - a plain data file rather than Python so that adding or
+#: retiring an entry never touches code, and so a future settings screen
+#: could let a user edit it without shipping a new build.
+WEB_SOURCES_PATH: Path = Path(__file__).resolve().parents[1] / "data" / "web_sources.json"
+
+
+@dataclass(frozen=True, slots=True)
+class WebDataSource:
+    """One quick-pick entry in the "Web source" catalogue.
+
+    A name and a direct URL, nothing else is fetched or negotiated: every
+    entry here is a plain file - CSV, JSON - the same read_web_url() any
+    typed-in URL goes through handles once it has been downloaded.
+    """
+
+    name: str
+    url: str
+    category: str
+    description: str
+
+
+@lru_cache(maxsize=1)
+def load_web_data_sources() -> tuple[WebDataSource, ...]:
+    """Return the curated web-source catalogue, read from web_sources.json.
+
+    Cached: the catalogue is bundled, read-only data, not something that
+    changes while the process is running.
+    """
+    raw = json.loads(WEB_SOURCES_PATH.read_text(encoding="utf-8"))
+    return tuple(
+        WebDataSource(
+            name=entry["name"],
+            url=entry["url"],
+            category=entry["category"],
+            description=entry["description"],
+        )
+        for entry in raw
+    )
 
 
 def is_valid_web_url(url: str) -> bool:

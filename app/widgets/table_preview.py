@@ -119,7 +119,13 @@ class TablePreviewPanel(QWidget):
 
         header = self.view.horizontalHeader()
         header.setStretchLastSection(True)
-        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        # Interactive rather than ResizeToContents: the latter locks every
+        # column at its computed width and silently undoes a drag the moment
+        # the user lets go of it. Columns are still sized to fit whenever a
+        # new model is set - see resizeColumnsToContents() below - so the
+        # panel opens looking the same as before; the difference is that a
+        # resize the user makes now sticks.
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         header.setHighlightSections(False)
 
         self.view.verticalHeader().setVisible(False)
@@ -167,6 +173,7 @@ class TablePreviewPanel(QWidget):
         self._repo = None
         self._table = None
         self.view.setModel(model)
+        self.view.resizeColumnsToContents()
 
     def _reload_model(self) -> None:
         """Show the current source, whether it is a table or a saved query.
@@ -187,9 +194,11 @@ class TablePreviewPanel(QWidget):
                     source, limit=QUERY_PREVIEW_ROW_LIMIT, offset=0
                 )
                 self.view.setModel(DataFrameTableModel(frame, parent=self.view))
+                self.view.resizeColumnsToContents()
                 return
 
             self.view.setModel(LazyTableModel(self._repo, self._table, parent=self.view))
+            self.view.resizeColumnsToContents()
         except Exception as exc:
             applogger.exception("Preview model init failed for source=%s: %s", self._table, exc)
             self.view.setModel(None)

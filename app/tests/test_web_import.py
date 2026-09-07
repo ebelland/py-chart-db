@@ -152,6 +152,45 @@ def test_the_catalogue_spans_more_than_one_subject() -> None:
     assert len(categories) >= 3
 
 
+def test_the_catalogue_is_loaded_from_the_bundled_json_file() -> None:
+    """WEB_DATA_SOURCES is not hand-typed Python: it comes from
+    app/data/web_sources.json, so retiring or adding an entry never touches
+    code."""
+    from app.utils.data_sources import WEB_SOURCES_PATH
+
+    assert WEB_SOURCES_PATH.exists()
+    assert WEB_SOURCES_PATH.name == "web_sources.json"
+
+
+# ----------------------------------------------------------------------
+# The web-source picker: a chevron button whose menu is grouped by category
+# ----------------------------------------------------------------------
+def test_the_web_source_button_pops_up_a_menu_instead_of_a_click(
+    dialog: ImportDataDialog,
+) -> None:
+    assert dialog._web_source_button.menu() is dialog._web_source_menu
+    assert (
+        dialog._web_source_button.popupMode()
+        == dialog._web_source_button.ToolButtonPopupMode.InstantPopup
+    )
+
+
+def test_the_menu_groups_entries_by_category_and_fills_the_url_on_click(
+    dialog: ImportDataDialog,
+) -> None:
+    entry_actions = [
+        entry for entry in dialog._web_source_menu.actions() if not entry.isSeparator()
+    ]
+    assert len(entry_actions) == len(WEB_DATA_SOURCES)
+
+    first = WEB_DATA_SOURCES[0]
+    matching = next(entry for entry in entry_actions if entry.text() == first.name)
+    matching.trigger()
+
+    assert dialog._url.text() == first.url
+    assert dialog._source_mode == "none"
+
+
 # ----------------------------------------------------------------------
 # The dialog: Fetch behaves like Browse
 # ----------------------------------------------------------------------
@@ -184,12 +223,7 @@ def test_fetching_replaces_a_previously_pasted_source(
 def test_picking_a_catalogue_entry_fills_the_url_field_without_fetching(
     dialog: ImportDataDialog,
 ) -> None:
-    index = dialog._web_source_combo.findText(
-        f"{WEB_DATA_SOURCES[0].name} ({WEB_DATA_SOURCES[0].category})"
-    )
-    assert index >= 0
-
-    dialog._web_source_combo.setCurrentIndex(index)
+    dialog._on_web_source_picked(WEB_DATA_SOURCES[0])
 
     assert dialog._url.text() == WEB_DATA_SOURCES[0].url
     # Nothing was downloaded yet - the source has not been loaded.
@@ -242,17 +276,14 @@ def test_the_default_table_name_comes_from_the_catalogue_entry_when_one_matches(
 ) -> None:
     """A random URL-derived name is not a table name a person would
     recognise; the catalogue's own name is."""
-    entry_index = dialog._web_source_combo.findText(
-        f"{WEB_DATA_SOURCES[0].name} ({WEB_DATA_SOURCES[0].category})"
-    )
-    dialog._web_source_combo.setCurrentIndex(entry_index)
+    dialog._on_web_source_picked(WEB_DATA_SOURCES[0])
     dialog._url.setText(f"{local_server}/data.csv")  # override with the fake server
 
     dialog._on_fetch_url()
 
-    # The combo's own entry no longer matches the (overridden) URL, so the
-    # seed falls back to the URL's own file name rather than the catalogue
-    # name - this asserts the fallback path runs without raising.
+    # The picked entry no longer matches the (overridden) URL, so the seed
+    # falls back to the URL's own file name rather than the catalogue name -
+    # this asserts the fallback path runs without raising.
     assert dialog._table.text()
 
 

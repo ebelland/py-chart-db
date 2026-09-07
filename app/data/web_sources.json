@@ -1,0 +1,80 @@
+[
+  {
+    "name": "Iris flower measurements",
+    "url": "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv",
+    "category": "Statistics",
+    "description": "150 rows of petal/sepal measurements across three iris species - the classic dataset for a first scatter or box plot by category."
+  },
+  {
+    "name": "Anscombe's quartet",
+    "url": "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/anscombe.csv",
+    "category": "Mathematics",
+    "description": "Four x/y datasets with nearly identical summary statistics but very different shapes - plot them to see why a fit needs a chart, not just the numbers."
+  },
+  {
+    "name": "World population by country",
+    "url": "https://ourworldindata.org/grapher/population.csv",
+    "category": "Demographics",
+    "description": "Annual population estimates per country and region, from Our World in Data."
+  },
+  {
+    "name": "Life expectancy by country",
+    "url": "https://ourworldindata.org/grapher/life-expectancy.csv",
+    "category": "Health",
+    "description": "Life expectancy at birth, by country and year, from Our World in Data - a long country/year panel for a time series or a map-style comparison."
+  },
+  {
+    "name": "CO2 emissions per capita",
+    "url": "https://ourworldindata.org/grapher/co-emissions-per-capita.csv",
+    "category": "Environment",
+    "description": "Annual CO2 emissions per person, by country and year, from Our World in Data."
+  },
+  {
+    "name": "Titanic passenger manifest",
+    "url": "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/titanic.csv",
+    "category": "Society",
+    "description": "891 passengers - class, age, sex, fare - with who survived: a categorical variable against several continuous ones at once."
+  },
+  {
+    "name": "Diamond prices and cuts",
+    "url": "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/diamonds.csv",
+    "category": "Economics",
+    "description": "53,940 diamonds - carat, cut, colour, clarity, price - big enough to show what a scatter plot looks like with real density in it."
+  },
+  {
+    "name": "Car fuel efficiency",
+    "url": "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/mpg.csv",
+    "category": "Engineering",
+    "description": "398 cars from the 1970s-80s: fuel economy against weight, cylinders and horsepower, by country of origin."
+  },
+  {
+    "name": "Exoplanet discoveries",
+    "url": "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/planets.csv",
+    "category": "Astronomy",
+    "description": "1,035 confirmed exoplanets - orbital period, mass, distance, discovery year and method."
+  },
+  {
+    "name": "Airline passengers, 1949-1960",
+    "url": "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/flights.csv",
+    "category": "Time series",
+    "description": "The classic monthly airline-passenger series, 144 rows - trend and seasonality together, good for Smoothing or Calculus."
+  },
+  {
+    "name": "NBA game results since 1938",
+    "url": "https://raw.githubusercontent.com/fivethirtyeight/data/master/nba-elo/nbaallelo.csv",
+    "category": "Sports",
+    "description": "126,314 games with each team's Elo rating - a large real-world table (about 18 MB) to see the application handle scale."
+  },
+  {
+    "name": "College majors and earnings",
+    "url": "https://raw.githubusercontent.com/fivethirtyeight/data/master/college-majors/recent-grads.csv",
+    "category": "Society",
+    "description": "173 US college majors with employment and median salary by gender share - from FiveThirtyEight."
+  },
+  {
+    "name": "Marvel comic characters",
+    "url": "https://raw.githubusercontent.com/fivethirtyeight/data/master/comic-characters/marvel-wikia-data.csv",
+    "category": "Entertainment",
+    "description": "16,376 characters - alignment, eye and hair colour, sex, first appearance - from FiveThirtyEight's comics dataset."
+  }
+]

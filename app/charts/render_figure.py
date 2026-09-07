@@ -405,6 +405,11 @@ def _create_axes_grid(
     created_by_id: dict[int, Any] = {}
     first_ax: Any | None = None
     gridspec = figure.add_gridspec(rows, cols)
+    # Every axis on either side of a sharex/sharey pairing, deferred to one
+    # label_outer() pass after the loop: an axis created early in the loop
+    # can still gain a shared partner created later, so hiding labels inside
+    # the loop could act on a pairing that had not been discovered yet.
+    shared_axes: set[Any] = set()
 
     for axis_desc, axis_index in axes_with_positions:
         axis_index = int(axis_index)
@@ -440,8 +445,20 @@ def _create_axes_grid(
         axes_flat[axis_index] = ax
         created_by_id[axis_id] = ax
 
+        if "sharex" in kwargs or "sharey" in kwargs:
+            shared_axes.add(ax)
+            shared_axes.update(kwargs[key] for key in ("sharex", "sharey") if key in kwargs)
+
         if first_ax is None:
             first_ax = ax
+
+    # A shared-scale grid reads as one instrument split into panels, not
+    # several unrelated charts that happen to agree - which needs the
+    # repeated tick labels between them gone, not just the numbers agreeing.
+    # Matches Matplotlib's own convention for this (see the sharex/sharey
+    # examples in the subplots_axes_and_figures gallery).
+    for ax in shared_axes:
+        ax.label_outer()
 
     return axes_flat
 
@@ -1047,9 +1064,21 @@ def _normalize_axes_fill_policy(figure: Figure, fig_desc: FigureDescriptor) -> N
 
 
 def _set_layout_engine_safely(figure: Figure, mode: LayoutMode) -> None:
-    """Set Matplotlib layout engine without letting layout failure stop render."""
+    """Set Matplotlib layout engine without letting layout failure stop render.
+
+    ``mode == "none"`` passes Python ``None``, not the string ``"none"``: the
+    two are not equivalent past this call, only right now. The string leaves
+    a ``PlaceHolderLayoutEngine`` in place - matplotlib's own marker that
+    *some* layout engine used to be set - and ``subplots_adjust`` refuses to
+    touch a figure carrying one, forever, no matter how many times "none" is
+    set again. Only actual ``None`` clears the engine outright, which is what
+    switching to manual spacing needs: this figure's chart tab keeps the same
+    Matplotlib Figure across every redraw, so a figure that had ever used
+    "constrained" would otherwise have its manual margins silently ignored
+    from that point on.
+    """
     try:
-        figure.set_layout_engine(mode)
+        figure.set_layout_engine(None if mode == "none" else mode)
     except Exception:
         applogger.exception("Failed to set Matplotlib layout engine: %s", mode)
 

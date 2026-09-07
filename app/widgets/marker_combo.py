@@ -28,6 +28,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QWidget
 
+from app.charts.kwarg_spec import DEFAULT
 from app.widgets.icon_combo import ComboEntry, IconComboBox
 from app.styles.style import create_hidpi_pixmap
 
@@ -38,8 +39,13 @@ _PEN_WIDTH = 1.4
 
 
 # Matplotlib marker entries.
-# Stored value is the exact marker code passed to Matplotlib.
+# Stored value is the exact marker code passed to Matplotlib. "Default" is
+# first and is what a brand-new series should start on: it defers to the
+# active style sheet's marker rcParam rather than this combo hard-coding
+# "None" the moment a series exists - see
+# app.charts.base.BaseAxisRenderer.series_marker.
 _ENTRIES: tuple[ComboEntry, ...] = (
+    ("Default", DEFAULT),
     ("None", ""),
     ("Point .", "."),
     ("Pixel ,", ","),
@@ -468,7 +474,14 @@ def _marker_icon(marker: str) -> QIcon:
     try:
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
 
-        pen = QPen(QColor(_MARKER_COLOR))
+        marker_color = QColor(_MARKER_COLOR)
+        if marker == DEFAULT:
+            # No shape of its own to preview - a faint circle reads as
+            # "unset/inherited" without claiming to be the concrete "Circle"
+            # entry, which is drawn at full strength.
+            marker_color.setAlpha(110)
+
+        pen = QPen(marker_color)
         pen.setWidthF(_PEN_WIDTH)
         pen.setJoinStyle(Qt.PenJoinStyle.MiterJoin)
         painter.setPen(pen)
@@ -476,16 +489,19 @@ def _marker_icon(marker: str) -> QIcon:
         if marker in _STROKE_ONLY:
             painter.setBrush(Qt.BrushStyle.NoBrush)
         else:
-            painter.setBrush(QBrush(QColor(_MARKER_COLOR)))
+            painter.setBrush(QBrush(marker_color))
 
         center = _ICON_SIZE / 2
         radius = _ICON_SIZE * 0.32
 
-        draw = _DRAW_FUNCS.get(marker)
-        if draw is not None:
-            draw(painter, center, center, radius)
+        if marker == DEFAULT:
+            _draw_circle(painter, center, center, radius)
         else:
-            _draw_text_marker(painter, center, center, radius, marker)
+            draw = _DRAW_FUNCS.get(marker)
+            if draw is not None:
+                draw(painter, center, center, radius)
+            else:
+                _draw_text_marker(painter, center, center, radius, marker)
 
     finally:
         painter.end()
