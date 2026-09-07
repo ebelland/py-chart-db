@@ -469,6 +469,11 @@ SERVER_DATABASE_READERS: dict[str, tuple] = {
 #: would otherwise read local disk through it.
 _ALLOWED_WEB_SCHEMES: tuple[str, ...] = ("http", "https")
 
+#: Bytes read from a URL before this gives up. This is a dataset importer,
+#: not a general-purpose downloader: refusing a multi-gigabyte reply is
+#: safer than filling the machine's memory with one.
+WEB_FETCH_MAX_BYTES: int = 200 * 1024 * 1024
+
 #: Content-Type -> the extension read_any_file dispatches on, for a response
 #: whose URL has no recognisable suffix of its own (an API endpoint, a
 #: redirect, a query string with no path).
@@ -531,8 +536,14 @@ def read_web_url(
 
     request = urllib.request.Request(url, headers={"User-Agent": "Data Hub/1.0"})
     with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
-        data = response.read()
         content_type = response.headers.get_content_type()
+        data = response.read(WEB_FETCH_MAX_BYTES + 1)
+
+    if len(data) > WEB_FETCH_MAX_BYTES:
+        raise ValueError(
+            f"Response exceeds the {WEB_FETCH_MAX_BYTES // (1024 * 1024)} MB "
+            "limit for a web import."
+        )
 
     ext = _extension_for_web_source(url, content_type)
     fd, tmp_path = tempfile.mkstemp(suffix=ext)

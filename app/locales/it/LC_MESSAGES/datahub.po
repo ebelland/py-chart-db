@@ -4254,3 +4254,45 @@ msgstr "Salva database con nome"
 
 msgid "Could not save the database as a new file:\n{error}"
 msgstr "Impossibile salvare il database come nuovo file:\n{error}"
+
+msgid "Web source..."
+msgstr "Fonte web..."
+
+msgid "A few ready-made web sources to try - pick one to fill the URL below."
+msgstr "Alcune fonti web pronte all'uso: scegline una per compilare l'URL qui sotto."
+
+msgid "https://example.com/data.csv"
+msgstr "https://esempio.it/dati.csv"
+
+msgid "Fetch"
+msgstr "Scarica"
+
+msgid "Download the data at this web address"
+msgstr "Scarica i dati da questo indirizzo web"
+
+msgid "Web import"
+msgstr "Importazione dal web"
+
+msgid "Could not fetch {url}:\n{error}"
+msgstr "Impossibile scaricare {url}:\n{error}"
+
+msgid "{url} does not look like a web address. It should start with http:// or https://."
+msgstr "{url} non sembra un indirizzo web. Deve iniziare con http:// o https://."
+
+msgid "Layout"
+msgstr "Layout"
+
+msgid "Shared axes (grid)"
+msgstr "Assi condivisi (griglia)"
+
+msgid "Main + secondary (grid)"
+msgstr "Principale + secondari (griglia)"
+
+msgid "Overlapping (twin Y)"
+msgstr "Sovrapposti (Y gemello)"
+
+msgid "Apply layout"
+msgstr "Applica layout"
+
+msgid "Arrange every axis in this figure using the chosen layout"
+msgstr "Disponi tutti gli assi di questa figura secondo il layout scelto"

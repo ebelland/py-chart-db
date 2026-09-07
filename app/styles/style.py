@@ -312,6 +312,14 @@ EXTRA_THEME_ICON_NAMES: frozenset[str] = frozenset(
         # Connecting to a server database: the freedesktop Status icon for
         # network activity, the closest standard name to what this does.
         "network-transmit-receive",
+        # No Qt ThemeIcon enum member covers a grid-of-cells layout icon;
+        # Breeze, Papirus and Adwaita all ship this one for a grid/icon view.
+        "view-grid",
+        # No Qt ThemeIcon enum member covers "fetch this from the web" -
+        # GoDown is a plain navigation arrow, not a download. Breeze,
+        # Papirus and Adwaita all ship this Icon Naming Specification
+        # emblem, originally for a downloads folder.
+        "emblem-downloads",
         "object-select",
         # No icon theme has a chart, and a plotting application's Plot button
         # is the one place a drawing of our own is the honest answer. Breeze
@@ -330,10 +338,6 @@ EXTRA_THEME_ICON_NAMES: frozenset[str] = frozenset(
         # "x-office-spreadsheet" above, this one for LibreOffice Base's .odb.
         "x-office-database",
         "x-office-spreadsheet",
-        # Import from the web: every desktop ships an actual browser under
-        # this name, and a globe is the honest icon for "fetch this from a
-        # URL" regardless of which application answers it.
-        "web-browser",
     }
 )
 

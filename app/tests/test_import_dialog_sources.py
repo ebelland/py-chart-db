@@ -334,8 +334,8 @@ class _FakeResponse:
         self._body = body
         self._content_type = content_type
 
-    def read(self) -> bytes:
-        return self._body
+    def read(self, size: int | None = None) -> bytes:
+        return self._body if size is None else self._body[:size]
 
     @property
     def headers(self):
@@ -366,12 +366,9 @@ def _stub_url(monkeypatch: pytest.MonkeyPatch, body: bytes, content_type: str) -
     )
 
 
-def _type_url(monkeypatch: pytest.MonkeyPatch, url: str, *, ok: bool = True) -> None:
-    from PySide6.QtWidgets import QInputDialog
-
-    monkeypatch.setattr(
-        QInputDialog, "getText", staticmethod(lambda *_a, **_k: (url, ok))
-    )
+def _type_url(dialog, url: str) -> None:
+    """Stand in for typing into the web-source row's URL field."""
+    dialog._url.setText(url)
 
 
 def test_web_urls_reject_every_scheme_but_http_and_https() -> None:
@@ -402,9 +399,9 @@ def test_picking_a_url_fetches_and_parses_it(
     dialog, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _stub_url(monkeypatch, b"region,units\nnorth,10\nsouth,20\n", "text/csv")
-    _type_url(monkeypatch, "https://example.com/sales.csv")
+    _type_url(dialog, "https://example.com/sales.csv")
 
-    dialog._on_import_web()
+    dialog._on_fetch_url()
 
     assert dialog._source_mode == "web"
     assert _columns(dialog) == ["region", "units"]
@@ -413,8 +410,8 @@ def test_picking_a_url_fetches_and_parses_it(
 
 def test_a_web_import_remembers_its_url(dialog, monkeypatch: pytest.MonkeyPatch) -> None:
     _stub_url(monkeypatch, b"region,units\nnorth,10\n", "text/csv")
-    _type_url(monkeypatch, "https://example.com/sales.csv")
-    dialog._on_import_web()
+    _type_url(dialog, "https://example.com/sales.csv")
+    dialog._on_fetch_url()
 
     dialog._on_accept()
 
@@ -427,13 +424,13 @@ def test_a_web_import_remembers_its_url(dialog, monkeypatch: pytest.MonkeyPatch)
     }
 
 
-def test_declining_the_url_prompt_leaves_the_dialog_alone(
-    dialog, csv_file: Path, monkeypatch: pytest.MonkeyPatch
+def test_an_empty_url_field_does_nothing(
+    dialog, csv_file: Path
 ) -> None:
     dialog.load_file(csv_file)
-    _type_url(monkeypatch, "", ok=False)
+    _type_url(dialog, "")
 
-    dialog._on_import_web()
+    dialog._on_fetch_url()
 
     assert dialog._source_mode == "file"
     assert _columns(dialog) == ["region", "units"]
@@ -450,21 +447,27 @@ def test_an_invalid_url_is_rejected_without_touching_the_source(
     )
 
     dialog.load_file(csv_file)
-    _type_url(monkeypatch, "not-a-url")
+    _type_url(dialog, "not-a-url")
 
-    dialog._on_import_web()
+    dialog._on_fetch_url()
 
     assert shown == ["import.web_invalid_url"]
     assert dialog._source_mode == "file"
     assert _columns(dialog) == ["region", "units"]
 
 
+def test_picking_a_quick_source_fills_the_url_field(dialog) -> None:
+    dialog._web_source_combo.setCurrentIndex(1)
+
+    assert dialog._url.text() == dialog._web_source_combo.itemData(1).url
+
+
 def test_opening_a_file_after_a_url_hides_the_table_picker(
     dialog, csv_file: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _stub_url(monkeypatch, b"region,units\nnorth,10\n", "text/csv")
-    _type_url(monkeypatch, "https://example.com/sales.csv")
-    dialog._on_import_web()
+    _type_url(dialog, "https://example.com/sales.csv")
+    dialog._on_fetch_url()
 
     dialog.load_file(csv_file)
 

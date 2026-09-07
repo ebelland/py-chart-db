@@ -25,7 +25,6 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
-    QInputDialog,
     QLineEdit,
     QScrollArea,
     QSpinBox,
@@ -85,6 +84,75 @@ from app.utils.data_sources import (  # noqa: E402
     _extension_for_web_source,
 )
 from app.dialogs.connect_database_dialog import ConnectDatabaseDialog
+
+
+# -----------------------------------------------------------------------------
+# A curated "Web source" quick-pick, on top of a free-typed URL
+# -----------------------------------------------------------------------------
+@dataclass(frozen=True, slots=True)
+class WebDataSource:
+    """One quick-pick entry in the "Web source" dropdown.
+
+    A name and a direct URL, nothing else is fetched or negotiated: every
+    entry here is a plain file - CSV, JSON - the same read_web_url() any
+    typed-in URL goes through handles once it has been downloaded.
+    """
+
+    name: str
+    url: str
+    category: str
+    description: str
+
+
+#: A small, curated set of stable, no-authentication, directly downloadable
+#: reference datasets - one file per URL, no API key and no pagination -
+#: spanning the subjects asked for: statistics, chemistry, and a couple of
+#: the classic datasets mathematics/statistics teaching uses to make a point
+#: about a technique rather than about the numbers themselves.
+#:
+#: Chosen for stability over novelty: raw.githubusercontent.com and PubChem
+#: are both long-lived, unauthenticated endpoints that are unlikely to move
+#: or start requiring a key.  This list is a starting point, not a directory
+#: - the URL prompt still takes any direct CSV/JSON link, typed in by hand.
+WEB_DATA_SOURCES: tuple[WebDataSource, ...] = (
+    WebDataSource(
+        "Iris flower measurements",
+        "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv",
+        "Statistics",
+        "150 rows of petal/sepal measurements across three iris species - "
+        "the classic dataset for a first scatter or box plot by category.",
+    ),
+    WebDataSource(
+        "Anscombe's quartet",
+        "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/anscombe.csv",
+        "Mathematics",
+        "Four x/y datasets with nearly identical summary statistics but "
+        "very different shapes - plot them to see why a fit needs a chart, "
+        "not just the numbers.",
+    ),
+    WebDataSource(
+        "Periodic table of elements",
+        "https://raw.githubusercontent.com/Bowserinator/Periodic-Table-JSON/master/PeriodicTableJSON.json",
+        "Chemistry",
+        "Atomic number, mass, symbol, and other properties for all 118 "
+        "elements.",
+    ),
+    WebDataSource(
+        "Aspirin: computed properties (PubChem)",
+        "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/2244/property/"
+        "MolecularFormula,MolecularWeight,CanonicalSMILES,IUPACName/CSV",
+        "Chemistry",
+        "One compound (CID 2244) from PubChem's public REST API - change "
+        "the CID or the property list in the URL for a different one.",
+    ),
+    WebDataSource(
+        "World population by country",
+        "https://ourworldindata.org/grapher/population.csv",
+        "Statistics",
+        "Annual population estimates per country and region, from Our "
+        "World in Data.",
+    ),
+)
 
 
 # -----------------------------------------------------------------------------
@@ -230,13 +298,45 @@ class ImportDataDialog(QDialog):
                                   action=self._on_import_database,
                                   layout=src_bottom_lay,
                               )
-        self._btn_web = create_action_button(
-                             parent=src_bottom,
-                             action_id="import_web",
-                             action=self._on_import_web,
-                             layout=src_bottom_lay,
-                         )
         src_lay.addWidget(src_bottom)
+
+        # Web row: a quick-pick source (fills the URL field below), the URL
+        # itself, and Fetch. A separate row rather than a modal prompt: a
+        # URL needs to be typed, pasted or picked and then reviewed before
+        # it is fetched, not answered in a single dialog box.
+        src_web = QWidget(src_row)
+        src_web_lay = QHBoxLayout(src_web)
+        stdSizeAndlayout(src_web_lay)
+
+        self._web_source_combo = QComboBox(src_web)
+        self._web_source_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self._web_source_combo.addItem(_("Web source..."), None)
+        for source in WEB_DATA_SOURCES:
+            # Not run through _(): the scanner that checks translation
+            # coverage only sees string literals passed to _(), and these
+            # dataset names/categories are data, not source text - wrapping
+            # a variable in _() here would look translated without being
+            # checked at all.
+            self._web_source_combo.addItem(f"{source.name} ({source.category})", source)
+        self._web_source_combo.setToolTip(
+            _("A few ready-made web sources to try - pick one to fill the URL below.")
+        )
+        self._web_source_combo.currentIndexChanged.connect(self._on_web_source_selected)
+        stdSizeAndlayout(self._web_source_combo)
+        src_web_lay.addWidget(self._web_source_combo)
+
+        self._url = QLineEdit(src_web)
+        self._url.setPlaceholderText(_("https://example.com/data.csv"))
+        stdSizeAndlayout(self._url)
+        src_web_lay.addWidget(self._url, 1)
+
+        self._btn_fetch = create_action_button(
+                               parent=src_web,
+                               action_id="fetch_url",
+                               action=self._on_fetch_url,
+                               layout=src_web_lay,
+                           )
+        src_lay.addWidget(src_web)
 
         form.addRow(_("Source"), src_row)
 
@@ -837,20 +937,32 @@ class ImportDataDialog(QDialog):
         self._set_default_table_name(picker.table)
         self._refresh_preview()
 
-    def _on_import_web(self) -> None:
-        """Ask for a URL, then fetch and import whatever it points to.
+    def _on_web_source_selected(self, _index: int) -> None:
+        """Fill the URL field from the chosen quick-pick source.
+
+        Fills the field rather than fetching immediately: a URL from the
+        catalogue is still a URL, and the person picking it should see it -
+        and be free to edit it, e.g. PubChem's CID - before anything is
+        downloaded.
+        """
+        source = self._web_source_combo.currentData()
+        if source is None:
+            return
+        self._url.setText(source.url)
+        self._url.setToolTip(source.description)
+
+    def _on_fetch_url(self) -> None:
+        """Download the URL in the web-source field and load it as this
+        dialog's web source.
 
         Fetched once as a probe before anything replaces the current source,
         the same way the clipboard is - a typo in the URL or an unreachable
         host must leave the dialog exactly as it was, not clear it first and
         say why afterwards.
         """
-        url, ok = QInputDialog.getText(
-            self, _("Import from web"), _("URL:"), QLineEdit.EchoMode.Normal, self._path if self._source_mode == "web" else ""
-        )
-        if not ok or not url.strip():
+        url = (self._url.text() or "").strip()
+        if not url:
             return
-        url = url.strip()
 
         if not is_valid_web_url(url):
             show_message(self, "import.web_invalid_url")
@@ -880,7 +992,12 @@ class ImportDataDialog(QDialog):
         self._set_file_name_label(url)
         self._update_sheet_choices("")
         self._db_connection = None
-        self._set_default_table_name(filename_from_url(url))
+
+        # A quick-pick source names the table for what it is; a typed-in URL
+        # falls back to its own file name.
+        picked = self._web_source_combo.currentData()
+        table_name_seed = picked.name if picked is not None and picked.url == url else filename_from_url(url)
+        self._set_default_table_name(table_name_seed)
 
         self._refresh_preview()
 

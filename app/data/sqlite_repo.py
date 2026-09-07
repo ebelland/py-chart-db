@@ -2661,6 +2661,63 @@ class SqliteRepo:
                 (by_id[second_id], first_id),
             )
 
+    def apply_axis_layout(
+        self,
+        *,
+        figure_id: int,
+        nrows: int,
+        ncols: int,
+        placements: list[tuple[int, int, dict[str, Any]]],
+    ) -> None:
+        """Rewrite a figure's grid size and every axis's position/options at
+        once - what a layout preset applies in one click.
+
+        *placements* is ``(axis_id, axis_index, option_overrides)`` for every
+        axis of the figure, in any order. An override value of ``None``
+        removes that key from the axis's options rather than storing null,
+        the same convention ``set_axis_options`` callers already follow
+        elsewhere; anything else in the axis's existing options - a colour,
+        a title - is left alone.
+
+        Every axis_index is rewritten together, not one at a time: the
+        UNIQUE(figure_id, axis_index) constraint would reject a plan that
+        gives one axis the index another axis is about to give up, in
+        whichever order a loop happened to touch them. Two passes side-step
+        it the same way :meth:`swap_axis_indexes` does for two axes - here
+        for however many a whole layout touches.
+        """
+        assert self._con is not None
+        if not placements:
+            return
+
+        with self.transaction(immediate=True):
+            self._con.execute(
+                "UPDATE __figure_descriptors__ SET nrows = ?, ncols = ? WHERE id = ?",
+                (int(nrows), int(ncols), int(figure_id)),
+            )
+
+            for offset, (axis_id, _axis_index, _overrides) in enumerate(placements):
+                self._con.execute(
+                    "UPDATE __axis_descriptors__ SET axis_index = ? WHERE id = ?",
+                    (-(offset + 1), int(axis_id)),
+                )
+
+            for axis_id, axis_index, overrides in placements:
+                row = self._con.execute(
+                    "SELECT options_json FROM __axis_descriptors__ WHERE id = ?",
+                    (int(axis_id),),
+                ).fetchone()
+                options = _loads_json(row["options_json"]) if row else {}
+                for key, value in overrides.items():
+                    if value is None:
+                        options.pop(key, None)
+                    else:
+                        options[key] = value
+                self._con.execute(
+                    "UPDATE __axis_descriptors__ SET axis_index = ?, options_json = ? WHERE id = ?",
+                    (int(axis_index), _dumps_json(options), int(axis_id)),
+                )
+
     def close(self) -> None:
         """Close the database connection (call on app shutdown)."""
         con = self._con

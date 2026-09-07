@@ -21,6 +21,13 @@
       "SegoeFluent": "E73E",
       "ThemeIcon": "object-select"
     },
+    "apply_layout_preset": {
+      "text": "Apply layout",
+      "description": "Arrange every axis in this figure using the chosen layout",
+      "SFSymbol": "rectangle.grid.2x2",
+      "SegoeFluent": "E80A",
+      "ThemeIcon": "view-grid"
+    },
     "clear": {
       "text": "Clear",
       "description": "Clear the content",
@@ -108,6 +115,13 @@
       "SegoeFluent": "f232",
       "ThemeIcon": "document-save-as"
     },
+    "fetch_url": {
+      "text": "Fetch",
+      "description": "Download the data at this web address",
+      "SFSymbol": "arrow.down.circle",
+      "SegoeFluent": "E896",
+      "ThemeIcon": "emblem-downloads"
+    },
     "import": {
       "text": "Import",
       "description": "Import data into the database",
@@ -121,13 +135,6 @@
       "SFSymbol": "cylinder",
       "SegoeFluent": "EDA2",
       "ThemeIcon": "x-office-database"
-    },
-    "import_web": {
-      "text": "Web",
-      "description": "Import data from a URL",
-      "SFSymbol": "globe",
-      "SegoeFluent": "E774",
-      "ThemeIcon": "web-browser"
     },
     "infer_params": {
       "text": "Infer from expr",
