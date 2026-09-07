@@ -7,11 +7,9 @@ link can later be refreshed through exactly the same code path.
 """
 from __future__ import annotations
 
-import csv
 import re
 
 from dataclasses import dataclass
-from io import StringIO
 from pathlib import Path
 from collections.abc import Callable
 from typing import Optional
@@ -27,6 +25,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
+    QInputDialog,
     QLineEdit,
     QScrollArea,
     QSpinBox,
@@ -54,191 +53,38 @@ from app.utils.i18n import _
 
 # -----------------------------------------------------------------------------
 # Reading helpers
+#
+# The actual reading - files, another SQLite database, a server database, a
+# URL - lives in app.utils.data_sources, which has no Qt import: it is what
+# app.utils.import_runner.refresh_link calls into headlessly for "Update
+# link", and this dialog calls into live for the preview.  Imported here
+# (rather than qualified as data_sources.whatever at each call site) so that
+# existing external imports of these names from this module - the test suite
+# and app.dialogs.main_window - keep working unchanged.
 # -----------------------------------------------------------------------------
-
-
-#: The default table name for pasted data, and the stand-in for a file path
-#: wherever one is expected.  Named once: it is both what the table is called
-#: and what _safe_table_name_from_filename has to recognise as "not a path".
-CLIPBOARD_SOURCE_NAME: str = "from_clipboard"
-
-
-def sniff_delimiter(sample: str) -> str:
-    """Best-effort delimiter detection."""
-    try:
-        dialect = csv.Sniffer().sniff(sample, delimiters=",\t;| ")
-        return dialect.delimiter
-    except Exception:  # noqa: BLE001
-        candidates = [",", "\t", ";", "|", " "]
-        counts: dict[str, int] = {d: sample.count(d) for d in candidates}
-        return max(candidates, key=lambda d: counts[d])
-
-
-def read_text_file(
-    path: str,
-    *,
-    skiprows: int = 0,
-    skipfooter: int = 0,
-    header: bool = True,
-    encoding: Optional[str] = None,
-    delimiter: Optional[str] = None,
-) -> pd.DataFrame:
-    encodings = [encoding] if encoding else ["utf-8-sig", "utf-8", "cp1252", "latin-1"]
-    encodings = [e for e in encodings if e]
-
-    with open(path, "rb") as f:
-        raw = f.read(64 * 1024)
-
-    sample = ""
-    for enc in encodings:
-        try:
-            sample = raw.decode(enc)
-            break
-        except Exception:  # noqa: BLE001
-            continue
-
-    delim = delimiter or sniff_delimiter(sample)
-    hdr = 0 if header else None
-
-    last_exc: Optional[Exception] = None
-    for enc in encodings:
-        try:
-            return pd.read_csv(
-                path,
-                sep=delim,
-                encoding=enc,
-                skiprows=int(skiprows),
-                skipfooter=int(skipfooter),
-                engine="python" if skipfooter else "c",
-                header=hdr,
-            )
-        except Exception as exc:  # noqa: BLE001
-            last_exc = exc
-
-    applogger.error(f"Failed reading text file: {last_exc}")
-    return pd.DataFrame()
-
-
-def read_clipboard_text(
-    clipboard_text: str,
-    *,
-    skiprows: int = 0,
-    skipfooter: int = 0,
-    header: bool = True,
-    delimiter: Optional[str] = None,
-) -> Optional[pd.DataFrame]:
-    text = (clipboard_text or "").strip("\ufeff\n\r\t ")
-    if not text:
-        return None
-
-    sample = text[:4096]
-    delim = delimiter or sniff_delimiter(sample)
-    hdr = 0 if header else None
-
-    return pd.read_csv(
-        StringIO(text),
-        sep=delim,
-        skiprows=int(skiprows),
-        skipfooter=int(skipfooter),
-        engine="python" if skipfooter else "c",
-        header=hdr,
-    )
-
-
-def read_excel_file(
-    path: str,
-    *,
-    skiprows: int = 0,
-    skipfooter: int = 0,
-    sheet_name: Optional[str] = None,
-    header: bool = True,
-) -> pd.DataFrame:
-    hdr = 0 if header else None
-    df = pd.read_excel(path, sheet_name=sheet_name or 0, skiprows=int(skiprows), header=hdr, engine="openpyxl")
-    if skipfooter:
-        df = df.iloc[: max(0, len(df) - int(skipfooter))]
-    return df
-
-
-def read_json_file(path: str, *, skiprows: int = 0, skipfooter: int = 0) -> pd.DataFrame:
-    try:
-        df = pd.read_json(path)
-    except ValueError:
-        df = pd.read_json(path, lines=True)
-
-    if skiprows:
-        df = df.iloc[int(skiprows) :]
-    if skipfooter:
-        df = df.iloc[: max(0, len(df) - int(skipfooter))]
-    return df
-
-
-def read_xml_file(path: str, *, skiprows: int = 0, skipfooter: int = 0) -> pd.DataFrame:
-    df = pd.read_xml(path)
-    if skiprows:
-        df = df.iloc[int(skiprows) :]
-    if skipfooter:
-        df = df.iloc[: max(0, len(df) - int(skipfooter))]
-    return df
-
-
-#: What the readers above can open, and therefore what the file dialog offers
-#: and what a drop onto the main window is accepted for.  One list: the dialog
-#: filter and the drop test used to be two literals, and a format added to the
-#: reader was a format the window still refused.
-IMPORTABLE_SUFFIXES: tuple[str, ...] = (
-    ".csv", ".tsv", ".txt", ".xlsx", ".xlsm", ".xls", ".json", ".xml",
+from app.utils.data_sources import (  # noqa: E402
+    CLIPBOARD_SOURCE_NAME,
+    DATABASE_FILE_FILTER,
+    DEFAULT_PORTS,
+    IMPORTABLE_SUFFIXES,
+    IMPORT_FILE_FILTER,
+    DatabaseConnection,
+    filename_from_url,
+    is_importable,
+    is_valid_web_url,
+    list_mysql_tables,
+    list_postgres_tables,
+    list_sqlite_tables,
+    read_any_file,
+    read_clipboard_text,
+    read_mysql_table,
+    read_postgres_table,
+    read_sqlite_table,
+    read_web_url,
+    SERVER_DATABASE_READERS,
+    _extension_for_web_source,
 )
-
-#: The same list as a QFileDialog filter.
-IMPORT_FILE_FILTER: str = (
-    "Data files ("
-    + " ".join(f"*{suffix}" for suffix in IMPORTABLE_SUFFIXES)
-    + ");;All files (*.*)"
-)
-
-
-def is_importable(path: str | Path) -> bool:
-    """True when this file is one the import dialog can read."""
-    return (Path(path).suffix or "").lower() in IMPORTABLE_SUFFIXES
-
-
-def read_any_file(
-    path: str,
-    *,
-    skiprows: int,
-    skipfooter: int,
-    header: bool,
-    sheet: Optional[str],
-    delim: Optional[str],
-    encoding: Optional[str],
-) -> pd.DataFrame:
-    ext = (Path(path).suffix or "").lower()
-    if ext in (".csv", ".tsv", ".txt"):
-        return read_text_file(
-            path,
-            skiprows=skiprows,
-            skipfooter=skipfooter,
-            header=header,
-            encoding=encoding,
-            delimiter=delim,
-        )
-    if ext in (".xlsx", ".xlsm", ".xls"):
-        return read_excel_file(path, skiprows=skiprows, skipfooter=skipfooter, sheet_name=sheet, header=header)
-    if ext in (".json",):
-        return read_json_file(path, skiprows=skiprows, skipfooter=skipfooter)
-    if ext in (".xml",):
-        return read_xml_file(path, skiprows=skiprows, skipfooter=skipfooter)
-
-    # fallback: try delimited text
-    return read_text_file(
-        path,
-        skiprows=skiprows,
-        skipfooter=skipfooter,
-        header=header,
-        encoding=encoding,
-        delimiter=delim,
-    )
+from app.dialogs.connect_database_dialog import ConnectDatabaseDialog
 
 
 # -----------------------------------------------------------------------------
@@ -322,13 +168,15 @@ class ImportDataDialog(QDialog):
         self.result: Optional[ImportResult] = None
         self._df: Optional[pd.DataFrame] = None
 
-        # Which of the two sources the preview and the import read from.
-        # Every path that sets one must clear the other, or the dialog shows
-        # one source's data under the other's name - which is exactly what
-        # pasting after opening a file used to do.
-        self._source_mode: str = "none"  # none|file|clipboard
+        # Which of the sources the preview and the import read from. Every
+        # path that sets one must clear the others, or the dialog shows one
+        # source's data under another's name - which is exactly what pasting
+        # after opening a file used to do.
+        self._source_mode: str = "none"  # none|file|clipboard|database|web
         self._clipboard_text: str = ""
         self._path: str = ""
+        self._db_connection: DatabaseConnection | None = None
+        self._db_table_name: str = ""
         self._last_auto_table: str = ""
 
         self.setWindowTitle(_("Import data"))
@@ -346,7 +194,10 @@ class ImportDataDialog(QDialog):
         form = QFormLayout()
         stdSizeAndlayout(form)
 
-        # Source row: path + Browse + Clipboard
+        # Source row: two rows of two buttons, rather than one row of four -
+        # four action buttons at their normal width do not fit the dialog's
+        # default size in one line, and this dialog does not own that width
+        # (the shared "medium" shell size does).
         src_row = QWidget(left)
         src_lay = QVBoxLayout(src_row)
         stdSizeAndlayout(src_lay)
@@ -368,6 +219,24 @@ class ImportDataDialog(QDialog):
                              layout=src_top_lay,
                          )
         src_lay.addWidget(src_top)
+
+        src_bottom = QWidget(src_row)
+        src_bottom_lay = QHBoxLayout(src_bottom)
+        stdSizeAndlayout(src_bottom_lay)
+
+        self._btn_database = create_action_button(
+                                  parent=src_bottom,
+                                  action_id="import_database",
+                                  action=self._on_import_database,
+                                  layout=src_bottom_lay,
+                              )
+        self._btn_web = create_action_button(
+                             parent=src_bottom,
+                             action_id="import_web",
+                             action=self._on_import_web,
+                             layout=src_bottom_lay,
+                         )
+        src_lay.addWidget(src_bottom)
 
         form.addRow(_("Source"), src_row)
 
@@ -636,6 +505,18 @@ class ImportDataDialog(QDialog):
                 show_message(self, "import.clipboard_failed", error=failure)
             return
 
+        if self._source_mode == "database":
+            failure = self._show_frame(self._read_database_source)
+            if failure is not None:
+                show_message(self, "import.database_failed", error=failure)
+            return
+
+        if self._source_mode == "web":
+            failure = self._show_frame(self._read_web_source)
+            if failure is not None:
+                show_message(self, "import.web_failed", error=failure)
+            return
+
         path = (self.file_name or "").strip()
         if not path or not Path(path).exists():
             return
@@ -693,6 +574,30 @@ class ImportDataDialog(QDialog):
             skipfooter=int(self._skip_last.value()),
             header=bool(self._has_header.isChecked()),
             delimiter=self._current_delim(),
+        )
+
+    def _read_database_source(self) -> pd.DataFrame:
+        """Read the currently selected table from the other database."""
+        if self._db_connection is None or not self._db_table_name:
+            return pd.DataFrame()
+        _list_tables, read_table = SERVER_DATABASE_READERS[self._db_connection.kind]
+        return read_table(
+            self._db_connection,
+            self._db_table_name,
+            skiprows=int(self._skip_rows.value()),
+            skipfooter=int(self._skip_last.value()),
+        )
+
+    def _read_web_source(self) -> pd.DataFrame:
+        """Fetch and parse the remembered URL with the current options."""
+        return read_web_url(
+            self._path,
+            skiprows=int(self._skip_rows.value()),
+            skipfooter=int(self._skip_last.value()),
+            header=bool(self._has_header.isChecked()),
+            sheet=self._current_sheet(),
+            delim=self._current_delim(),
+            encoding=self._current_encoding(),
         )
 
     def _read_source(self, path: str) -> pd.DataFrame:
@@ -859,6 +764,7 @@ class ImportDataDialog(QDialog):
         self._set_default_table_name(name)
         self._path = name
         self._update_sheet_choices(name)
+        self._db_connection = None
 
         # Auto preview immediately: the file was chosen, not typed.
         self._refresh_preview()
@@ -902,7 +808,79 @@ class ImportDataDialog(QDialog):
         self._path = ""
         self._set_file_name_label("")
         self._update_sheet_choices("")
+        self._db_connection = None
         self._set_default_table_name(CLIPBOARD_SOURCE_NAME)
+
+        self._refresh_preview()
+
+    def _on_import_database(self) -> None:
+        """Connect to another database, then import one of its tables.
+
+        Connecting and picking a table both happen in ConnectDatabaseDialog -
+        not the application's own ``self._repo``: this dialog only ever reads
+        a table out of a *different* database into the current one. That
+        dialog's own error handling covers a failed connection or a database
+        with nothing in it, so a plain cancel is the only outcome to handle
+        here.
+        """
+        picker = ConnectDatabaseDialog(self)
+        if not picker.exec() or picker.connection is None or not picker.table:
+            return
+
+        self._source_mode = "database"
+        self._db_connection = picker.connection
+        self._db_table_name = picker.table
+        self._path = ""
+        self._set_file_name_label(f"{picker.connection.display_name()} · {picker.table}")
+        self._update_sheet_choices("")
+
+        self._set_default_table_name(picker.table)
+        self._refresh_preview()
+
+    def _on_import_web(self) -> None:
+        """Ask for a URL, then fetch and import whatever it points to.
+
+        Fetched once as a probe before anything replaces the current source,
+        the same way the clipboard is - a typo in the URL or an unreachable
+        host must leave the dialog exactly as it was, not clear it first and
+        say why afterwards.
+        """
+        url, ok = QInputDialog.getText(
+            self, _("Import from web"), _("URL:"), QLineEdit.EchoMode.Normal, self._path if self._source_mode == "web" else ""
+        )
+        if not ok or not url.strip():
+            return
+        url = url.strip()
+
+        if not is_valid_web_url(url):
+            show_message(self, "import.web_invalid_url")
+            return
+
+        try:
+            probe = read_web_url(
+                url,
+                skiprows=int(self._skip_rows.value()),
+                skipfooter=int(self._skip_last.value()),
+                header=bool(self._has_header.isChecked()),
+                sheet=None,
+                delim=self._current_delim(),
+                encoding=self._current_encoding(),
+            )
+        except Exception as exc:  # noqa: BLE001
+            applogger.exception("Web import failed: %s", exc)
+            show_message(self, "import.web_failed", error=exc)
+            return
+
+        if probe is None or probe.empty:
+            show_message(self, "import.nothing_to_import")
+            return
+
+        self._source_mode = "web"
+        self._path = url
+        self._set_file_name_label(url)
+        self._update_sheet_choices("")
+        self._db_connection = None
+        self._set_default_table_name(filename_from_url(url))
 
         self._refresh_preview()
 
@@ -945,9 +923,26 @@ class ImportDataDialog(QDialog):
         try:
             table_name=self._safe_table_name_from_filename(table)
             self._repo.import_into_sqlite(table_name, df2, types)
-            if self._source_mode == "file":
-                cfg=get_import_data_dialog_config()
-                if not self._repo.upsert_link(table_name= table_name, source_path=self._path, settings=cfg):
+
+            source = self._link_source_settings()
+            if source is not None:
+                link_settings = {
+                    "source": source,
+                    "read": {
+                        "skiprows": int(self._skip_rows.value()),
+                        "skip_last": int(self._skip_last.value()),
+                        "header": bool(self._has_header.isChecked()),
+                        "delimiter": self._current_delim(),
+                        "encoding": self._current_encoding(),
+                    },
+                    "destination": {"table": table_name, "normalize_columns": True},
+                    "columns": {"types": types},
+                }
+                if not self._repo.upsert_link(
+                    table_name=table_name,
+                    source_path=self._link_display_path(),
+                    settings=link_settings,
+                ):
                     applogger.warning("Failed to create link for imported table '%s'", table_name)
         except Exception as exc:  # noqa: BLE001
             applogger.exception("Import failed: %s", exc)
@@ -956,6 +951,30 @@ class ImportDataDialog(QDialog):
 
         self.result = ImportResult(table_name=table, rows=int(len(df2)), cols=int(len(df2.columns)))
         self.accept()
+
+    def _link_source_settings(self) -> dict[str, object] | None:
+        """Return the ``source`` dict a saved link should remember, or None.
+
+        Every source that can meaningfully be read again gets one - file,
+        another database, a URL. Pasted text cannot: there is nothing left
+        to reread once the clipboard has moved on, so "Update link" has
+        nothing to offer it and none is created.
+        """
+        if self._source_mode == "file":
+            return {"kind": "file", "path": self._path, "sheet": self._current_sheet()}
+        if self._source_mode == "database" and self._db_connection is not None:
+            settings = self._db_connection.to_link_settings()
+            settings["table"] = self._db_table_name
+            return settings
+        if self._source_mode == "web":
+            return {"kind": "web", "url": self._path}
+        return None
+
+    def _link_display_path(self) -> str:
+        """Return the display string a saved link is listed under."""
+        if self._source_mode == "database" and self._db_connection is not None:
+            return f"{self._db_connection.display_name()}#{self._db_table_name}"
+        return self._path
 
     @staticmethod
     def _coerce_df(df: pd.DataFrame, types: dict[str, str]) -> pd.DataFrame:

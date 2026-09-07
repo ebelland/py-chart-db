@@ -36,6 +36,13 @@
       "SegoeFluent": "E711",
       "ThemeIcon": "window-close"
     },
+    "connect_database": {
+      "text": "Connect",
+      "description": "Connect to the database and list its tables",
+      "SFSymbol": "antenna.radiowaves.left.and.right",
+      "SegoeFluent": "E703",
+      "ThemeIcon": "network-transmit-receive"
+    },
     "copy": {
       "text": "Copy",
       "description": "Copy to the clipboard",
@@ -46,7 +53,7 @@
     },
     "create_demo": {
       "text": "Create demo",
-      "description": "Build one of the shipped demo projects and open it",
+      "description": "Create one of the shipped demo projects and open it",
       "SFSymbol": "wand.and.stars",
       "SegoeFluent": "e8a5",
       "ThemeIcon": "document-new"
@@ -107,6 +114,20 @@
       "SFSymbol": "square.and.arrow.down",
       "SegoeFluent": "E8B5",
       "ThemeIcon": "document-open"
+    },
+    "import_database": {
+      "text": "Database",
+      "description": "Import a table from another SQLite database",
+      "SFSymbol": "cylinder",
+      "SegoeFluent": "EDA2",
+      "ThemeIcon": "x-office-database"
+    },
+    "import_web": {
+      "text": "Web",
+      "description": "Import data from a URL",
+      "SFSymbol": "globe",
+      "SegoeFluent": "E774",
+      "ThemeIcon": "web-browser"
     },
     "infer_params": {
       "text": "Infer from expr",
@@ -372,6 +393,13 @@
       "SegoeFluent": "e70e",
       "ThemeIcon": "go-up"
     },
+    "user_manual": {
+      "text": "User manual",
+      "description": "Open the user manual",
+      "SFSymbol": "book",
+      "SegoeFluent": "E897",
+      "ThemeIcon": "help-contents"
+    },
     "zoom_fit": {
       "text": "Zoom to fit",
       "description": "Fit the whole chart in the panel",
@@ -426,6 +454,11 @@
       "title": "Database check",
       "text": "{report}"
     },
+    "database.connection_missing_file": {
+      "level": "warning",
+      "title": "Connect to database",
+      "text": "Enter the path to a SQLite database file."
+    },
     "database.create_failed": {
       "level": "error",
       "title": "New database",
@@ -444,7 +477,7 @@
     "demo.build_failed": {
       "level": "error",
       "title": "Create demo",
-      "text": "Could not build the demo project:\n{error}"
+      "text": "Could not create the demo project:\n{error}"
     },
     "import.clipboard_empty": {
       "level": "info",
@@ -455,6 +488,31 @@
       "level": "error",
       "title": "Clipboard",
       "text": "Could not read the clipboard:\n{error}"
+    },
+    "import.database_failed": {
+      "level": "error",
+      "title": "Import from database",
+      "text": "Could not read from the database:\n{error}"
+    },
+    "import.database_no_tables": {
+      "level": "warning",
+      "title": "Import from database",
+      "text": "This database has no tables to import."
+    },
+    "import.database_no_table_selected": {
+      "level": "warning",
+      "title": "Import from database",
+      "text": "Select a table to import."
+    },
+    "import.web_failed": {
+      "level": "error",
+      "title": "Import from web",
+      "text": "Could not fetch the data:\n{error}"
+    },
+    "import.web_invalid_url": {
+      "level": "warning",
+      "title": "Import from web",
+      "text": "Enter a valid http:// or https:// URL."
     },
     "import.failed": {
       "level": "error",
@@ -480,6 +538,11 @@
       "level": "error",
       "title": "Preview",
       "text": "Could not build the preview:\n{error}"
+    },
+    "manual.unavailable": {
+      "level": "warning",
+      "title": "User manual",
+      "text": "The user manual could not be opened:\n{path}"
     },
     "preview.add_column_failed": {
       "level": "error",

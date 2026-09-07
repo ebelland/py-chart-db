@@ -1,14 +1,17 @@
-"""Execute file imports and refresh saved import links.
+"""Execute imports and refresh saved import links.
 
-``execute_import`` is the single path from a file on disk into a database table:
-read, apply per-column type overrides and ignores, then hand the frame to the
-repository.  ``refresh_link`` re-runs a previously saved import, always
-replacing the destination table so a refresh cannot silently append duplicates.
+``execute_import`` is the single path from any source - a file, another
+database, a URL - into a database table: read, apply per-column type
+overrides and ignores, then hand the frame to the repository. The reading
+itself is ``app.utils.data_sources.read_from_link_source``, dispatching on
+``settings["source"]["kind"]``, so a link is refreshed exactly the way its
+source would be previewed live in the import dialog. ``refresh_link``
+re-runs a previously saved import, always replacing the destination table so
+a refresh cannot silently append duplicates.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, cast
 
 import pandas as pd
@@ -16,6 +19,7 @@ from pandas._typing import DtypeArg
 
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
+from app.utils.data_sources import read_from_link_source
 
 
 @dataclass(slots=True)
@@ -24,48 +28,6 @@ class LinkRefreshResult:
     table_name: str
     rows: int
     cols: int
-
-
-def read_any_file(
-    path: str,
-    *,
-    sheet: str | None,
-    skiprows: int,
-    skip_last: int,
-    header: bool,
-    encoding: str | None,
-    delimiter: str | None,
-) -> pd.DataFrame:
-    """Read a file into a DataFrame based on extension."""
-    p = Path(path)
-    suffix = p.suffix.lower()
-    header_row = 0 if header else None
-
-    if suffix in {".xlsx", ".xlsm", ".xls"}:
-        df = pd.read_excel(
-            str(p),
-            sheet_name=sheet if sheet else 0,
-            skiprows=skiprows,
-            header=header_row,
-            engine=("openpyxl" if suffix in {".xlsx", ".xlsm"} else None),
-        )
-    else:
-        df = pd.read_csv(
-            str(p),
-            sep=delimiter or ",",
-            skiprows=skiprows,
-            header=header_row,
-            encoding=None if encoding is None or encoding== 'auto' else encoding,
-            engine="c",
-        )
-
-    if not header:
-        df.columns = [f"col_{i + 1}" for i in range(len(df.columns))]
-
-    if skip_last > 0:
-        df = df.iloc[:-skip_last] if len(df) > skip_last else df.iloc[0:0]
-
-    return df
 
 
 def _convert_datetime(series: pd.Series, kind: str) -> pd.Series:
@@ -91,27 +53,21 @@ def execute_import(
     *,
     settings: dict[str, Any],
     link_id: int | None = None,  # kept for compatibility with older callers
+    password: str | None = None,
 ) -> tuple[int, int]:
-    """Execute an import from a settings dict. Returns (rows, cols)."""
+    """Execute an import from a settings dict. Returns (rows, cols).
+
+    ``password`` is only ever needed for a PostgreSQL or MySQL source - see
+    ``app.utils.data_sources.DatabaseConnection`` for why it is never part of
+    ``settings`` itself, and raises ``MissingPasswordError`` when the source
+    needs one and none was given, for the caller to catch and ask for.
+    """
     source = cast(dict[str, Any], settings.get("source", {}))
     read = cast(dict[str, Any], settings.get("read", {}))
     dest = cast(dict[str, Any], settings.get("destination", {}))
     columns = cast(dict[str, Any], settings.get("columns", {}))
 
-    path = cast(str | None, source.get("path"))
-    if not path:
-        applogger.error("Missing source path")
-        return 0, 0
-
-    df = read_any_file(
-        path,
-        sheet=cast(str | None, source.get("sheet")),
-        skiprows=int(read.get("skiprows", 0)),
-        skip_last=int(read.get("skip_last", 0)),
-        header=bool(read.get("header", True)),
-        encoding=cast(str | None, read.get("encoding")),
-        delimiter=cast(str | None, read.get("delimiter")),
-    )
+    df = read_from_link_source(source, read, password=password)
 
     col_types = cast(dict[str, str], columns.get("types", {}))
 
@@ -148,49 +104,64 @@ def execute_import(
     return int(rows), int(df.shape[1])
 
 
-def refresh_link(repo: SqliteRepo, *, link_id: int) -> LinkRefreshResult:
+def refresh_link(
+    repo: SqliteRepo, *, link_id: int, password: str | None = None
+) -> LinkRefreshResult:
     """Refresh a link by re-importing its stored settings.
 
     SqliteRepo.get_import_link() returns a dict with keys:
       - table_name: destination table name
-      - source_path: file path
-      - settings: JSON dict saved from ImportDataDialog
+      - source_path: a display string only - see app.data.sqlite_repo.upsert_link
+      - settings: the structured JSON dict saved from ImportDataDialog
 
-    ImportDataDialog stores a *flat* config dict (table/header/skip_rows/skip_last/delim/encoding/sheet).
-    execute_import() expects a structured dict. This function maps the flat config accordingly.
+    A link saved before ``settings["source"]["kind"]`` existed carries the
+    *flat* config dict ImportDataDialog used to save instead (table/header/
+    skip_rows/skip_last/delim/encoding/sheet), with the file path in its own
+    ``source_path`` column rather than inside ``settings`` - adapted to the
+    structured shape here, once, rather than asking every older project's
+    links to be rewritten.
     """
     link = repo.get_import_link(int(link_id))
 
     table_name = cast(str, link.get("table_name"))
-    source_path = cast(str, link.get("source_path"))
-    cfg = cast(dict[str, Any], link.get("settings", {}))
+    raw_settings = cast(dict[str, Any], link.get("settings", {}))
 
-    if not source_path:
-        applogger.error("Link has no source path")
     if not table_name:
         applogger.error("Link has no table name")
 
-    settings: dict[str, Any] = {
-        "source": {
-            "path": source_path,
-            "sheet": cast(str | None, cfg.get("sheet")) or None,
-        },
-        "read": {
-            "skiprows": int(cfg.get("skip_rows", 0) or 0),
-            "skip_last": int(cfg.get("skip_last", 0) or 0),
-            "header": bool(cfg.get("header", True)),
-            "encoding": cast(str | None, cfg.get("encoding")) or None,
-            "delimiter": cast(str | None, cfg.get("delim")) or None,
-        },
-        "destination": {
-            "table": table_name,
-            "normalize_columns": True,
-        },
-        "columns": cast(dict[str, Any], cfg.get("columns", {}))
-        or {"types": cast(dict[str, str], cfg.get("types", {}))},
-    }
+    if "source" in raw_settings:
+        settings: dict[str, Any] = dict(raw_settings)
+        destination = dict(cast(dict[str, Any], settings.get("destination") or {}))
+        destination.setdefault("table", table_name)
+        destination.setdefault("normalize_columns", True)
+        settings["destination"] = destination
+    else:
+        source_path = cast(str, link.get("source_path") or "")
+        if not source_path:
+            applogger.error("Link has no source path")
+        settings = {
+            "source": {
+                "kind": "file",
+                "path": source_path,
+                "sheet": cast(str | None, raw_settings.get("sheet")) or None,
+            },
+            "read": {
+                "skiprows": int(raw_settings.get("skip_rows", 0) or 0),
+                "skip_last": int(raw_settings.get("skip_last", 0) or 0),
+                "header": bool(raw_settings.get("header", True)),
+                "encoding": cast(str | None, raw_settings.get("encoding")) or None,
+                "delimiter": cast(str | None, raw_settings.get("delim")) or None,
+            },
+            "destination": {
+                "table": table_name,
+                "normalize_columns": True,
+            },
+            "columns": {"types": cast(dict[str, str], raw_settings.get("types", {}))},
+        }
 
-    rows, cols = execute_import(repo, settings=settings, link_id=int(link_id))
+    rows, cols = execute_import(
+        repo, settings=settings, link_id=int(link_id), password=password
+    )
 
     return LinkRefreshResult(
         link_id=int(link_id),

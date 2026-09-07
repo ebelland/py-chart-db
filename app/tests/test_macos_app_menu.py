@@ -110,12 +110,14 @@ def test_the_menu_holds_every_item_the_popup_has(window: MainWindow) -> None:
     assert ids == [
         "new",
         "open",
+        "save_as",
         "import",
         "query_builder",
         "create_demo",
         "optimize_db",
         "settings",
         "log_viewer",
+        "user_manual",
         "credits",
     ]
 

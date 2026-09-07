@@ -1,36 +1,48 @@
-"""Build a demo ``.dhub`` project showing what the application can do.
+"""Build the shipped demo set from the real sample data in ``sample data/``.
 
-Shipped rather than kept with the tests, because the application offers it:
-the first run of a fresh install has no database, and an empty one shows
-nothing at all - so startup offers to build this instead (see
-``app/utils/startup.py``).
+The demo used to be synthetic data generated fresh on every click of "Create
+demo" - four batches of `rng.normal`, a peak placed exactly where the Fit
+dialog needed one. That showed the chart types, but nothing in it was a
+dataset anyone would recognise, and generating it on demand meant "Create
+demo" could only ever be as fast as the slowest table it built.
 
-Run it directly::
+The demo set is built ahead of time instead, from the CSV and Excel files
+under ``sample data/`` at the repository root - real, ordinary datasets
+(Palmer penguins, a stock's daily close, a DLVO force curve, the classic
+driver-clustering set) each shaped for a chart type or a Series Operations
+tool. Run this module directly, or the thin wrapper at the repository root::
 
-    python -m app.data.demo_project --output "Demo Project.dhub"
+    python _make_demo_project.py
 
-Everything is written through :class:`SqliteRepo`, not by hand-crafted SQL, so
-the demo exercises the same code path the application uses and cannot drift
-from the real schema.  The data is synthetic but shaped like real measurements
-- a sensor network with drift and outages, a batch process with per-batch
-spread, a calibration run with measurement uncertainty - because a demo made of
-random noise shows the chart types without showing what they are *for*.
+which writes one ``.dhub`` file per subject into ``demo/`` - see
+:data:`DEMO_DIR`. The running application never calls :func:`build_demo_project`
+itself; ``Create demo`` copies the pre-built file instead, through
+:func:`copy_demo_project`. Only this module and the tests that check its
+output need pandas' read_csv/read_excel machinery.
 """
 from __future__ import annotations
 
 import argparse
-from collections.abc import Sequence
-from dataclasses import dataclass
+import shutil
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
-import numpy as np
 import pandas as pd
 
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
 
-SEED = 20260101
+#: The repository root: three levels above this file (app/data/demo_project.py).
+REPO_ROOT: Path = Path(__file__).resolve().parents[2]
+
+#: Where the source CSV/Excel files live.
+SAMPLE_DATA_DIR: Path = REPO_ROOT / "sample data"
+
+#: Where the built demo set is written, and where "Create demo" reads it from.
+#: Not version-controlled (see .gitignore's ``*.dhub``): every environment
+#: that wants the demo set runs this module once to build it.
+DEMO_DIR: Path = REPO_ROOT / "demo"
 
 # A calm, print-friendly style applied to every figure in the demo.
 DEMO_STYLE = """
@@ -76,7 +88,7 @@ class FigureSpec:
 
     ``key`` names it for a demo project's figure list, and ``tables`` says
     what it reads - which is what lets a single-subject demo file carry only
-    the tables its own charts need instead of all six.
+    the tables its own charts need instead of all twelve.
     """
 
     name: str
@@ -92,558 +104,463 @@ class FigureSpec:
 
 
 # ----------------------------------------------------------------------
-# Data
+# Data: one loader per table, each reading a file under sample data/
 # ----------------------------------------------------------------------
-def _sensor_network(rng: np.random.Generator, hours: int = 24 * 6) -> pd.DataFrame:
-    """Three sensors sampled hourly: daily cycle, drift, and one outage."""
-    time = np.arange(hours, dtype=float)
-    daily = np.sin(2.0 * np.pi * time / 24.0)
-
-    rows: list[pd.DataFrame] = []
-    for index, (sensor, offset, drift, noise) in enumerate(
-        [("north", 18.0, 0.004, 0.35), ("south", 21.5, -0.002, 0.30), ("roof", 16.0, 0.010, 0.55)]
-    ):
-        values = offset + 4.0 * daily + drift * time + rng.normal(0.0, noise, hours)
-
-        # One sensor loses power for a day and a half; the time-series renderer
-        # draws that as a gap rather than a straight line through it.
-        if sensor == "roof":
-            values[24 * 3 : 24 * 3 + 20] = np.nan
-
-        rows.append(
-            pd.DataFrame(
-                {
-                    "hour": time,
-                    "sensor": sensor,
-                    "temperature": values,
-                    "humidity": 55.0 + 8.0 * np.cos(2 * np.pi * time / 24.0 + index)
-                    + rng.normal(0.0, 1.2, hours),
-                }
-            )
-        )
-
-    frame = pd.concat(rows, ignore_index=True)
-    return frame.dropna(subset=["temperature"]).reset_index(drop=True)
+def _antibiotics() -> pd.DataFrame:
+    """Sixteen bacteria against three antibiotics - Neomycin, Penicillin and
+    Streptomycin - and the Gram stain that turns out to explain the pattern."""
+    frame = pd.read_csv(SAMPLE_DATA_DIR / "Antibiotics.csv")
+    frame.columns = [str(c).strip().lower() for c in frame.columns]
+    return frame
 
 
-def _calibration(rng: np.random.Generator, points: int = 12) -> pd.DataFrame:
-    """A calibration curve with asymmetric, level-dependent uncertainty."""
-    applied = np.linspace(0.0, 100.0, points)
-    measured = 0.98 * applied + 1.2 + rng.normal(0.0, 0.6, points)
+def _penguins() -> pd.DataFrame:
+    """The Palmer penguins, minus the handful of rows missing a measurement."""
+    frame = pd.read_csv(SAMPLE_DATA_DIR / "penguins.csv")
+    return frame.dropna(
+        subset=["bill_length_mm", "bill_depth_mm", "flipper_length_mm", "body_mass_g"]
+    ).reset_index(drop=True)
 
-    # Uncertainty grows with the reading and is not symmetric: the instrument
-    # under-reads more than it over-reads at the top of its range.
-    scale = 0.4 + 0.02 * applied
-    return pd.DataFrame(
-        {
-            "applied": applied,
-            "measured": measured,
-            "err_low": scale * rng.uniform(0.8, 1.4, points),
-            "err_high": scale * rng.uniform(0.4, 0.9, points),
-            "applied_err": np.full(points, 0.5),
+
+def _yeast() -> pd.DataFrame:
+    """Yeast protein measurements, with their localisation class."""
+    frame = pd.read_csv(SAMPLE_DATA_DIR / "Yeast1141.csv")
+    frame.columns = [
+        str(c).strip().lower().replace(" ", "_") for c in frame.columns
+    ]
+    return frame
+
+
+def _dlvo_curve() -> pd.DataFrame:
+    """A DLVO force-distance curve: repulsive at short range, attractive
+    beyond it. Already clean - column names are the physical quantities."""
+    return pd.read_csv(SAMPLE_DATA_DIR / "dlvo_standalone_output.csv")
+
+
+def _stock_prices() -> pd.DataFrame:
+    """Daily OHLC for three tickers, kept down to date/close/stock."""
+    frame = pd.read_csv(SAMPLE_DATA_DIR / "hello-world-stock.csv")
+    frame = frame.rename(columns={"Date": "date", "Close": "close", "Stock": "stock"})
+    return frame[["date", "close", "stock"]]
+
+
+def _employee_compensation() -> pd.DataFrame:
+    """Salaries across five departments, with one genuine outlier."""
+    return pd.read_csv(SAMPLE_DATA_DIR / "outlier_sample_dataset.csv")
+
+
+def _driver_behaviour() -> pd.DataFrame:
+    """The classic two-feature driver-clustering dataset."""
+    frame = pd.read_csv(SAMPLE_DATA_DIR / "Clustering.csv")
+    return frame.rename(
+        columns={
+            "Driver_ID": "driver_id",
+            "Distance_Feature": "distance_feature",
+            "Speeding_Feature": "speeding_feature",
         }
-    )
+    )[["driver_id", "distance_feature", "speeding_feature"]]
 
 
-def _batches(rng: np.random.Generator, per_batch: int = 220) -> pd.DataFrame:
-    """Four production batches with different spread and one skewed batch."""
-    rows: list[pd.DataFrame] = []
-    for index, batch in enumerate(("A", "B", "C", "D")):
-        if batch == "D":
-            # A skewed batch is what makes a violin say something a box cannot.
-            values = 48.0 + rng.gamma(shape=2.0, scale=2.4, size=per_batch)
-        else:
-            values = rng.normal(50.0 + 1.5 * index, 1.2 + 0.5 * index, per_batch)
-        rows.append(pd.DataFrame({"batch": batch, "yield_pct": values}))
-    return pd.concat(rows, ignore_index=True)
+def _transactions() -> pd.DataFrame:
+    """Card, online, mobile and branch transactions, a small fraction fraud."""
+    return pd.read_csv(SAMPLE_DATA_DIR / "synthetic_balancing_resampling_dataset.csv")
 
 
-def _throughput(rng: np.random.Generator) -> pd.DataFrame:
-    """Monthly throughput per line, with a measurement error per bar."""
-    months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
-    base = np.array([120.0, 138.0, 131.0, 155.0, 168.0, 162.0])
-    return pd.DataFrame(
-        {
-            "month": months,
-            "throughput": base + rng.normal(0.0, 3.0, len(months)),
-            "throughput_err": rng.uniform(3.0, 9.0, len(months)),
-        }
-    )
+def _pairwise_sample() -> pd.DataFrame:
+    """Two coordinates plus a colour and a marker size - built for a scatter
+    plot with every optional role in use."""
+    return pd.read_excel(SAMPLE_DATA_DIR / "pairwise_sample.xlsx")
 
 
-def _particles(rng: np.random.Generator, count: int = 4000) -> pd.DataFrame:
-    """Two overlapping particle populations, for a multi-dataset histogram."""
-    fine = rng.lognormal(mean=1.1, sigma=0.35, size=count)
-    coarse = rng.lognormal(mean=2.0, sigma=0.30, size=count // 2)
-    return pd.DataFrame(
-        {
-            "population": ["fine"] * count + ["coarse"] * (count // 2),
-            "diameter_um": np.concatenate([fine, coarse]),
-        }
-    )
+def _surface_grid() -> pd.DataFrame:
+    """A smooth surface on a regular 40x40 x/y grid."""
+    return pd.read_excel(SAMPLE_DATA_DIR / "sample_3d_surface.xlsx")
 
 
-def _scatter_cloud(rng: np.random.Generator, count: int = 2500) -> pd.DataFrame:
-    """A correlated cloud with a continuous colour and a size channel."""
-    cloud = rng.multivariate_normal([0.0, 0.0], [[1.0, 0.72], [0.72, 1.0]], size=count)
-    energy = np.hypot(cloud[:, 0], cloud[:, 1])
-    return pd.DataFrame(
-        {
-            "pressure": 40.0 + 6.0 * cloud[:, 0],
-            "flow": 12.0 + 2.4 * cloud[:, 1],
-            "energy": energy,
-            "weight": 12.0 + 40.0 * (energy / energy.max()),
-        }
-    )
+def _scattered_surface() -> pd.DataFrame:
+    """The same kind of surface, sampled at 200 scattered (non-gridded)
+    points - what the triangulated Surface Plot (Scattered) is for."""
+    return pd.read_excel(SAMPLE_DATA_DIR / "sample_3d_scatter.xlsx")
+
+
+def _parametric_curve() -> pd.DataFrame:
+    """A helix: x=cos(t), y=sin(t), z=t. Read as x against y, it is a circle
+    coloured by how far along the curve each point is."""
+    return pd.read_excel(SAMPLE_DATA_DIR / "sample_3d_parametric.xlsx")
+
+
+#: Table name -> the function that loads it. A demo file writes only the
+#: tables its own figures read, which is what keeps a single-subject demo
+#: small enough to open and understand.
+TABLE_SOURCES: dict[str, Callable[[], pd.DataFrame]] = {
+    "antibiotics": _antibiotics,
+    "penguins": _penguins,
+    "yeast": _yeast,
+    "dlvo_curve": _dlvo_curve,
+    "stock_prices": _stock_prices,
+    "employee_compensation": _employee_compensation,
+    "driver_behaviour": _driver_behaviour,
+    "transactions": _transactions,
+    "pairwise_sample": _pairwise_sample,
+    "surface_grid": _surface_grid,
+    "scattered_surface": _scattered_surface,
+    "parametric_curve": _parametric_curve,
+}
+
+#: Saved query name -> its SQL, and the table it reads.
+QUERY_SOURCES: dict[str, tuple[str, str]] = {
+    "avg_amount_by_channel": (
+        "SELECT channel AS X, AVG(transaction_amount) AS Y, COUNT(*) AS n "
+        "FROM transactions GROUP BY channel ORDER BY Y DESC",
+        "transactions",
+    ),
+}
 
 
 # ----------------------------------------------------------------------
 # Figures
 # ----------------------------------------------------------------------
-def _process_run(rng: np.random.Generator, count: int = 120) -> pd.DataFrame:
-    """A measured process that shifts part-way through.
-
-    Shaped for the Control Chart operation, and shifted on purpose: limits
-    built from the *overall* spread would be wide enough to contain the shift
-    and would declare the process fine, which is the mistake the operation
-    exists to avoid. A demo that only shows a stable process cannot show that.
-    """
-    values = rng.normal(50.0, 1.0, count)
-    values[80:] += 2.5
-
-    return pd.DataFrame(
-        {
-            "sample": np.arange(1, count + 1, dtype=int),
-            "measurement": values,
-        }
-    )
-
-
-def _peak_scan(rng: np.random.Generator, points: int = 240) -> pd.DataFrame:
-    """One peak on a sloping baseline, with noise.
-
-    Shaped for the Fit operation: a Gaussian sitting at x=8.2 rather than at
-    the origin, because that is where a starting point read off the data earns
-    its keep - the declared default puts the curve where there is no signal at
-    all and a local optimiser has no gradient to follow.
-    """
-    x = np.linspace(0.0, 20.0, points)
-    peak = 5.2 * np.exp(-((x - 8.2) ** 2) / (2.0 * 0.9**2))
-    baseline = 1.4 + 0.06 * x
-
-    return pd.DataFrame(
-        {
-            "wavelength_nm": x,
-            "intensity": peak + baseline + rng.normal(0.0, 0.05, points),
-        }
-    )
-
-
-def _wafer_map(rng: np.random.Generator, side: int = 41) -> pd.DataFrame:
-    """Film thickness measured on a regular grid across a 300mm wafer.
-
-    A complete x/y grid, which is what the gridded Surface Plot needs, and
-    the case its circular_mask option exists for: the measurements cover the
-    square grid, but a wafer is round, so the corners are outside the wafer
-    rather than zero-thickness parts of it.
-
-    The shape is a shallow dome (thicker at the centre, as a spin-coated
-    film tends to be) plus a radial ripple, so the surface has something to
-    show at both scales.
-    """
-    axis = np.linspace(-150.0, 150.0, side)
-    x_grid, y_grid = np.meshgrid(axis, axis)
-    radius = np.hypot(x_grid, y_grid)
-
-    dome = 850.0 - 0.0035 * radius**2
-    ripple = 6.0 * np.cos(radius / 18.0)
-    thickness = dome + ripple + rng.normal(0.0, 1.2, x_grid.shape)
-
-    return pd.DataFrame(
-        {
-            "x_mm": x_grid.ravel(),
-            "y_mm": y_grid.ravel(),
-            "thickness_nm": thickness.ravel(),
-        }
-    )
-
-
-def _terrain_survey(rng: np.random.Generator, points: int = 600) -> pd.DataFrame:
-    """Elevation at scattered survey points - deliberately not on a grid.
-
-    The counterpart to _wafer_map: the same kind of quantity sampled where
-    the surveyor could stand rather than at every grid intersection, which
-    is what the triangulated Surface Plot (Scattered) is for. Pivoting this
-    into a grid would invent values for the gaps; the triangulation does
-    not.
-    """
-    angle = rng.uniform(0.0, 2.0 * np.pi, points)
-    # sqrt keeps the points evenly spread over the area rather than piling
-    # up at the centre, which is what uniform radius would do.
-    distance = 1200.0 * np.sqrt(rng.uniform(0.0, 1.0, points))
-    x = distance * np.cos(angle)
-    y = distance * np.sin(angle)
-
-    ridge = 180.0 * np.exp(-((x - 250.0) ** 2 + (y + 150.0) ** 2) / 2.6e5)
-    valley = -120.0 * np.exp(-((x + 400.0) ** 2 + (y - 300.0) ** 2) / 3.4e5)
-    slope = 0.05 * x + 0.02 * y
-
-    return pd.DataFrame(
-        {
-            "easting_m": x,
-            "northing_m": y,
-            "elevation_m": 420.0 + ridge + valley + slope + rng.normal(0.0, 4.0, points),
-        }
-    )
-
-
 def _figure_specs() -> list[FigureSpec]:
     """Return every demo figure, in the order they appear as tabs."""
-    line = {"linestyle": "-", "marker": "", "show_in_legend": True}
-
     return [
         FigureSpec(
-            name="1 · Sensor network",
-            key="sensors",
-            tables=('sensor_readings',),
+            name="1 · Antibiotic potency",
+            key="antibiotics",
+            tables=("antibiotics",),
             queries=(),
-            chart_type="Time Series",
-            title="Hourly temperature by sensor",
-            x_label="hours since start",
-            y_label="temperature (°C)",
-            axis_options={
-                "grid": True,
-                # The rolling average would double the number of lines on a
-                # chart that is already three series deep.
-                "show_rolling": False,
-                # Numeric x, so the gap threshold is a number of x units: the
-                # roof sensor's outage reads as a gap instead of a straight
-                # line drawn through it.
-                "gap_threshold": 2.0,
-            },
+            chart_type="Horizontal Bar Chart",
+            title="Antibiotic potency by bacteria (lower is more effective)",
+            x_label="minimum inhibitory concentration",
+            y_label="bacteria",
+            axis_options={"grid": True, "grid_axis": "x"},
             series=[
                 SeriesSpec(
-                    name=sensor.capitalize(),
+                    name=column.capitalize(),
                     sql=(
-                        "SELECT hour AS x, temperature AS y FROM sensor_readings "
-                        f"WHERE sensor = '{sensor}' ORDER BY hour"
+                        f"SELECT bacteria AS X, {column} AS Y FROM antibiotics "
+                        f"ORDER BY {column}"
                     ),
-                    roles={"x": "x", "y": "y"},
-                    style=dict(line),
+                    roles={"X": "X", "Y": "Y"},
+                    style={"alpha": 0.85},
                 )
-                for sensor in ("north", "south", "roof")
+                for column in ("penicillin", "streptomycin", "neomycin")
             ],
         ),
         FigureSpec(
-            name="2 · Calibration",
-            key="calibration",
-            tables=('calibration',),
+            name="2 · Penguin bill dimensions",
+            key="penguin_scatter",
+            tables=("penguins",),
             queries=(),
             chart_type="Scatter Plot",
-            title="Calibration curve with measurement uncertainty",
-            x_label="applied (units)",
-            y_label="measured (units)",
-            axis_options={"grid": True, "capsize": 3.0, "elinewidth": 1.1},
+            title="Bill length against bill depth, by species",
+            x_label="bill length (mm)",
+            y_label="bill depth (mm)",
+            axis_options={"grid": True},
             series=[
                 SeriesSpec(
-                    name="Run 1",
+                    name=species,
                     sql=(
-                        "SELECT applied AS x, measured AS y, "
-                        "applied_err AS xerr, err_low AS yerr_low, err_high AS yerr_high "
-                        "FROM calibration ORDER BY applied"
+                        "SELECT bill_length_mm AS x, bill_depth_mm AS y "
+                        f"FROM penguins WHERE species = '{species}'"
                     ),
                     roles={"x": "x", "y": "y"},
-                    style={"marker": "o", "linestyle": "-", "alpha": 0.95},
-                ),
-            ],
-        ),
-        FigureSpec(
-            name="3 · Process spread",
-            key="spread",
-            tables=('batch_yields',),
-            queries=(),
-            chart_type="Violin Plot",
-            title="Yield distribution per batch",
-            x_label="batch",
-            y_label="yield (%)",
-            axis_options={
-                "grid": True,
-                "grid_axis": "y",
-                "showmedians": True,
-                "quantiles": "0.25, 0.75",
-                "alpha": 0.75,
-            },
-            series=[
-                SeriesSpec(
-                    name=f"Batch {batch}",
-                    sql=(
-                        'SELECT batch AS "group", yield_pct AS value '
-                        f"FROM batch_yields WHERE batch = '{batch}'"
-                    ),
-                    roles={"value": "value", "group": "group"},
-                    style={},
+                    style={"marker": "o", "alpha": 0.75},
                 )
-                for batch in ("A", "B", "C", "D")
+                for species in ("Adelie", "Chinstrap", "Gentoo")
             ],
         ),
         FigureSpec(
-            name="4 · Process summary",
-            key="summary",
-            tables=('batch_yields',),
-            queries=(),
-            chart_type="Box Plot",
-            title="Yield summary per batch",
-            x_label="batch",
-            y_label="yield (%)",
-            axis_options={"grid": True, "grid_axis": "y", "showmeans": True},
-            series=[
-                SeriesSpec(
-                    name=f"Batch {batch}",
-                    sql=(
-                        'SELECT batch AS "group", yield_pct AS value '
-                        f"FROM batch_yields WHERE batch = '{batch}'"
-                    ),
-                    roles={"value": "value", "group": "group"},
-                    style={},
-                )
-                for batch in ("A", "B", "C", "D")
-            ],
-        ),
-        FigureSpec(
-            name="5 · Particle sizes",
-            key="particles",
-            tables=('particles',),
+            name="3 · Penguin body mass",
+            key="penguin_hist",
+            tables=("penguins",),
             queries=(),
             chart_type="Histogram",
-            title="Particle diameter by population",
-            x_label="diameter (µm)",
+            title="Body mass by species",
+            x_label="body mass (g)",
             y_label="",
-            axis_options={"bins": 45, "alpha": 0.8, "grid": True, "grid_axis": "y"},
+            axis_options={"bins": 30, "alpha": 0.8, "grid": True, "grid_axis": "y"},
             series=[
                 SeriesSpec(
-                    name="Populations",
-                    sql="SELECT population AS dataset, diameter_um AS value FROM particles",
+                    name="Species",
+                    sql="SELECT species AS dataset, body_mass_g AS value FROM penguins",
                     roles={"value": "value", "dataset": "dataset"},
                     style={},
                 ),
             ],
         ),
         FigureSpec(
-            name="6 · Throughput",
-            key="throughput",
-            tables=('throughput',),
+            name="4 · Penguin flipper length - spread",
+            key="penguin_violin",
+            tables=("penguins",),
             queries=(),
-            chart_type="Bar Chart",
-            title="Monthly throughput",
-            x_label="month",
-            y_label="units / day",
-            axis_options={"grid": True, "grid_axis": "y", "capsize": 4.0},
+            chart_type="Violin Plot",
+            title="Flipper length distribution by species",
+            x_label="species",
+            y_label="flipper length (mm)",
+            axis_options={
+                "grid": True,
+                "grid_axis": "y",
+                "showmedians": True,
+                "alpha": 0.75,
+            },
             series=[
                 SeriesSpec(
-                    name="Line 1",
+                    name=species,
                     sql=(
-                        "SELECT month AS X, throughput AS Y, throughput_err AS YError "
-                        "FROM throughput"
+                        'SELECT species AS "group", flipper_length_mm AS value '
+                        f"FROM penguins WHERE species = '{species}'"
                     ),
-                    roles={"X": "X", "Y": "Y"},
-                    style={"alpha": 0.9},
+                    roles={"value": "value", "group": "group"},
+                    style={},
+                )
+                for species in ("Adelie", "Chinstrap", "Gentoo")
+            ],
+        ),
+        FigureSpec(
+            name="5 · Penguin flipper length - summary",
+            key="penguin_box",
+            tables=("penguins",),
+            queries=(),
+            chart_type="Box Plot",
+            title="Flipper length summary by species",
+            x_label="species",
+            y_label="flipper length (mm)",
+            axis_options={"grid": True, "grid_axis": "y", "showmeans": True},
+            series=[
+                SeriesSpec(
+                    name=species,
+                    sql=(
+                        'SELECT species AS "group", flipper_length_mm AS value '
+                        f"FROM penguins WHERE species = '{species}'"
+                    ),
+                    roles={"value": "value", "group": "group"},
+                    style={},
+                )
+                for species in ("Adelie", "Chinstrap", "Gentoo")
+            ],
+        ),
+        FigureSpec(
+            name="6 · Yeast protein localisation",
+            key="yeast_hist",
+            tables=("yeast",),
+            queries=(),
+            chart_type="Histogram",
+            title="mcg signal by localisation class",
+            x_label="mcg",
+            y_label="",
+            axis_options={"bins": 40, "alpha": 0.8, "grid": True, "grid_axis": "y"},
+            series=[
+                SeriesSpec(
+                    name="Class",
+                    sql=(
+                        "SELECT class AS dataset, mcg AS value FROM yeast "
+                        "WHERE class IN ('CYT', 'NUC', 'MIT')"
+                    ),
+                    roles={"value": "value", "dataset": "dataset"},
+                    style={},
                 ),
             ],
         ),
         FigureSpec(
-            name="7 · Operating envelope",
-            key="envelope",
-            tables=('operating_points',),
+            name="7 · DLVO force curve",
+            key="dlvo_force",
+            tables=("dlvo_curve",),
             queries=(),
             chart_type="Scatter Plot",
-            title="Flow against pressure, coloured by energy",
-            x_label="pressure (bar)",
-            y_label="flow (l/s)",
+            title="Total force against separation",
+            x_label="separation (nm)",
+            y_label="force (nN)",
+            axis_options={"grid": True},
+            series=[
+                SeriesSpec(
+                    name="Force",
+                    sql=(
+                        "SELECT separation_nm AS x, F_total_nN AS y FROM dlvo_curve "
+                        "ORDER BY separation_nm"
+                    ),
+                    roles={"x": "x", "y": "y"},
+                    style={"marker": "", "linestyle": "-"},
+                ),
+            ],
+        ),
+        FigureSpec(
+            name="8 · Stock prices",
+            key="stock_timeseries",
+            tables=("stock_prices",),
+            queries=(),
+            chart_type="Time Series",
+            title="Daily closing price",
+            x_label="date",
+            y_label="close (USD)",
+            axis_options={"grid": True, "show_rolling": False},
+            series=[
+                SeriesSpec(
+                    name=ticker,
+                    sql=(
+                        "SELECT date AS x, close AS y FROM stock_prices "
+                        f"WHERE stock = '{ticker}' ORDER BY date"
+                    ),
+                    roles={"x": "x", "y": "y"},
+                    style={"linestyle": "-", "marker": ""},
+                )
+                for ticker in ("AAPL", "TSLA", "COKE")
+            ],
+        ),
+        FigureSpec(
+            name="9 · Employee compensation",
+            key="employee_box",
+            tables=("employee_compensation",),
+            queries=(),
+            chart_type="Box Plot",
+            title="Salary by department",
+            x_label="department",
+            y_label="salary (EUR)",
+            axis_options={"grid": True, "grid_axis": "y", "showmeans": True},
+            series=[
+                SeriesSpec(
+                    name=department,
+                    sql=(
+                        'SELECT department AS "group", salary_eur AS value '
+                        f"FROM employee_compensation WHERE department = '{department}'"
+                    ),
+                    roles={"value": "value", "group": "group"},
+                    style={},
+                )
+                for department in ("Operations", "Sales", "Finance", "IT", "HR")
+            ],
+        ),
+        FigureSpec(
+            name="10 · Driver behaviour",
+            key="driver_scatter",
+            tables=("driver_behaviour",),
+            queries=(),
+            chart_type="Scatter Plot",
+            title="Distance against speeding, four thousand drivers",
+            x_label="distance feature",
+            y_label="speeding feature",
+            axis_options={"grid": True},
+            series=[
+                SeriesSpec(
+                    name="Drivers",
+                    sql=(
+                        "SELECT distance_feature AS x, speeding_feature AS y "
+                        "FROM driver_behaviour"
+                    ),
+                    roles={"x": "x", "y": "y"},
+                    style={"marker": ".", "linestyle": "", "alpha": 0.35, "markersize": 4.0},
+                ),
+            ],
+        ),
+        FigureSpec(
+            name="11 · Transaction amounts",
+            key="transactions_hist",
+            tables=("transactions",),
+            queries=(),
+            chart_type="Histogram",
+            title="Transaction amount, fraud against legitimate",
+            x_label="transaction amount",
+            y_label="",
+            axis_options={"bins": 40, "alpha": 0.8, "grid": True, "grid_axis": "y"},
+            series=[
+                SeriesSpec(
+                    name="Outcome",
+                    sql=(
+                        "SELECT CASE fraud WHEN 1 THEN 'fraud' ELSE 'legitimate' END "
+                        "AS dataset, transaction_amount AS value FROM transactions"
+                    ),
+                    roles={"value": "value", "dataset": "dataset"},
+                    style={},
+                ),
+            ],
+        ),
+        FigureSpec(
+            name="12 · Transactions by channel",
+            key="transactions_query",
+            tables=("transactions",),
+            queries=("avg_amount_by_channel",),
+            chart_type="Bar Chart",
+            title="Average transaction amount by channel (from a saved query)",
+            x_label="channel",
+            y_label="average amount",
+            axis_options={"grid": True, "grid_axis": "y"},
+            series=[],  # filled in from the saved query, see build_demo_project
+        ),
+        FigureSpec(
+            name="13 · Pairwise sample",
+            key="pairwise_scatter",
+            tables=("pairwise_sample",),
+            queries=(),
+            chart_type="Scatter Plot",
+            title="Two coordinates, coloured and sized by two more",
+            x_label="x1",
+            y_label="x2",
             axis_options={"grid": True},
             series=[
                 SeriesSpec(
                     name="Samples",
                     sql=(
-                        "SELECT pressure AS x, flow AS y, energy AS color, weight AS size "
-                        "FROM operating_points"
+                        "SELECT x1 AS x, x2 AS y, color AS color, size AS size "
+                        "FROM pairwise_sample"
                     ),
                     roles={"x": "x", "y": "y", "color": "color", "size": "size"},
-                    style={"marker": "o", "alpha": 0.55},
+                    style={"marker": "o", "alpha": 0.7},
                 ),
             ],
         ),
         FigureSpec(
-            name="8 · Saved query",
-            key="saved_query",
-            tables=('sensor_readings',),
-            queries=('daily_mean_temperature',),
-            chart_type="Time Series",
-            title="Daily mean temperature (from a saved query)",
-            x_label="day",
-            y_label="mean temperature (°C)",
-            axis_options={"grid": True},
-            series=[],  # filled in from the saved query, see build_demo_project
-        ),
-        FigureSpec(
-            name="9 · Process run",
-            key="process_run",
-            tables=("process_run",),
-            queries=(),
-            chart_type="Scatter Plot",
-            title="Measurements ready for a control chart",
-            x_label="sample",
-            y_label="measurement",
-            axis_options={"grid": True},
-            series=[
-                SeriesSpec(
-                    name="Run",
-                    sql=(
-                        "SELECT sample AS x, measurement AS y FROM process_run "
-                        "ORDER BY sample"
-                    ),
-                    roles={"x": "x", "y": "y"},
-                    style={"marker": "o", "linestyle": "-", "markersize": 4.0},
-                ),
-            ],
-        ),
-        FigureSpec(
-            name="10 · Peak scan",
-            key="peak_scan",
-            tables=("peak_scan",),
-            queries=(),
-            chart_type="Scatter Plot",
-            title="A peak ready to fit",
-            x_label="wavelength (nm)",
-            y_label="intensity",
-            axis_options={"grid": True},
-            series=[
-                SeriesSpec(
-                    name="Scan",
-                    sql=(
-                        "SELECT wavelength_nm AS x, intensity AS y FROM peak_scan "
-                        "ORDER BY wavelength_nm"
-                    ),
-                    roles={"x": "x", "y": "y"},
-                    style={"marker": ".", "linestyle": "", "markersize": 4.0},
-                ),
-            ],
-        ),
-        FigureSpec(
-            name="11 · Wafer map",
-            key="wafer_map",
-            tables=("wafer_map",),
+            name="14 · 3D surface",
+            key="surface_3d",
+            tables=("surface_grid",),
             queries=(),
             chart_type="Surface Plot",
-            title="Film thickness across a 300mm wafer",
-            x_label="x (mm)",
-            y_label="y (mm)",
-            axis_options={
-                # 3D axes are requested through this option, which
-                # render_figure._subplot_kwargs_for_axis reads for any axis.
-                "projection": "3d",
-                # The measurements are on a square grid but the wafer is
-                # round: without this the corners are drawn as if they were
-                # part of it.
-                "circular_mask": True,
-                "cmap": "viridis",
-            },
+            title="A surface on a regular grid",
+            x_label="x",
+            y_label="y",
+            axis_options={"projection": "3d", "cmap": "viridis"},
             series=[
                 SeriesSpec(
-                    name="Thickness",
-                    sql=(
-                        "SELECT x_mm AS x, y_mm AS y, thickness_nm AS z "
-                        "FROM wafer_map"
-                    ),
+                    name="Surface",
+                    sql="SELECT x AS x, y AS y, z AS z FROM surface_grid",
                     roles={"x": "x", "y": "y", "z": "z"},
                     style={},
                 ),
             ],
         ),
         FigureSpec(
-            name="12 · Terrain survey",
-            key="terrain_survey",
-            tables=("terrain_survey",),
+            name="15 · 3D scattered surface",
+            key="scattered_3d",
+            tables=("scattered_surface",),
             queries=(),
             chart_type="Surface Plot (Scattered)",
-            title="Elevation from scattered survey points",
-            x_label="easting (m)",
-            y_label="northing (m)",
+            title="The same kind of surface, from scattered points",
+            x_label="x",
+            y_label="y",
             axis_options={"projection": "3d", "cmap": "terrain"},
             series=[
                 SeriesSpec(
-                    name="Elevation",
-                    sql=(
-                        "SELECT easting_m AS x, northing_m AS y, elevation_m AS z "
-                        "FROM terrain_survey"
-                    ),
+                    name="Surface",
+                    sql="SELECT x AS x, y AS y, z AS z FROM scattered_surface",
                     roles={"x": "x", "y": "y", "z": "z"},
                     style={},
                 ),
             ],
         ),
         FigureSpec(
-            name="13 · Wafer contour",
-            key="wafer_contour",
-            tables=("wafer_map",),
+            name="16 · Parametric curve",
+            key="parametric_scatter",
+            tables=("parametric_curve",),
             queries=(),
-            chart_type="Contour Plot",
-            title="Film thickness across a 300mm wafer",
-            x_label="x (mm)",
-            y_label="y (mm)",
-            axis_options={
-                # The same measurements as figure 11, read flat instead of
-                # lifted into a third axis. Which of the two is the better
-                # chart is the question this pair is here to let you answer:
-                # the surface shows the shape, the contour map reads values
-                # off it - and a wafer map is normally the second one.
-                "levels": "10",
-                "label_lines": True,
-                "label_format": "%d",
-                "colorbar": True,
-                "colorbar_label": "thickness (nm)",
-                # Circles on the chart should be circles on the wafer.
-                "aspect": "equal",
-            },
+            chart_type="Scatter Plot",
+            title="A helix, seen end-on and coloured by progress",
+            x_label="x",
+            y_label="y",
+            axis_options={"grid": True},
             series=[
                 SeriesSpec(
-                    name="Thickness",
-                    sql=(
-                        "SELECT x_mm AS x, y_mm AS y, thickness_nm AS z "
-                        "FROM wafer_map"
-                    ),
-                    roles={"x": "x", "y": "y", "z": "z"},
-                    style={},
-                ),
-            ],
-        ),
-        FigureSpec(
-            name="14 · Terrain contour",
-            key="terrain_contour",
-            tables=("terrain_survey",),
-            queries=(),
-            chart_type="Contour Plot (Scattered)",
-            title="Elevation from scattered survey points",
-            x_label="easting (m)",
-            y_label="northing (m)",
-            axis_options={
-                # The contour lines stop at the convex hull of the survey
-                # points, which is exactly as far as the survey went - the
-                # thing interpolating onto a grid first would hide.
-                "cmap": "terrain",
-                "levels": "14",
-                "line_overlay": False,
-                "colorbar": True,
-                "colorbar_label": "elevation (m)",
-            },
-            series=[
-                SeriesSpec(
-                    name="Elevation",
-                    sql=(
-                        "SELECT easting_m AS x, northing_m AS y, elevation_m AS z "
-                        "FROM terrain_survey"
-                    ),
-                    roles={"x": "x", "y": "y", "z": "z"},
-                    style={},
+                    name="Helix",
+                    sql="SELECT x AS x, y AS y, t AS color FROM parametric_curve ORDER BY t",
+                    roles={"x": "x", "y": "y", "color": "color"},
+                    style={"marker": ".", "linestyle": "", "markersize": 5.0},
                 ),
             ],
         ),
@@ -651,46 +568,16 @@ def _figure_specs() -> list[FigureSpec]:
 
 
 # ----------------------------------------------------------------------
-# Build
+# The demo set
 # ----------------------------------------------------------------------
-#: Table name -> the function that makes it.  A demo file writes only the
-#: tables its own figures read, which is what keeps a single-subject demo
-#: small enough to open and understand.
-TABLE_BUILDERS: dict[str, Any] = {
-    "sensor_readings": _sensor_network,
-    "calibration": _calibration,
-    "batch_yields": _batches,
-    "throughput": _throughput,
-    "particles": _particles,
-    "operating_points": _scatter_cloud,
-    "process_run": _process_run,
-    "peak_scan": _peak_scan,
-    "wafer_map": _wafer_map,
-    "terrain_survey": _terrain_survey,
-}
-
-#: Saved query name -> its SQL, and the table it reads.
-QUERY_SOURCES: dict[str, tuple[str, str]] = {
-    "daily_mean_temperature": (
-        "SELECT CAST(hour / 24 AS INTEGER) AS day, AVG(temperature) AS mean_c "
-        "FROM sensor_readings GROUP BY day ORDER BY day",
-        "sensor_readings",
-    ),
-    "roof_sensor": (
-        "SELECT hour, temperature FROM sensor_readings WHERE sensor = 'roof'",
-        "sensor_readings",
-    ),
-}
-
-
 @dataclass(frozen=True, slots=True)
 class DemoProject:
     """One demo file: what it is called, and what it contains.
 
-    The file name is the documentation.  Someone with eight .dhub files in a
+    The file name is the documentation.  Someone with a dozen .dhub files in a
     folder should be able to open the one that answers their question without
-    opening the other seven, which means the name has to say both the subject
-    and what it demonstrates.
+    opening the other eleven, which means the name has to say both the
+    subject and what it demonstrates.
     """
 
     file_name: str
@@ -702,95 +589,103 @@ class DemoProject:
         """Return the file name with its extension."""
         return f"{self.file_name}.dhub"
 
+    @property
+    def source_path(self) -> Path:
+        """Return where the pre-built copy of this project lives.
+
+        Built by :func:`build_demo_projects` into :data:`DEMO_DIR`, not at
+        the point this is read - see :func:`copy_demo_project`.
+        """
+        return DEMO_DIR / self.path_name
+
 
 #: The demo set.  The first is the complete project - every chart type over
-#: every table - and the rest are one subject each.
+#: every table - and the rest are one real dataset each.
 DEMO_PROJECTS: tuple[DemoProject, ...] = (
     DemoProject(
-        "Getting started - a bit of everything",
-        "Every chart type in the set, over six tables and two saved queries.",
+        "Getting started - real data across every chart type",
+        "Twelve real datasets, sixteen figures across every chart type, and "
+        "one saved query.",
         (),
     ),
     DemoProject(
-        "Sensor network - time series with a gap",
-        "Three sensors sampled hourly. One loses power, and the chart draws "
-        "the outage as a gap rather than a line through it.",
-        ("sensors",),
+        "Antibiotics - grouped bars from a classic dataset",
+        "1930s antibiotic potency data for sixteen bacteria, as a horizontal "
+        "bar chart sorted by effectiveness.",
+        ("antibiotics",),
     ),
     DemoProject(
-        "Calibration - error bars on both axes",
-        "A calibration run with uncertainty in what was applied and in what "
-        "was measured.",
-        ("calibration",),
+        "Penguins - species compared across four chart types",
+        "The Palmer penguins: the same three species read as a scatter plot, "
+        "a histogram, a violin plot and a box plot.",
+        ("penguin_scatter", "penguin_hist", "penguin_violin", "penguin_box"),
     ),
     DemoProject(
-        "Batch yields - distributions compared",
-        "The same four batches as a violin plot and as a box plot: one shows "
-        "the shape, the other the summary, and batch D is why that matters.",
-        ("spread", "summary"),
+        "Yeast proteins - histogram of three localisation classes",
+        "Cytoplasm, nucleus and mitochondria: three overlapping distributions "
+        "of one measured feature.",
+        ("yeast_hist",),
     ),
     DemoProject(
-        "Particle sizes - histogram of two populations",
-        "Two overlapping populations in one histogram.",
-        ("particles",),
+        "DLVO force curve - ready for Fit and Calculus",
+        "A real colloidal force-distance curve, repulsive at short range and "
+        "attractive beyond it, with a measurable crossover.",
+        ("dlvo_force",),
     ),
     DemoProject(
-        "Throughput - bar chart with error bars",
-        "Monthly throughput per line, with the spread on each bar.",
-        ("throughput",),
+        "Stock prices - three tickers, ready for Smoothing",
+        "Three years of daily closing prices for three stocks, noisy enough "
+        "that a moving average earns its keep.",
+        ("stock_timeseries",),
     ),
     DemoProject(
-        "Operating points - scatter coloured by a third variable",
-        "Flow against pressure, with energy as colour and weight as marker "
-        "size: four variables on two axes.",
-        ("envelope",),
+        "Employee compensation - ready for the Outlier operation",
+        "Salaries across five departments, with one real outlier the box "
+        "plot already shows and the operation can confirm.",
+        ("employee_box",),
     ),
     DemoProject(
-        "Saved query - a chart built on a query",
-        "A daily average that is computed on every read rather than stored, "
-        "so editing the query updates the chart.",
-        ("saved_query",),
+        "Driver behaviour - ready for the Cluster operation",
+        "Four thousand drivers by distance and speeding: the classic "
+        "two-feature clustering dataset.",
+        ("driver_scatter",),
     ),
     DemoProject(
-        "Process run - ready for a control chart",
-        "A process that shifts part-way through. Run Series operations, "
-        "Control Chart on the series to see the shift caught.",
-        ("process_run",),
+        "Transactions - histogram and a saved query",
+        "Fraud against legitimate transactions by amount, and a saved query "
+        "averaging amount by channel.",
+        ("transactions_hist", "transactions_query"),
     ),
     DemoProject(
-        "Peak scan - ready for the Fit operation",
-        "One Gaussian peak on a sloping baseline. Run Series operations, "
-        "Fit and pick Gaussian peak: the starting values come from the data.",
-        ("peak_scan",),
+        "Pairwise sample - four variables on two axes",
+        "Two coordinates, a colour and a marker size: four variables read "
+        "off one scatter plot.",
+        ("pairwise_scatter",),
     ),
     DemoProject(
         "3D surfaces - gridded and scattered",
-        "The same kind of measurement in the two layouts the surface "
-        "renderers each need: film thickness on a regular wafer grid, "
-        "masked to the round wafer, and elevation at scattered survey "
-        "points, triangulated rather than interpolated onto a grid.",
-        ("wafer_map", "terrain_survey"),
+        "The same kind of surface in the two layouts the surface renderers "
+        "each need: a regular grid, and scattered points triangulated into "
+        "one.",
+        ("surface_3d", "scattered_3d"),
     ),
     DemoProject(
-        "Contour maps - the same fields drawn flat",
-        "The wafer and the survey again as 2D contour maps, gridded and "
-        "triangulated. The gridded one is labelled and equal-aspect; the "
-        "scattered one stops at the hull of the points, which is as far as "
-        "the survey actually went.",
-        ("wafer_contour", "terrain_contour"),
+        "Parametric curve - a helix in projection",
+        "A helix seen end-on: a circle, coloured by how far along the curve "
+        "each point is.",
+        ("parametric_scatter",),
     ),
 )
 
 
-def build_demo_project(db_path: Path, figures: Sequence[str] = ()) -> Path:
+def build_demo_project(db_path: Path, figures: tuple[str, ...] = ()) -> Path:
     """Create a demo project and return the path actually written.
 
     ``figures`` selects by key; empty means every figure, which is the
     complete project. Only the tables and saved queries those figures read are
-    written, so a single-subject file carries one table rather than six.
+    written, so a single-subject file carries one or two tables rather than
+    twelve.
     """
-    rng = np.random.default_rng(SEED)
-
     db_path = SqliteRepo.ensure_dhub_extension(Path(db_path))
     db_path.parent.mkdir(parents=True, exist_ok=True)
     if db_path.exists():
@@ -811,19 +706,11 @@ def build_demo_project(db_path: Path, figures: Sequence[str] = ()) -> Path:
 
     repo = SqliteRepo(db_path=db_path)
 
-    tables = {
-        name: builder(rng)
-        for name, builder in TABLE_BUILDERS.items()
-        if name in wanted_tables
-    }
+    tables = {name: loader() for name, loader in TABLE_SOURCES.items() if name in wanted_tables}
     for name, frame in tables.items():
         repo.import_dataframe(frame, table_name=name, normalize_columns=False)
         applogger.info("Demo: wrote table %s (%d rows)", name, len(frame))
 
-    # Saved queries: one aggregate that would be tedious to rebuild by hand,
-    # and one filter, to show both uses. The complete project gets both; a
-    # single-subject file gets only what its own figures read, because a query
-    # nothing charts is a loose end in a file meant to be read.
     for name, (sql, source_table) in QUERY_SOURCES.items():
         if source_table not in wanted_tables:
             continue
@@ -835,16 +722,16 @@ def build_demo_project(db_path: Path, figures: Sequence[str] = ()) -> Path:
     # what the chart dialog does: the subquery is inlined so the series stays
     # self-contained.
     for spec in specs:
-        if spec.key != "saved_query":
+        if spec.key != "transactions_query":
             continue
-        query_source = repo.get_data_source("daily_mean_temperature")
+        query_source = repo.get_data_source("avg_amount_by_channel")
         if query_source is not None:
             spec.series = [
                 SeriesSpec(
-                    name="Daily mean",
-                    sql=f'SELECT "day" AS x, "mean_c" AS y FROM {query_source.from_clause()}',
-                    roles={"x": "x", "y": "y"},
-                    style={"linestyle": "-", "marker": "o", "show_rolling": False},
+                    name="Channel",
+                    sql=f'SELECT "X" AS X, "Y" AS Y FROM {query_source.from_clause()}',
+                    roles={"X": "X", "Y": "Y"},
+                    style={"alpha": 0.9},
                 )
             ]
 
@@ -862,7 +749,7 @@ def build_demo_projects(directory: Path) -> list[Path]:
 
     Several files rather than one, each named for what it shows: a folder of
     self-describing projects is browsable, and the one that answers today's
-    question can be opened without reading the other nine.
+    question can be opened without reading the other eleven.
     """
     target = Path(directory)
     target.mkdir(parents=True, exist_ok=True)
@@ -873,6 +760,31 @@ def build_demo_projects(directory: Path) -> list[Path]:
         applogger.info("Demo: wrote %s - %s", path.name, demo.summary)
         written.append(path)
     return written
+
+
+def copy_demo_project(demo: DemoProject, target: Path) -> Path:
+    """Copy *demo*'s pre-built file to *target*, and return the path written.
+
+    The application does not build a demo on the spot any more: several of
+    the source datasets (four thousand drivers, three years of daily prices)
+    are large enough that rebuilding one on every click would make "Create
+    demo" feel like it had hung. Run ``_make_demo_project.py`` once to
+    populate :data:`DEMO_DIR`; after that, "Create demo" is just a file copy.
+    """
+    source = demo.source_path
+    if not source.is_file():
+        raise FileNotFoundError(
+            f"Demo project not built: {source}. "
+            "Run _make_demo_project.py to build the demo set into "
+            f"{DEMO_DIR}."
+        )
+
+    target = SqliteRepo.ensure_dhub_extension(Path(target))
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists():
+        target.unlink()
+    shutil.copy2(source, target)
+    return target
 
 
 def _create_figure(repo: SqliteRepo, spec: FigureSpec) -> int:
@@ -908,27 +820,33 @@ def _create_figure(repo: SqliteRepo, spec: FigureSpec) -> int:
 
 
 def main() -> None:
-    """Write the demo project, or the whole set, to the requested path."""
+    """Write the whole demo set, or one project, to the requested path.
+
+    With no arguments, writes the whole set into :data:`DEMO_DIR` - the usual
+    case, run once after cloning and again whenever the demo set changes.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--output",
-        default="Demo Project.dhub",
-        help="Path of the .dhub file to create (overwritten if present).",
+        metavar="PATH",
+        help="Write a single .dhub file (the complete project) to PATH "
+        "instead of building the whole set.",
     )
     parser.add_argument(
         "--all",
         metavar="DIRECTORY",
-        help="Write every demo project into DIRECTORY, one file per subject.",
+        default=str(DEMO_DIR),
+        help=f"Write every demo project into DIRECTORY (default: {DEMO_DIR}).",
     )
     args = parser.parse_args()
 
-    if args.all:
-        for path in build_demo_projects(Path(args.all)):
-            print(f"Demo project written to {path}")
+    if args.output:
+        written = build_demo_project(Path(args.output))
+        print(f"Demo project written to {written}")
         return
 
-    written = build_demo_project(Path(args.output))
-    print(f"Demo project written to {written}")
+    for path in build_demo_projects(Path(args.all)):
+        print(f"Demo project written to {path}")
 
 
 if __name__ == "__main__":

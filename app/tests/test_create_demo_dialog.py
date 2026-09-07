@@ -11,7 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from app.data.demo_project import DEMO_PROJECTS
+from app.data import demo_project
+from app.data.demo_project import DEMO_PROJECTS, build_demo_project
 from app.dialogs.create_demo_dialog import CreateDemoDialog
 
 
@@ -94,13 +95,23 @@ def window(qapp, repo, tmp_db_path: Path):
 def test_choosing_a_demo_builds_it_and_opens_it(
     window, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The whole path: pick one, say where, and it becomes the open database."""
+    """The whole path: pick one, say where, and it becomes the open database.
+
+    "Create demo" copies a pre-built file rather than building on the spot -
+    see app.data.demo_project.copy_demo_project - so the test pre-builds the
+    chosen project into a temp DEMO_DIR instead of relying on the real one,
+    which is not version-controlled and may not exist in a fresh checkout.
+    """
     from PySide6.QtWidgets import QFileDialog
 
-    target = tmp_path / "peak scan demo.dhub"
+    chosen = DEMO_PROJECTS[9]
+    build_demo_project(tmp_path / "source" / chosen.path_name, chosen.figures)
+    monkeypatch.setattr(demo_project, "DEMO_DIR", tmp_path / "source")
+
+    target = tmp_path / "pairwise demo.dhub"
 
     monkeypatch.setattr(
-        CreateDemoDialog, "exec", lambda self: (setattr(self, "chosen", DEMO_PROJECTS[9]) or True)
+        CreateDemoDialog, "exec", lambda self: (setattr(self, "chosen", chosen) or True)
     )
     monkeypatch.setattr(
         QFileDialog,

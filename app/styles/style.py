@@ -306,6 +306,12 @@ EXTRA_THEME_ICON_NAMES: frozenset[str] = frozenset(
         "accessories-calculator",
         "applications-system",
         "document-edit",
+        # The user manual: freedesktop's own name for "open the help
+        # document", which is exactly what this action does.
+        "help-contents",
+        # Connecting to a server database: the freedesktop Status icon for
+        # network activity, the closest standard name to what this does.
+        "network-transmit-receive",
         "object-select",
         # No icon theme has a chart, and a plotting application's Plot button
         # is the one place a drawing of our own is the honest answer. Breeze
@@ -320,7 +326,14 @@ EXTRA_THEME_ICON_NAMES: frozenset[str] = frozenset(
         # a condition" has no better standard name.
         "view-filter",
         "view-sort-ascending",
+        # Import from another database: the same MIME-type naming family as
+        # "x-office-spreadsheet" above, this one for LibreOffice Base's .odb.
+        "x-office-database",
         "x-office-spreadsheet",
+        # Import from the web: every desktop ships an actual browser under
+        # this name, and a globe is the honest icon for "fetch this from a
+        # URL" regardless of which application answers it.
+        "web-browser",
     }
 )
 

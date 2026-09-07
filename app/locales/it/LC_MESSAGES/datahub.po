@@ -400,7 +400,7 @@ msgid "Build a multi-peak expression"
 msgstr "Costruisci un’espressione multi-picco"
 
 
-msgid "Build one of the shipped demo projects and open it"
+msgid "Create one of the shipped demo projects and open it"
 msgstr "Crea uno dei progetti dimostrativi inclusi e aprilo"
 
 
@@ -616,6 +616,18 @@ msgid "Cooperative saturation curve."
 msgstr "Curva di saturazione cooperativa."
 
 
+msgid "Connect"
+msgstr "Connetti"
+
+
+msgid "Connect to the database and list its tables"
+msgstr "Connettiti al database ed elenca le sue tabelle"
+
+
+msgid "Connect to database"
+msgstr "Connetti a un database"
+
+
 msgid "Copy"
 msgstr "Copia"
 
@@ -682,6 +694,14 @@ msgstr "Impossibile aprire il database:\n{error}"
 
 msgid "Could not read the clipboard:\n{error}"
 msgstr "Impossibile leggere gli appunti:\n{error}"
+
+
+msgid "Could not read from the database:\n{error}"
+msgstr "Impossibile leggere dal database:\n{error}"
+
+
+msgid "Could not fetch the data:\n{error}"
+msgstr "Impossibile scaricare i dati:\n{error}"
 
 
 msgid "Could not render the preview:\n{error}"
@@ -786,6 +806,10 @@ msgstr "Sorgente dati:"
 
 msgid "Data type:"
 msgstr "Tipo di dato:"
+
+
+msgid "Database"
+msgstr "Database"
 
 
 msgid "Database check"
@@ -1078,6 +1102,14 @@ msgstr "Isoterma di adsorbimento empirica."
 
 msgid "Encoding"
 msgstr "Codifica"
+
+
+msgid "Engine"
+msgstr "Motore"
+
+
+msgid "Enter the path to a SQLite database file."
+msgstr "Inserisci il percorso di un file di database SQLite."
 
 
 msgid "End of the range to evaluate over."
@@ -1570,6 +1602,22 @@ msgstr "Importa dati"
 
 msgid "Import data into the database"
 msgstr "Importa dati nel database"
+
+
+msgid "Import a table from another SQLite database"
+msgstr "Importa una tabella da un altro database SQLite"
+
+
+msgid "Import data from a URL"
+msgstr "Importa dati da un URL"
+
+
+msgid "Import from web"
+msgstr "Importa dal web"
+
+
+msgid "Import from database"
+msgstr "Importa da database"
 
 
 msgid "Import failed:\n{error}"
@@ -2238,6 +2286,10 @@ msgstr "Apri il log dell'applicazione"
 
 msgid "Open the application settings"
 msgstr "Apri le impostazioni dell'applicazione"
+
+
+msgid "Open the user manual"
+msgstr "Apri il manuale utente"
 
 
 msgid "Operating points - scatter coloured by a third variable"
@@ -3204,6 +3256,58 @@ msgid "Source"
 msgstr "Origine"
 
 
+msgid "Source table"
+msgstr "Tabella di origine"
+
+
+msgid "Table to read from the other database"
+msgstr "Tabella da leggere dall'altro database"
+
+
+msgid "Select database"
+msgstr "Seleziona database"
+
+
+msgid "Select a table to import."
+msgstr "Seleziona una tabella da importare."
+
+
+msgid "SQLite file"
+msgstr "File SQLite"
+
+
+msgid "PostgreSQL"
+msgstr "PostgreSQL"
+
+
+msgid "MySQL"
+msgstr "MySQL"
+
+
+msgid "Host"
+msgstr "Host"
+
+
+msgid "Port"
+msgstr "Porta"
+
+
+msgid "Username"
+msgstr "Nome utente"
+
+
+msgid "Password"
+msgstr "Password"
+
+
+msgid "URL:"
+msgstr "URL:"
+
+
+msgid "Enter a valid http:// or https:// URL."
+msgstr "Inserisci un URL http:// o https:// valido."
+
+
 msgid "Spacing"
 msgstr "Spaziatura"
 
@@ -3416,6 +3520,10 @@ msgid "The tables have no fields in common to UNION."
 msgstr "Le tabelle non hanno campi comuni per la UNION."
 
 
+msgid "The user manual could not be opened:\n{path}"
+msgstr "Non è stato possibile aprire il manuale utente:\n{path}"
+
+
 msgid "The upper and lower limits. Without them the chart is a run chart - the points, but nothing to judge them against."
 msgstr "I limiti superiore e inferiore. Senza di essi la carta è un semplice grafico dei valori: i punti, ma nulla con cui confrontarli."
 
@@ -3436,6 +3544,10 @@ msgstr "Queste voci non sono valide e non sono state applicate:\n{entries}"
 
 msgid "Third-order polynomial."
 msgstr "Polinomio di terzo grado."
+
+
+msgid "This database has no tables to import."
+msgstr "Questo database non contiene tabelle da importare."
 
 
 msgid "This function takes no parameters."
@@ -3582,6 +3694,10 @@ msgid "Update link"
 msgstr "Aggiorna collegamento"
 
 
+msgid "Password for {username}@{host}:"
+msgstr "Password per {username}@{host}:"
+
+
 msgid "Upper control limit"
 msgstr "Limite di controllo superiore"
 
@@ -3604,6 +3720,10 @@ msgstr "Usa gli ultimi parametri ottimizzati"
 
 msgid "User functions"
 msgstr "Funzioni utente"
+
+
+msgid "User manual"
+msgstr "Manuale utente"
 
 
 msgid "Value"
@@ -3636,6 +3756,10 @@ msgstr "Picco di Voigt"
 
 msgid "WHERE with the comparisons spelled out"
 msgstr "WHERE con i confronti esplicitati"
+
+
+msgid "Web"
+msgstr "Web"
 
 
 msgid "Weibull CDF"
@@ -3996,6 +4120,75 @@ msgstr "Superfici 3D - a griglia e sparse"
 msgid "The same kind of measurement in the two layouts the surface renderers each need: film thickness on a regular wafer grid, masked to the round wafer, and elevation at scattered survey points, triangulated rather than interpolated onto a grid."
 msgstr "Lo stesso tipo di misura nei due formati richiesti dai renderer di superficie: lo spessore del film su una griglia regolare del wafer, mascherata sul wafer rotondo, e l'altimetria in punti di rilievo sparsi, triangolata anziché interpolata su una griglia."
 
+msgid "The same kind of surface in the two layouts the surface renderers each need: a regular grid, and scattered points triangulated into one."
+msgstr "Lo stesso tipo di superficie nei due formati richiesti dai renderer di superficie: una griglia regolare, e punti sparsi triangolati in una superficie."
+
+msgid "Getting started - real data across every chart type"
+msgstr "Per iniziare - dati reali per ogni tipo di grafico"
+
+msgid "Twelve real datasets, sixteen figures across every chart type, and one saved query."
+msgstr "Dodici dataset reali, sedici figure per ogni tipo di grafico e una query salvata."
+
+msgid "Antibiotics - grouped bars from a classic dataset"
+msgstr "Antibiotici - barre raggruppate da un dataset classico"
+
+msgid "1930s antibiotic potency data for sixteen bacteria, as a horizontal bar chart sorted by effectiveness."
+msgstr "Dati degli anni '30 sulla potenza di antibiotici per sedici batteri, come grafico a barre orizzontali ordinato per efficacia."
+
+msgid "Penguins - species compared across four chart types"
+msgstr "Pinguini - specie confrontate in quattro tipi di grafico"
+
+msgid "The Palmer penguins: the same three species read as a scatter plot, a histogram, a violin plot and a box plot."
+msgstr "I pinguini di Palmer: le stesse tre specie lette come grafico a dispersione, istogramma, violin plot e box plot."
+
+msgid "Yeast proteins - histogram of three localisation classes"
+msgstr "Proteine del lievito - istogramma di tre classi di localizzazione"
+
+msgid "Cytoplasm, nucleus and mitochondria: three overlapping distributions of one measured feature."
+msgstr "Citoplasma, nucleo e mitocondri: tre distribuzioni sovrapposte di una caratteristica misurata."
+
+msgid "DLVO force curve - ready for Fit and Calculus"
+msgstr "Curva di forza DLVO - pronta per Fit e Calculus"
+
+msgid "A real colloidal force-distance curve, repulsive at short range and attractive beyond it, with a measurable crossover."
+msgstr "Una vera curva forza-distanza colloidale, repulsiva a corto raggio e attrattiva oltre, con un punto di transizione misurabile."
+
+msgid "Stock prices - three tickers, ready for Smoothing"
+msgstr "Prezzi azionari - tre titoli, pronti per lo Smoothing"
+
+msgid "Three years of daily closing prices for three stocks, noisy enough that a moving average earns its keep."
+msgstr "Tre anni di prezzi di chiusura giornalieri per tre titoli, abbastanza rumorosi da giustificare una media mobile."
+
+msgid "Employee compensation - ready for the Outlier operation"
+msgstr "Retribuzioni dei dipendenti - pronte per l'operazione Outlier"
+
+msgid "Salaries across five departments, with one real outlier the box plot already shows and the operation can confirm."
+msgstr "Stipendi in cinque reparti, con un vero valore anomalo già visibile nel box plot e che l'operazione può confermare."
+
+msgid "Driver behaviour - ready for the Cluster operation"
+msgstr "Comportamento dei conducenti - pronto per l'operazione Cluster"
+
+msgid "Four thousand drivers by distance and speeding: the classic two-feature clustering dataset."
+msgstr "Quattromila conducenti per distanza e velocità in eccesso: il classico dataset di clustering a due variabili."
+
+msgid "Transactions - histogram and a saved query"
+msgstr "Transazioni - istogramma e una query salvata"
+
+msgid "Fraud against legitimate transactions by amount, and a saved query averaging amount by channel."
+msgstr "Transazioni fraudolente contro legittime per importo, e una query salvata che calcola la media dell'importo per canale."
+
+msgid "Pairwise sample - four variables on two axes"
+msgstr "Campione pairwise - quattro variabili su due assi"
+
+msgid "Two coordinates, a colour and a marker size: four variables read off one scatter plot."
+msgstr "Due coordinate, un colore e una dimensione del marcatore: quattro variabili lette da un solo grafico a dispersione."
+
+msgid "Parametric curve - a helix in projection"
+msgstr "Curva parametrica - un'elica in proiezione"
+
+msgid "A helix seen end-on: a circle, coloured by how far along the curve each point is."
+msgstr "Un'elica vista di taglio: un cerchio, colorato in base a quanto ogni punto è avanzato lungo la curva."
+
 msgid "Contour maps - the same fields drawn flat"
 msgstr "Mappe di contorno - gli stessi campi disegnati in piano"
 
@@ -4005,7 +4198,7 @@ msgstr "Il wafer e il rilievo di nuovo come mappe di contorno 2D, a griglia e tr
 msgid "Could not create a database in your home folder:\n{error}\n\nPick one to open instead."
 msgstr "Impossibile creare un database nella cartella home:\n{error}\n\nScegline uno da aprire."
 
-msgid "Could not build the demo project:\n{error}"
+msgid "Could not create the demo project:\n{error}"
 msgstr "Impossibile creare il progetto dimostrativo:\n{error}"
 
 msgid "...and {count} more, under Show Details."

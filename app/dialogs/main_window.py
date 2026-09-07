@@ -14,10 +14,11 @@ import gc
 from pathlib import Path
 from typing import Any, cast
 
-from PySide6.QtCore import QSize, Qt, QTimer
+from PySide6.QtCore import QSize, Qt, QTimer, QUrl
 from PySide6.QtGui import (
     QAction,
     QCloseEvent,
+    QDesktopServices,
     QIcon,
 )
 from app.dialogs.log_viewer_dialog import LogViewerDialog
@@ -25,7 +26,7 @@ from app.data.sqlite_repo import SqliteRepo
 from app.widgets.chart_panel import ChartPanel
 from app.dialogs.create_chart_dialog import NewPlotTabDialog
 from app.dialogs.import_data_dialog import ImportDataDialog, is_importable
-from app.data.demo_project import build_demo_project
+from app.data.demo_project import copy_demo_project
 from app.dialogs.create_demo_dialog import CreateDemoDialog
 from app.dialogs.credits_dialog import CreditsDialog
 from app.dialogs.query_builder_dialog import QueryBuilderDialog
@@ -66,6 +67,10 @@ PROPERTIES_REDRAW_DEBOUNCE_MS: int = 120
 STATE_KEY: str = "main_window"
 SPLITTERS_SECTION: str = "main_window_splitters"
 LOG_VIEWER_STATE_KEY: str = "log_viewer"
+
+# The user manual PDF, built by docs/manual/user_manual.typ and shipped
+# alongside the source rather than generated at runtime.
+USER_MANUAL_PATH: Path = Path(__file__).resolve().parents[2] / "docs" / "manual" / "user_manual.pdf"
 
 # Narrowest useful chart pane.  Explicit, because the alternative is whatever
 # the chart toolbar happens to add up to - and that number silently wins the
@@ -426,6 +431,7 @@ class MainWindow(QMainWindow):
             None,
             action_menu_item("settings", self._on_settings),
             action_menu_item("log_viewer", self._show_log_viewer),
+            action_menu_item("user_manual", self._on_user_manual),
             action_menu_item("credits", self._on_credits),
         ]
 
@@ -1226,7 +1232,7 @@ class MainWindow(QMainWindow):
             show_message(self, "database.create_failed", error=exc)
 
     def _on_create_demo(self) -> None:
-        """Build one of the shipped demo projects, and open it.
+        """Copy one of the shipped, pre-built demo projects, and open it.
 
         Where to save it is asked exactly like "New" asks - the demo is a
         real project, no different from one built by hand, and the sample
@@ -1249,11 +1255,11 @@ class MainWindow(QMainWindow):
             return
 
         target = SqliteRepo.ensure_dhub_extension(Path(file_path))
-        applogger.info("Building demo project %r at %s", demo.file_name, target)
+        applogger.info("Copying demo project %r to %s", demo.file_name, target)
         try:
-            build_demo_project(target, demo.figures)
+            copy_demo_project(demo, target)
         except Exception as exc:  # noqa: BLE001
-            applogger.exception("Failed to build demo project: %s", exc)
+            applogger.exception("Failed to copy demo project: %s", exc)
             show_message(self, "demo.build_failed", error=exc)
             return
 
@@ -1474,6 +1480,15 @@ class MainWindow(QMainWindow):
     def _on_credits(self) -> None:
         """Show who made this and what it is made of."""
         CreditsDialog(parent=self).exec()
+
+    def _on_user_manual(self) -> None:
+        """Open the user manual PDF in the system's default viewer."""
+        if not USER_MANUAL_PATH.is_file():
+            show_message(self, "manual.unavailable", path=str(USER_MANUAL_PATH))
+            return
+        opened = QDesktopServices.openUrl(QUrl.fromLocalFile(str(USER_MANUAL_PATH)))
+        if not opened:
+            show_message(self, "manual.unavailable", path=str(USER_MANUAL_PATH))
 
     def _on_query_builder(self) -> None:
         """Open the query builder and refresh the source lists afterwards."""

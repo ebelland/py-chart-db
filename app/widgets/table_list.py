@@ -648,7 +648,13 @@ class TableListPanel(QWidget):
                 applogger.exception(f"XLSX export failed: {exc}")
 
     def _refresh_link_for_table(self) -> None:
-        """Refresh the external link associated with a table."""
+        """Refresh the external link associated with a table.
+
+        A file or web link carries everything it needs. A PostgreSQL or
+        MySQL link never carries its password - see
+        ``app.utils.data_sources.DatabaseConnection.to_link_settings`` - so
+        this is where that gets asked for, fresh, every time.
+        """
         table, _unused = self._selected_row_info()
         if self._repo is None or table is None:
             return
@@ -656,10 +662,26 @@ class TableListPanel(QWidget):
         if not link:
             applogger.exception(f"No link for this table: {table}")
             return
+
+        source = (link.get("settings") or {}).get("source") or {}
+        password: str | None = None
+        if source.get("kind") in ("postgres", "mysql"):
+            entered, ok = QInputDialog.getText(
+                self,
+                _("Update link"),
+                _("Password for {username}@{host}:").format(
+                    username=source.get("username", ""), host=source.get("host", "")
+                ),
+                QLineEdit.EchoMode.Password,
+            )
+            if not ok:
+                return
+            password = entered
+
         try:
-            refresh_link(self._repo, link_id=int(link["id"]))
+            refresh_link(self._repo, link_id=int(link["id"]), password=password)
             self.update_parent()
-        except Exception as exc:  
+        except Exception as exc:
             applogger.exception(f"Link refresh failed: {exc}")
 
     def _delete_selected(self) -> None:

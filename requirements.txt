@@ -2,6 +2,9 @@ PySide6==6.11.1
 matplotlib==3.11.1
 numpy==2.5.1
 pandas==3.0.5
+# Required for every .xlsx/.xlsm import and export - app.dialogs.import_data_dialog
+# and app.widgets.table_list both hardcode engine="openpyxl", with no fallback.
+openpyxl==3.1.5
 PyWavelets==1.9.0
 scikit-image==0.26.0
 scipy==1.18.0
@@ -20,4 +23,12 @@ pyobjc-framework-Cocoa>=12.2; sys_platform == "darwin"
 # renderer works either way - installed, it spreads overlapping labels apart
 # instead of leaving them stacked at their points.
 adjustText==1.3.0
+
+# Required for "Import - Database" against a PostgreSQL or MySQL server.
+# Pure Python, deliberately: no C extension means no wheel to be missing on
+# whatever Python this ships on next, the same reasoning as adjustText above
+# just without the fallback, since importing a server database has no local
+# equivalent to fall back to.
+pg8000==1.31.5
+PyMySQL==1.2.0
 
