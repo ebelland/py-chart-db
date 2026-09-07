@@ -306,6 +306,9 @@ EXTRA_THEME_ICON_NAMES: frozenset[str] = frozenset(
         "accessories-calculator",
         "applications-system",
         "document-edit",
+        # No Qt ThemeIcon enum member covers a grid-of-cells layout icon;
+        # Breeze, Papirus and Adwaita all ship this one for a grid/icon view.
+        "view-grid",
         # No Qt ThemeIcon enum member covers "fetch this from the web" -
         # GoDown is a plain navigation arrow, not a download. Breeze,
         # Papirus and Adwaita all ship this Icon Naming Specification

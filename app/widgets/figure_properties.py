@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.charts import layout_presets
 from app.dialogs.edit_mpl_styles_dialog import (
     MplStyleEditorDialog,
     _sanitize_mplstyle_text,
@@ -77,6 +78,18 @@ class FigurePropertiesWidget(QWidget):
     style_changed = Signal(str)
     grid_layout_requested = Signal(int, int)
     figure_options_requested = Signal(dict)
+    #: Emitted with one of app.charts.layout_presets.PRESETS.
+    layout_preset_requested = Signal(str)
+
+    #: (label, preset constant) for the layout preset combo, in the order
+    #: offered. Grid first, since it is what a new figure already looks
+    #: like - re-picking it is how another preset gets undone.
+    LAYOUT_PRESETS: tuple[tuple[str, str], ...] = (
+        ("Grid", layout_presets.GRID),
+        ("Shared axes (grid)", layout_presets.SHARED_GRID),
+        ("Main + secondary (grid)", layout_presets.MAIN_AND_SECONDARY),
+        ("Overlapping (twin Y)", layout_presets.OVERLAPPING),
+    )
 
     # Sentinel combo entry that opens a native file picker instead of naming a
     # style. Keeps "browse anywhere" available even though the dropdown itself
@@ -268,6 +281,30 @@ class FigurePropertiesWidget(QWidget):
         grid_lay.addWidget(QLabel(_("Cols"), grid_row))
         grid_lay.addWidget(self._ncols_combo, 1)
         grid_section_lay.addWidget(grid_row)
+
+        # A preset writes row_span/col_span/sharex/sharey/twin_of across
+        # every axis at once - the rows/cols above only ever set a uniform
+        # grid, which is one of the four this offers rather than the whole
+        # of what an axis's own options can already express.
+        preset_row = QWidget(grid_section)
+        preset_lay = QHBoxLayout(preset_row)
+        preset_lay.setContentsMargins(0, 0, 0, 0)
+        preset_lay.setSpacing(8)
+
+        self._layout_preset_combo = QComboBox(preset_row)
+        for label, preset in self.LAYOUT_PRESETS:
+            self._layout_preset_combo.addItem(_(label), preset)
+        self._configure_combo_width(self._layout_preset_combo, minimum_contents_length=20)
+        preset_lay.addWidget(QLabel(_("Layout"), preset_row))
+        preset_lay.addWidget(self._layout_preset_combo, 1)
+        self._btn_apply_layout_preset = create_action_button(
+                                             parent=preset_row,
+                                             action_id="apply_layout_preset",
+                                             action=self._apply_layout_preset,
+                                             layout=preset_lay,
+                                         )
+        grid_section_lay.addWidget(preset_row)
+
         lay.addWidget(grid_section)
 
         # ----- Figure options -----
@@ -775,6 +812,19 @@ class FigurePropertiesWidget(QWidget):
         nrows = int(self._nrows_combo.currentData() or 1)
         ncols = int(self._ncols_combo.currentData() or 1)
         self.grid_layout_requested.emit(nrows, ncols)
+
+    def _apply_layout_preset(self) -> None:
+        """Request the chosen preset, applied across every axis in the figure.
+
+        Unlike ``_apply_grid_layout`` (a uniform rows x cols the person
+        chose), a preset computes its own grid size from how many axes the
+        figure has - see app.charts.layout_presets - so there is nothing
+        here to read from the Rows/Cols combos.
+        """
+        preset = self._layout_preset_combo.currentData()
+        if not preset:
+            return
+        self.layout_preset_requested.emit(str(preset))
 
     def _rcparams_dpi(self) -> int:
         try:

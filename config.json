@@ -21,6 +21,13 @@
       "SegoeFluent": "E73E",
       "ThemeIcon": "object-select"
     },
+    "apply_layout_preset": {
+      "text": "Apply layout",
+      "description": "Arrange every axis in this figure using the chosen layout",
+      "SFSymbol": "rectangle.grid.2x2",
+      "SegoeFluent": "E80A",
+      "ThemeIcon": "view-grid"
+    },
     "clear": {
       "text": "Clear",
       "description": "Clear the content",

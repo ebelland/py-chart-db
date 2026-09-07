@@ -4085,3 +4085,21 @@ msgstr "Impossibile scaricare {url}:\n{error}"
 
 msgid "{url} does not look like a web address. It should start with http:// or https://."
 msgstr "{url} non sembra un indirizzo web. Deve iniziare con http:// o https://."
+
+msgid "Layout"
+msgstr "Layout"
+
+msgid "Shared axes (grid)"
+msgstr "Assi condivisi (griglia)"
+
+msgid "Main + secondary (grid)"
+msgstr "Principale + secondari (griglia)"
+
+msgid "Overlapping (twin Y)"
+msgstr "Sovrapposti (Y gemello)"
+
+msgid "Apply layout"
+msgstr "Applica layout"
+
+msgid "Arrange every axis in this figure using the chosen layout"
+msgstr "Disponi tutti gli assi di questa figura secondo il layout scelto"

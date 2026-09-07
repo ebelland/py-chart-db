@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from contextlib import contextmanager
+from dataclasses import replace
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any, Literal
@@ -96,7 +97,14 @@ def render_figure_from_descriptor(
     with _figure_style_context(descriptor):
         _apply_figure_options(figure, descriptor)
 
-        axes_with_positions, rows, cols, spans_valid = _normalized_axes_for_grid(descriptor)
+        all_axes = list(descriptor.axes or [])
+        twin_targets = _twin_targets(all_axes)
+        base_axes = [a for a in all_axes if int(a.id) not in twin_targets]
+        twin_axes = [a for a in all_axes if int(a.id) in twin_targets]
+
+        axes_with_positions, rows, cols, spans_valid = _normalized_axes_for_grid(
+            replace(descriptor, axes=base_axes)
+        )
         axes_flat = _create_axes_grid(
             figure=figure,
             descriptor=descriptor,
@@ -106,6 +114,7 @@ def render_figure_from_descriptor(
             respect_spans=spans_valid,
         )
 
+        ax_by_id: dict[int, Any] = {}
         for axis_desc, axis_index in axes_with_positions:
             ax = axes_flat[axis_index]
             if ax is None:
@@ -115,6 +124,37 @@ def render_figure_from_descriptor(
                     axis_index,
                 )
                 return
+            ax_by_id[int(axis_desc.id)] = ax
+
+        # Overlapping ("twin") axes share their target's x-axis and grid
+        # cell, with their own independent y-scale on the right - the same
+        # pairing ``ax.twinx()`` builds by hand, but reached through an axis
+        # option instead of a second call site every dual-scale chart would
+        # otherwise need. Created after every base axis exists, since a twin
+        # is built from its target rather than placed on the grid itself -
+        # which is also why it never enters ``_normalized_axes_for_grid``:
+        # twin and target sharing a cell is the point, not a layout conflict.
+        for axis_desc in twin_axes:
+            target_ax = ax_by_id.get(twin_targets[int(axis_desc.id)])
+            if target_ax is None:
+                applogger.error(
+                    "Twin axis id=%r names a target that was not rendered.",
+                    axis_desc.id,
+                )
+                continue
+            ax_by_id[int(axis_desc.id)] = target_ax.twinx()
+
+        for axis_desc in all_axes:
+            ax = ax_by_id.get(int(axis_desc.id))
+            if ax is None:
+                # Already reported above, for a base axis; a twin whose
+                # target failed to render was already reported too.
+                continue
+            # Tagged so _normalize_axes_fill_policy can match figure.axes
+            # back to their descriptor by id - it cannot rely on the two
+            # lists sharing an order once axes are created out of order
+            # for one (base axes, then their twins).
+            ax._dhub_axis_id = int(axis_desc.id)  # noqa: SLF001 - our own attribute, not matplotlib's
 
             series_list = _build_series_data_list(repo=repo, axis_desc=axis_desc)
             chart_type = str(axis_desc.chart_type or "").strip()
@@ -142,6 +182,39 @@ def render_figure_from_descriptor(
 
         _apply_layout(figure, descriptor)
         _normalize_axes_fill_policy(figure, descriptor)
+
+
+def _twin_targets(axes: list[AxisDescriptor]) -> dict[int, int]:
+    """Return {twin axis id: target axis id} for every valid ``twin_of``.
+
+    An axis option rather than a descriptor column - see ``_axis_span`` for
+    the same reasoning. A target has to be another axis in the same figure,
+    which rules out a stale id left over from a deleted axis; it also has to
+    not itself be a twin, which rules out a chain (twin-of-a-twin) that
+    ``ax.twinx()`` cannot express - such an axis is drawn as an ordinary grid
+    axis instead of being silently dropped.
+    """
+    axis_ids = {int(axis_desc.id) for axis_desc in axes}
+    targets: dict[int, int] = {}
+    for axis_desc in axes:
+        options = axis_desc.options if isinstance(axis_desc.options, dict) else {}
+        raw_target = options.get("twin_of")
+        if isinstance(raw_target, bool):
+            continue
+        try:
+            target_id = int(raw_target)
+        except (TypeError, ValueError):
+            continue
+        axis_id = int(axis_desc.id)
+        if target_id == axis_id or target_id not in axis_ids:
+            continue
+        targets[axis_id] = target_id
+
+    return {
+        axis_id: target_id
+        for axis_id, target_id in targets.items()
+        if target_id not in targets
+    }
 
 
 # ----------------------------------------------------------------------
@@ -949,14 +1022,19 @@ def _normalize_axes_fill_policy(figure: Figure, fig_desc: FigureDescriptor) -> N
     fig_options = fig_desc.options if isinstance(fig_desc.options, dict) else {}
     preserve_all = bool(fig_options.get("preserve_aspect_box", False))
 
-    axes_options = [
-        axis_desc.options if isinstance(axis_desc.options, dict) else {}
+    # Matched by the id tagged onto each axes in render_figure_from_descriptor,
+    # not by position: a twin axis is created after every base axis, so
+    # figure.axes and fig_desc.axes no longer share one order once a figure
+    # has any twins at all.
+    options_by_id = {
+        int(axis_desc.id): axis_desc.options if isinstance(axis_desc.options, dict) else {}
         for axis_desc in list(fig_desc.axes or [])
-    ]
+    }
 
-    for index, ax in enumerate(list(figure.axes)):
+    for ax in list(figure.axes):
         try:
-            axis_options = axes_options[index] if index < len(axes_options) else {}
+            axis_id = getattr(ax, "_dhub_axis_id", None)
+            axis_options = options_by_id.get(axis_id, {}) if axis_id is not None else {}
             if preserve_all or bool(axis_options.get("preserve_aspect_box", False)):
                 continue
 
