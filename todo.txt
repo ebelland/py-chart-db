@@ -65,11 +65,6 @@ N-3   attribute control charts (p, np, c, u)
 P2 - VALUABLE
 ================================================================
 
-P2-1  renderers that pair with infrastructure already built
-        heatmap/imshow- no 2D renderer at all, despite scikit-image being a
-                        declared dependency
-        contour       - DONE, see N-4
-
 P2-14 renderer: il boilerplate duplicato appartiene a BaseAxisRenderer
       Misurato: _merge_options esiste in 5 copie byte-identiche (broken_bar,
       surface x2, table, text - piu' due varianti in bar e contour), e il

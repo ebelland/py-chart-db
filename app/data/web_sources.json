@@ -76,5 +76,11 @@
     "url": "https://raw.githubusercontent.com/fivethirtyeight/data/master/comic-characters/marvel-wikia-data.csv",
     "category": "Entertainment",
     "description": "16,376 characters - alignment, eye and hair colour, sex, first appearance - from FiveThirtyEight's comics dataset."
+  },
+  {
+    "name": "S&P 500, monthly since 1871",
+    "url": "https://raw.githubusercontent.com/datasets/s-and-p-500/master/data/data.csv",
+    "category": "Stock markets",
+    "description": "Shiller's monthly S&P 500 series - price, dividend, earnings, CPI and the cyclically-adjusted PE10 - a century and a half in one table, real (inflation-adjusted) alongside nominal."
   }
 ]

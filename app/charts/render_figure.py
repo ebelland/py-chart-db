@@ -105,7 +105,7 @@ def render_figure_from_descriptor(
         axes_with_positions, rows, cols, spans_valid = _normalized_axes_for_grid(
             replace(descriptor, axes=base_axes)
         )
-        axes_flat = _create_axes_grid(
+        axes_flat, shared_axes = _create_axes_grid(
             figure=figure,
             descriptor=descriptor,
             axes_with_positions=axes_with_positions,
@@ -180,6 +180,7 @@ def render_figure_from_descriptor(
 
             _apply_axis_runtime_options(ax=ax, axis_desc=axis_desc)
 
+        _clear_redundant_shared_axis_labels(shared_axes)
         _apply_layout(figure, descriptor)
         _normalize_axes_fill_policy(figure, descriptor)
 
@@ -381,8 +382,13 @@ def _create_axes_grid(
     rows: int,
     cols: int,
     respect_spans: bool = True,
-) -> list[Any]:
+) -> tuple[list[Any], set[Any]]:
     """Create all axes from a GridSpec using normalized positions.
+
+    Returns the flat axes list and the set of axes on either side of a
+    sharex/sharey pairing - the caller uses the latter for
+    ``_clear_redundant_shared_axis_labels`` once every axis has been drawn
+    and labelled.
 
     A GridSpec is used instead of the plain ``add_subplot(rows, cols, n)``
     numbering so that an axis whose options carry ``row_span``/``col_span``
@@ -406,10 +412,12 @@ def _create_axes_grid(
     first_ax: Any | None = None
     gridspec = figure.add_gridspec(rows, cols)
     # Every axis on either side of a sharex/sharey pairing, deferred to one
-    # label_outer() pass after the loop: an axis created early in the loop
-    # can still gain a shared partner created later, so hiding labels inside
-    # the loop could act on a pairing that had not been discovered yet.
+    # pass after the loop: an axis created early in the loop can still gain a
+    # shared partner created later, so acting inside the loop could act on a
+    # pairing that had not been discovered yet.
     shared_axes: set[Any] = set()
+    has_sharex = False
+    has_sharey = False
 
     for axis_desc, axis_index in axes_with_positions:
         axis_index = int(axis_index)
@@ -421,7 +429,7 @@ def _create_axes_grid(
                 rows,
                 cols,
             )
-            return axes_flat
+            return axes_flat, shared_axes
 
         axis_id = int(axis_desc.id)
         row = axis_index // cols
@@ -448,19 +456,58 @@ def _create_axes_grid(
         if "sharex" in kwargs or "sharey" in kwargs:
             shared_axes.add(ax)
             shared_axes.update(kwargs[key] for key in ("sharex", "sharey") if key in kwargs)
+            has_sharex = has_sharex or "sharex" in kwargs
+            has_sharey = has_sharey or "sharey" in kwargs
 
         if first_ax is None:
             first_ax = ax
 
     # A shared-scale grid reads as one instrument split into panels, not
-    # several unrelated charts that happen to agree - which needs the
-    # repeated tick labels between them gone, not just the numbers agreeing.
-    # Matches Matplotlib's own convention for this (see the sharex/sharey
-    # examples in the subplots_axes_and_figures gallery).
+    # several unrelated charts that happen to agree - which needs the panels
+    # touching, and the repeated tick labels between them gone, not just the
+    # numbers agreeing. Matches Matplotlib's own convention for this (see the
+    # sharex/sharey examples in the subplots_axes_and_figures gallery, which
+    # pair sharex/sharey with gridspec_kw={"hspace": 0, "wspace": 0}).
+    #
+    # One value each for the whole grid - a GridSpec has no per-row/per-column
+    # gap - so a sharex pairing (typically axes stacked in a column) closes
+    # every row gap, and a sharey pairing (typically axes side by side in a
+    # row) closes every column gap. A figure in "Manual" layout mode
+    # overrides this afterwards with its own explicit margins, which is the
+    # right precedence: this is only a default for the automatic layout
+    # engines, never a fight with a value the user actually set.
+    if has_sharex:
+        gridspec.update(hspace=0.0)
+    if has_sharey:
+        gridspec.update(wspace=0.0)
+
     for ax in shared_axes:
         ax.label_outer()
 
-    return axes_flat
+    return axes_flat, shared_axes
+
+
+def _clear_redundant_shared_axis_labels(shared_axes: set[Any]) -> None:
+    """Blank the axis label text label_outer() leaves standing.
+
+    label_outer() (called in _create_axes_grid, right after each axis is
+    created) only strips tick *numbers*; the axis label text - "body mass
+    (g)", "Count" - is a separate artist it never touches, and every panel
+    in a shared row/column keeps repeating it. This runs after every axis
+    has been drawn and given its label by _apply_axis_runtime_options,
+    which is what a call this early would otherwise be overwritten by:
+    blanked here, on exactly the same edges label_outer() already used, so
+    the one label left standing is the one whose tick numbers are also
+    there.
+    """
+    for ax in shared_axes:
+        spec = ax.get_subplotspec()
+        if spec is None:
+            continue
+        if not spec.is_last_row():
+            ax.set_xlabel("")
+        if not spec.is_first_col():
+            ax.set_ylabel("")
 
 
 # ----------------------------------------------------------------------

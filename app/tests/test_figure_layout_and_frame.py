@@ -86,7 +86,7 @@ def test_default_spans_render_like_a_plain_grid() -> None:
     assert spans_valid is True
 
     fig = Figure()
-    axes_flat = _create_axes_grid(figure=fig, descriptor=desc, axes_with_positions=positions, rows=rows, cols=cols)
+    axes_flat, _shared = _create_axes_grid(figure=fig, descriptor=desc, axes_with_positions=positions, rows=rows, cols=cols)
     assert len(axes_flat) == 4
     assert all(ax is not None for ax in axes_flat)
 
@@ -109,7 +109,7 @@ def test_col_span_widens_an_axis_across_the_top_row() -> None:
     assert spans_valid is True
 
     fig = Figure()
-    axes_flat = _create_axes_grid(figure=fig, descriptor=desc, axes_with_positions=positions, rows=rows, cols=cols)
+    axes_flat, _shared = _create_axes_grid(figure=fig, descriptor=desc, axes_with_positions=positions, rows=rows, cols=cols)
     wide_ax, left_ax, right_ax = axes_flat[0], axes_flat[2], axes_flat[3]
 
     wide_width = wide_ax.get_position().x1 - wide_ax.get_position().x0
@@ -129,7 +129,7 @@ def test_row_span_heightens_an_axis_down_a_column() -> None:
     positions, rows, cols, spans_valid = _normalized_axes_for_grid(desc)
     assert spans_valid is True
     fig = Figure()
-    axes_flat = _create_axes_grid(figure=fig, descriptor=desc, axes_with_positions=positions, rows=rows, cols=cols)
+    axes_flat, _shared = _create_axes_grid(figure=fig, descriptor=desc, axes_with_positions=positions, rows=rows, cols=cols)
     tall_ax, small_ax = axes_flat[0], axes_flat[1]
 
     tall_height = tall_ax.get_position().y1 - tall_ax.get_position().y0
@@ -154,7 +154,7 @@ def test_overlapping_spans_fall_back_to_a_compact_one_cell_grid() -> None:
     assert len(seen_indexes) == len(positions)  # no duplicate positions
 
     fig = Figure()
-    axes_flat = _create_axes_grid(
+    axes_flat, _shared = _create_axes_grid(
         figure=fig,
         descriptor=desc,
         axes_with_positions=positions,
@@ -181,7 +181,7 @@ def test_span_out_of_grid_bounds_is_clamped_not_raised() -> None:
     desc = _figure(1, 2, [axis])
     positions, rows, cols, spans_valid = _normalized_axes_for_grid(desc)
     fig = Figure()
-    axes_flat = _create_axes_grid(
+    axes_flat, _shared = _create_axes_grid(
         figure=fig,
         descriptor=desc,
         axes_with_positions=positions,
