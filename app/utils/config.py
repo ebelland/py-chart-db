@@ -289,9 +289,62 @@ def get_last_database() -> Path | None:
     return path if path.exists() else None
 
 
+#: How many databases the Open recent menu keeps. Ten is what a file menu
+#: can show without becoming a list to search rather than a shortcut.
+MAX_RECENT_DATABASES: int = 10
+
+CONFIG_RECENT_DATABASES: str = "recent_databases"
+
+
 def set_last_database(db_path: Path) -> None:
-    """Remember the database to reopen at the next start."""
+    """Remember the database to reopen at the next start, and in the menu.
+
+    Both, from one call, deliberately: every place that makes a database
+    the current one is by definition a place it belongs at the top of the
+    recent list, and two functions to call would eventually be one.
+    """
     set_value("last_database", str(db_path))
+    remember_recent_database(db_path)
+
+
+def get_recent_databases() -> list[Path]:
+    """Return the recently opened databases, most recent first.
+
+    Paths that no longer exist are dropped rather than listed: a menu
+    entry that can only fail is worse than a shorter menu, and a project
+    file gets renamed and moved like any other file.
+    """
+    raw = get_value(CONFIG_RECENT_DATABASES, [])
+    if not isinstance(raw, list):
+        return []
+
+    seen: set[Path] = set()
+    found: list[Path] = []
+    for entry in raw:
+        try:
+            path = Path(str(entry)).expanduser()
+        except (TypeError, ValueError):
+            continue
+        if path in seen or not path.exists():
+            continue
+        seen.add(path)
+        found.append(path)
+    return found[:MAX_RECENT_DATABASES]
+
+
+def remember_recent_database(db_path: Path) -> None:
+    """Put one database at the top of the recent list."""
+    path = Path(db_path).expanduser()
+    remaining = [entry for entry in get_recent_databases() if entry != path]
+    set_value(
+        CONFIG_RECENT_DATABASES,
+        [str(path), *(str(entry) for entry in remaining)][:MAX_RECENT_DATABASES],
+    )
+
+
+def clear_recent_databases() -> None:
+    """Forget every recent database. The current one is not reopened by it."""
+    set_value(CONFIG_RECENT_DATABASES, [])
 
 
 def get_language() -> str:

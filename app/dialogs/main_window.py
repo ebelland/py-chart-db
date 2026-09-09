@@ -11,6 +11,7 @@ re-renders the whole figure.
 from __future__ import annotations
 
 import gc
+from functools import partial
 from pathlib import Path
 from typing import Any, cast
 
@@ -39,6 +40,7 @@ from app.widgets.series_operation import SeriesOperationWidget
 from app.scanners.series_operation_scanner import import_class_from_file
 from app.styles.style import (
     IS_MACOS,
+    MenuItem,
     PANEL_MIN_WIDTH,
     action_menu_item,
     action_presentation,
@@ -55,7 +57,13 @@ from app.styles.style import (
 )
 from app.widgets.table_list import  TableListPanel
 from app.widgets.table_preview import TablePreviewPanel
-from app.utils.config import get_section, set_last_database, set_section
+from app.utils.config import (
+    clear_recent_databases,
+    get_recent_databases,
+    get_section,
+    set_last_database,
+    set_section,
+)
 from app.utils.dialog_state import restore_window_geometry, save_window_geometry
 from app.utils.messages import show_message
 from app.logs.logger import applogger
@@ -437,6 +445,7 @@ class MainWindow(QMainWindow):
         return [
             action_menu_item("new", self._on_new_file),
             action_menu_item("open", self._on_open_database),
+            self._recent_databases_item(),
             action_menu_item("save_as", self._on_save_as),
             action_menu_item("import", self._on_import_data),
             action_menu_item("query_builder", self._on_query_builder),
@@ -449,6 +458,65 @@ class MainWindow(QMainWindow):
             action_menu_item("user_manual", self._on_user_manual),
             action_menu_item("credits", self._on_credits),
         ]
+
+    def _recent_databases_item(self) -> MenuItem:
+        """The Open recent submenu, built from user.json's own list.
+
+        Every entry names one file, and the tooltip carries the folder it
+        is in: two projects called "analysis.dhub" in different places are
+        the normal case, and a menu of identical names is a menu of
+        guesses. Disabled rather than hidden when the list is empty, so
+        the menu keeps its shape between the first and the second launch.
+        """
+        recent = get_recent_databases()
+        items: list[MenuItem | None] = [
+            MenuItem(
+                text=path.name,
+                tooltip=str(path.parent),
+                icon="open",
+                callback=partial(self._on_open_recent, path),
+            )
+            for path in recent
+        ]
+        if items:
+            items.append(None)
+            items.append(
+                MenuItem(text=_("Clear menu"), callback=self._on_clear_recent)
+            )
+
+        return MenuItem(
+            text=_("Open recent"),
+            icon="open",
+            submenu=items,
+            enabled=bool(recent),
+        )
+
+    def _on_open_recent(self, db_path: Path) -> None:
+        """Open one remembered database."""
+        if not db_path.exists():
+            # Between building the menu and clicking it - or a file on a
+            # volume that has since been unmounted.
+            applogger.warning(
+                "That database is no longer there: %s",
+                db_path,
+                show_dialog=False,
+                raise_error=False,
+            )
+            show_message(self, "database.open_failed", error=db_path)
+            self._build_app_menu()
+            return
+
+        applogger.info("Opening recent database: %s", db_path)
+        try:
+            self._switch_database(db_path)
+        except Exception as exc:  # noqa: BLE001
+            applogger.exception("Failed to open database: %s", exc)
+            show_message(self, "database.open_failed", error=exc)
+
+    def _on_clear_recent(self) -> None:
+        """Forget the list. The database currently open is not affected."""
+        clear_recent_databases()
+        self._build_app_menu()
 
     def _build_app_menu(self) -> None:
         """Create the app menu, and place it where each platform expects it.
@@ -499,6 +567,17 @@ class MainWindow(QMainWindow):
             if item is None:
                 menu.addSeparator()
                 continue
+
+            if item.submenu is not None:
+                # The same helper the popup uses, so Open recent is one
+                # list of files rendered twice rather than two lists that
+                # can disagree.
+                child = create_menu(self, item.submenu)
+                child.setTitle(item.text)
+                child.setEnabled(item.enabled)
+                menu.addMenu(child)
+                continue
+
             create_menu_item(
                 parent=self,
                 menu=menu,
@@ -762,6 +841,10 @@ class MainWindow(QMainWindow):
             self._table_panel.reload()
             self._reload_tabs()
             self._update_properties_for_current_chart()
+            # set_last_database above has just put this file at the top of
+            # the recent list; the menu showing that list has to be rebuilt
+            # or it goes on showing the order from before the switch.
+            self._build_app_menu()
         finally:
             self.setUpdatesEnabled(True)
 

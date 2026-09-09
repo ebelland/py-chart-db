@@ -107,9 +107,13 @@ def test_the_menu_holds_every_item_the_popup_has(window: MainWindow) -> None:
     items = menu.actions()
 
     ids = [action.data() for action in items if not action.isSeparator()]
+    # Open recent carries no action id: it is a submenu, not an action, and
+    # its entries are file paths rather than catalogue ids.
+    assert [action.text() for action in items if action.menu()] == ["Open recent"]
     assert ids == [
         "new",
         "open",
+        None,
         "save_as",
         "import",
         "query_builder",

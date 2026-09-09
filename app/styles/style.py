@@ -138,6 +138,10 @@ class MenuItem:
     action_id: str | None = None
     checked: bool = False
     enabled: bool = True
+    #: Nested items, for an entry that opens a submenu rather than doing
+    #: something - "Open recent" and its list of files. A submenu item's
+    #: own callback is never called: Qt gives the entry to the submenu.
+    submenu: "list[MenuItem | None] | None" = None
 
 
 # ----------------------------------------------------------------------
@@ -1600,12 +1604,29 @@ def create_menu(
     parent: QWidget,
     items: list[MenuItem | None],
 ) -> QMenu:
-    """Create a QMenu from typed menu item descriptors."""
+    """Create a QMenu from typed menu item descriptors.
+
+    An item carrying ``submenu`` becomes a nested menu built from the same
+    descriptors, so a caller composes one list and both the popup menu and
+    (on macOS) the real menu bar are built from it - which is the whole
+    reason the descriptors exist.
+    """
     menu = QMenu(parent)
 
     for item in items:
         if item is None:
             menu.addSeparator()
+            continue
+
+        if item.submenu is not None:
+            child = create_menu(parent, item.submenu)
+            child.setTitle(item.text)
+            if item.icon is not None:
+                child.setIcon(
+                    item.icon if isinstance(item.icon, QIcon) else load_icon(item.icon)
+                )
+            child.setEnabled(item.enabled)
+            menu.addMenu(child)
             continue
 
         create_menu_item(

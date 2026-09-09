@@ -4516,3 +4516,11 @@ msgstr "Orientamento"
 
 msgid "A vertical or horizontal line across the whole axes, at a value in data coordinates. Kwargs must be JSON, for example: {\"color\": \"red\", \"linestyle\": \"--\", \"label\": \"limit\"}."
 msgstr "Una linea verticale o orizzontale su tutti gli assi, a un valore in coordinate dati. I kwargs devono essere JSON, per esempio: {"color": "red", "linestyle": "--", "label": "limit"}."
+
+
+msgid "Open recent"
+msgstr "Apri recenti"
+
+
+msgid "Clear menu"
+msgstr "Svuota il menu"
