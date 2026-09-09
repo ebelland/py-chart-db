@@ -129,14 +129,15 @@ QWidget#basePropertiesPanel {
   background: palette(window);
 }
 
-/* The dataset/series selector sits directly on top of a QTabWidget whose
-   own pane is the same palette(base) white as every other card - an 8%
-   hairline is the only thing telling them apart, which all but disappears
-   white-on-white. A faint tint gives it a surface of its own without
-   needing a stronger border to do it. */
-#axisSelectorCard {
-  background: rgba(@SHADOW_RGB@, 0.025);
-}
+/* #axisSelectorCard deliberately has no rule of its own: it is a card, and
+   a card here is white.
+
+   It carried a 2.5% tint for a while, on the theory that it needed its own
+   surface because the QTabWidget below it is white too. It does not: what
+   sits directly under it is the *tab bar*, which is a 5% grey strip, so the
+   two white surfaces were never touching. All the tint achieved was one
+   card in the whole application that was a slightly different colour from
+   every other one, which is what it looked like. */
 
 QWidget[editorPanel="true"],
 QAbstractItemView[editorPanel="true"] {
