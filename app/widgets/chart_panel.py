@@ -29,7 +29,13 @@ from app.charts.render_figure import render_figure_from_descriptor
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
 from app.utils.messages import ask, show_message
-from app.styles.style import SPLITTER_HANDLE_WIDTH, MenuItem, create_menu, create_toolbar_button
+from app.styles.style import (
+    SPLITTER_HANDLE_WIDTH,
+    MenuItem,
+    create_menu,
+    create_menu_item,
+    create_toolbar_button,
+)
 from app.utils.config import get_section, get_value, update_section
 from app.utils.figure_metrics import CM_PER_INCH, figure_metrics_from_options
 from app.utils.hidpi import (
@@ -1062,8 +1068,115 @@ class ChartPanel(QFrame):
         return menu
 
     def _show_context_menu(self, pos: QPoint) -> None:
-        """Show the cached actions menu."""
-        self._actions_menu.exec(self._canvas.mapToGlobal(pos))
+        """Show the actions menu, plus what can be done at the point clicked.
+
+        The cached menu covers the whole figure - reload, copy, save,
+        delete - and is the same wherever the click landed. The reference
+        lines are not: they are added *at* a value on one axis, so they
+        only appear when the click is inside an axes, and they name the
+        value they would use.
+        """
+        self.context_menu_for(pos).exec(self._canvas.mapToGlobal(pos))
+
+    def context_menu_for(self, pos: QPoint) -> QMenu:
+        """Return the menu a right-click at *pos* should open."""
+        target = self._axis_at(pos)
+        if target is None:
+            return self._actions_menu
+
+        axis_id, axes, x_value, y_value = target
+        menu = self._build_actions_menu()
+        menu.addSeparator()
+        create_menu_item(
+            parent=self,
+            menu=menu,
+            icon="add",
+            checkable=False,
+            text=_("Add vertical line at x = {value}").format(
+                value=axis_text(axes.xaxis, x_value)
+            ),
+            tooltip=_("A line across the whole axes, at this x."),
+            key=None,
+            action=lambda: self._add_reference_line(axis_id, "vertical", x_value),
+        )
+        create_menu_item(
+            parent=self,
+            menu=menu,
+            icon="add",
+            checkable=False,
+            text=_("Add horizontal line at y = {value}").format(
+                value=axis_text(axes.yaxis, y_value)
+            ),
+            tooltip=_("A line along the whole axes, at this y."),
+            key=None,
+            action=lambda: self._add_reference_line(axis_id, "horizontal", y_value),
+        )
+        return menu
+
+    def _axis_at(self, pos: QPoint) -> tuple[int, Any, float, float] | None:
+        """Return (axis id, axes, x, y) for the axes under *pos*, or None.
+
+        The axis id comes off the axes itself: render_figure tags every one
+        it creates with ``_dhub_axis_id``, so a click maps back to the
+        descriptor without this panel keeping a second mapping that could
+        fall out of step with the figure.
+
+        Qt counts pixels from the top-left and Matplotlib from the
+        bottom-left; ``mouseEventCoords`` is Matplotlib's own conversion,
+        device pixel ratio included, and using it is what makes this agree
+        with the toolbar's cursor readout on a Retina screen.
+        """
+        try:
+            x_pixels, y_pixels = self._canvas.mouseEventCoords(pos)
+        except Exception:  # noqa: BLE001 - a backend without the helper
+            return None
+
+        # Last first: a twin axes is created after the axes it overlays and
+        # is the one on top, so it is the one a click belongs to.
+        for axes in reversed(list(self._figure.axes)):
+            axis_id = getattr(axes, "_dhub_axis_id", None)
+            if axis_id is None or not axes.bbox.contains(x_pixels, y_pixels):
+                continue
+            try:
+                x_value, y_value = axes.transData.inverted().transform(
+                    (x_pixels, y_pixels)
+                )
+            except Exception:  # noqa: BLE001 - a 3D or polar axes may refuse
+                return None
+            return int(axis_id), axes, float(x_value), float(y_value)
+        return None
+
+    def _add_reference_line(
+        self, axis_id: int, orientation: str, value: float
+    ) -> None:
+        """Store one reference line on the axis, and redraw.
+
+        The same "lines" option the Overlay properties panel edits, so a
+        line dropped here can be restyled, moved or deleted there - see
+        BaseAxisRenderer.apply_reference_lines. Nothing about the style is
+        decided here: at the moment of the click the only thing known is
+        where.
+        """
+        try:
+            self._repo.snapshot_for_undo(
+                self._repo.DESCRIPTOR_TABLES,
+                label=_("Add {orientation} line").format(orientation=orientation),
+            )
+            options = dict(self._repo.get_axis_options(int(axis_id)) or {})
+            lines = list(options.get("lines") or [])
+            lines.append(
+                {"orientation": orientation, "value": float(value), "kwargs": {}}
+            )
+            options["lines"] = lines
+            self._repo.set_axis_options(int(axis_id), options)
+        except Exception:  # noqa: BLE001
+            applogger.exception("Could not add a reference line.")
+            return
+
+        applogger.info(
+            "Added a %s reference line at %g on axis %s", orientation, value, axis_id
+        )
+        self.reload()
 
     # ------------------------------------------------------------------
     # Resize / zoom / background helpers

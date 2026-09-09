@@ -4544,3 +4544,23 @@ msgstr "Asse: {action}"
 
 msgid "Reorder series"
 msgstr "Riordina le serie"
+
+
+msgid "Add vertical line at x = {value}"
+msgstr "Aggiungi linea verticale a x = {value}"
+
+
+msgid "Add horizontal line at y = {value}"
+msgstr "Aggiungi linea orizzontale a y = {value}"
+
+
+msgid "A line across the whole axes, at this x."
+msgstr "Una linea su tutta l'area del grafico, a questa x."
+
+
+msgid "A line along the whole axes, at this y."
+msgstr "Una linea lungo tutta l'area del grafico, a questa y."
+
+
+msgid "Add {orientation} line"
+msgstr "Aggiungi linea {orientation}"

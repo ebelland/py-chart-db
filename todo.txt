@@ -24,12 +24,14 @@ N-5   sqlite_repo: 3048 lines in one module
       changes. The dataclass with a mutable OrderedDict field and the series
       cache belong with the connection, not with the descriptors.
 
-N-8   ChartPanel: "Add vertical line" / "Add horizontal line"
-      Meta' fatta 2026-09-09: la chiave "lines" esiste, la disegna
-      BaseAxisRenderer.apply_reference_lines (chiamata da apply_annotations,
-      quindi ogni renderer la eredita) e si edita nel pannello Overlay
-      properties. Resta la voce nel menu contestuale del grafico, che deve
-      solo scrivere la stessa chiave con il valore del punto cliccato.
+FATTO 2026-09-10 (N-8) linee verticali/orizzontali dal menu contestuale
+      Il click destro dentro un axes offre due voci che nominano il valore
+      ("Add vertical line at x = 12.5"), formattato dall'axis come il
+      readout della toolbar - su un asse a date legge la data. L'asse
+      arriva dal tag _dhub_axis_id che render_figure lascia su ogni axes,
+      quindi nessuna seconda mappa da tenere allineata. Scrive la stessa
+      chiave "lines" del pannello Overlay, ed e' annullabile come ogni
+      altra modifica ai descrittori.
 
 N-3   attribute control charts (p, np, c, u)
       The half of SPC N-1 does not cover. These plot a proportion or a count
