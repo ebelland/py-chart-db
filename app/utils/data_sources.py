@@ -30,6 +30,7 @@ import os
 import sqlite3
 import tempfile
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
 from io import StringIO
@@ -347,6 +348,92 @@ class DatabaseConnection:
         )
 
 
+#: Schemas MySQL keeps for its own bookkeeping. They are databases like any
+#: other as far as ``SHOW DATABASES`` is concerned, and every server has them,
+#: so listing them would bury the two or three a user actually came for.
+_MYSQL_SYSTEM_SCHEMAS: frozenset[str] = frozenset(
+    {"information_schema", "performance_schema", "mysql", "sys"}
+)
+
+
+def _postgres_bootstrap_databases(conn: DatabaseConnection) -> list[str]:
+    """Databases to try opening in order to ask what databases exist.
+
+    PostgreSQL has no connection without one - the catalogue of databases is
+    itself read from inside a database - so this is a chicken-and-egg the
+    caller cannot solve by leaving the field blank. Whatever is typed comes
+    first (it is the one the user believes in), then ``postgres``, the
+    maintenance database every server is created with.
+    """
+    candidates = [conn.database.strip(), "postgres"]
+    return list(dict.fromkeys(name for name in candidates if name))
+
+
+def list_postgres_databases(conn: DatabaseConnection) -> list[str]:
+    """Return the databases on *conn*'s server this user is allowed to open.
+
+    Templates are left out - they exist to be copied, not queried - and so is
+    anything the login cannot CONNECT to, since offering a name that will
+    only ever answer "permission denied" is worse than not offering it.
+    """
+    import pg8000.dbapi
+
+    last_error: Exception | None = None
+    for candidate in _postgres_bootstrap_databases(conn):
+        try:
+            connection = pg8000.dbapi.connect(
+                host=conn.host,
+                port=int(conn.port),
+                database=candidate,
+                user=conn.username,
+                password=conn.password,
+            )
+        except Exception as exc:  # noqa: BLE001 - try the next candidate
+            last_error = exc
+            continue
+
+        try:
+            cursor = connection.cursor()
+            cursor.execute(
+                "SELECT datname FROM pg_database "
+                "WHERE datistemplate = false "
+                "AND has_database_privilege(datname, 'CONNECT') "
+                "ORDER BY datname"
+            )
+            return [str(row[0]) for row in cursor.fetchall()]
+        finally:
+            connection.close()
+
+    raise last_error or ConnectionError("No database to connect to")
+
+
+def list_mysql_databases(conn: DatabaseConnection) -> list[str]:
+    """Return the databases on *conn*'s server, minus MySQL's own schemas.
+
+    No database is named in the connection: MySQL is happy to be asked what
+    it has before being told which one to use, which is exactly the order a
+    user picking one from a list needs.
+    """
+    import pymysql
+
+    connection = pymysql.connect(
+        host=conn.host,
+        port=int(conn.port),
+        user=conn.username,
+        password=conn.password,
+    )
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SHOW DATABASES")
+            return [
+                str(row[0])
+                for row in cursor.fetchall()
+                if str(row[0]).lower() not in _MYSQL_SYSTEM_SCHEMAS
+            ]
+    finally:
+        connection.close()
+
+
 def list_postgres_tables(conn: DatabaseConnection) -> list[str]:
     """Return the base tables in *conn*'s ``public`` schema."""
     import pg8000.dbapi
@@ -459,6 +546,15 @@ SERVER_DATABASE_READERS: dict[str, tuple] = {
     ),
     "postgres": (list_postgres_tables, read_postgres_table),
     "mysql": (list_mysql_tables, read_mysql_table),
+}
+
+#: kind -> list_databases(conn), for the engines that have more than one.
+#: SQLite is absent deliberately rather than mapped to something that returns
+#: the file: a SQLite file *is* the database, and the dialog's "which database
+#: on this server?" step has nothing to ask about it.
+SERVER_DATABASE_CATALOGUES: dict[str, Callable[[DatabaseConnection], list[str]]] = {
+    "postgres": list_postgres_databases,
+    "mysql": list_mysql_databases,
 }
 
 

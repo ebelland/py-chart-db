@@ -47,8 +47,8 @@ _ENTRIES: tuple[ComboEntry, ...] = (
 )
 
 #: Matplotlib linestyle code -> Qt pen style. ``None`` means "draw nothing"
-#: (used for the "None" / no-line entry). "Default" has no fixed pen of its
-#: own - see _line_icon, which draws it as a faint solid line instead.
+#: (used for the "None" / no-line entry). "Default" is absent deliberately:
+#: it has no pen of its own - see _line_icon.
 _PEN_STYLES: dict[str, Qt.PenStyle | None] = {
     "-": Qt.PenStyle.SolidLine,
     "--": Qt.PenStyle.DashLine,
@@ -65,11 +65,17 @@ def _line_icon(linestyle: str) -> QIcon:
     # logical, but the bitmap has the pixels to be sharp on a Retina screen.
     pixmap = create_hidpi_pixmap(_ICON_W, _ICON_H)
 
-    # "Default" draws no fixed style of its own - a faint dashed line reads
-    # as "unset/inherited" without being mistaken for the concrete "Dashed"
-    # entry, which is drawn solid-strength above.
+    # "Default" has no style of its own to preview, so it is drawn as a
+    # faint version of what it almost always resolves to: rcParams'
+    # ``lines.linestyle``, which is solid in every style sheet that ships
+    # with Matplotlib. It used to be drawn *dashed*, which made the entry
+    # read as a second, washed-out "Dashed" - the faintness is the whole
+    # signal, so it has to be the only difference. Same treatment as the
+    # marker combo's Default, a faint circle. (Reading the live rcParam
+    # here instead would be worse: the icons are built once and cached,
+    # so it would go stale the moment a style sheet was loaded.)
     is_default = linestyle == DEFAULT
-    pen_style = Qt.PenStyle.DashLine if is_default else _PEN_STYLES.get(linestyle)
+    pen_style = Qt.PenStyle.SolidLine if is_default else _PEN_STYLES.get(linestyle)
     if pen_style is not None:
         painter = QPainter(pixmap)
         try:

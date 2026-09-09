@@ -37,8 +37,14 @@ ON: str = "on"
 #: Grid choices, as (stored value, label).  The line styles force an
 #: appearance as well as presence, which is what makes a minor grid usable:
 #: dotted minor against solid major reads as two levels rather than as noise.
+#:
+#: "Default" rather than the "From the style" it read as until the grid and
+#: tick settings moved onto a tab of their own: six of these combos sit
+#: three-across there, and a label that long left each of them showing "Fr".
+#: It is also the word the Series panel's own defer-to-the-style entries
+#: use, and one vocabulary for one idea is worth more than the extra words.
 GRID_CHOICES: tuple[tuple[str, str], ...] = (
-    (AUTO, "From the style"),
+    (AUTO, "Default"),
     (OFF, "Off"),
     (ON, "On"),
     ("-", "Solid"),
@@ -50,7 +56,7 @@ GRID_CHOICES: tuple[tuple[str, str], ...] = (
 #: Tick choices.  Direction doubles as "on", because a tick that is shown is
 #: shown somewhere: inside the axes, outside, or across.
 TICK_CHOICES: tuple[tuple[str, str], ...] = (
-    (AUTO, "From the style"),
+    (AUTO, "Default"),
     (OFF, "Off"),
     (ON, "On"),
     ("in", "Inside"),

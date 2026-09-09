@@ -211,6 +211,18 @@ msgstr "Annotazione aggiunta a x: {x}, y: {y}"
 msgid "Annotations"
 msgstr "Annotazioni"
 
+msgid "Labels"
+msgstr "Etichette"
+
+msgid "Scale"
+msgstr "Scala"
+
+msgid "Kwargs"
+msgstr "Kwargs"
+
+msgid "Position"
+msgstr "Posizione"
+
 
 msgid "Annotations are stored in axis options. Kwargs must be JSON, for example: {\"xytext\": [10, 10], \"textcoords\": \"offset points\"}."
 msgstr "Le annotazioni sono salvate nelle opzioni dell'asse. I kwargs devono essere in JSON, per esempio: {\"xytext\": [10, 10], \"textcoords\": \"offset points\"}."
@@ -1461,6 +1473,10 @@ msgstr "Freundlich"
 
 msgid "From the style"
 msgstr "Dallo stile"
+
+
+msgid "Default"
+msgstr "Predefinito"
 
 
 msgid "From x:"
@@ -3623,6 +3639,12 @@ msgstr "Polinomio di terzo grado."
 
 msgid "This database has no tables to import."
 msgstr "Questo database non contiene tabelle da importare."
+
+msgid "This server reported no databases you can open. Type the name if you know it."
+msgstr "Il server non ha indicato database che puoi aprire. Digita il nome se lo conosci."
+
+msgid "Connection"
+msgstr "Connessione"
 
 
 msgid "This function takes no parameters."

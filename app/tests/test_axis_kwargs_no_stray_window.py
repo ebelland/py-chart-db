@@ -24,10 +24,14 @@ from PySide6.QtCore import QCoreApplication, QEvent
 from app.data.sqlite_repo import SqliteRepo
 from app.dialogs.main_window import MainWindow
 from app.logs.logger import applogger
+from app.widgets.axis_properties import AxisPropertiesWidget
 from app.widgets.dictionary_editor import DictEditorPanel
 
-#: Index of the "Axis drawing (kwargs)" tab in AxisPropertiesWidget.
-KWARGS_TAB_INDEX = 1
+#: Index of the Kwargs tab, from the widget itself: the tab strip has been
+#: renumbered once already (the single "Axis options" page became
+#: Labels/Scale/Ticks), and a stale literal here would have gone on passing
+#: while opening a page with no kwargs editor on it at all.
+KWARGS_TAB_INDEX = AxisPropertiesWidget.KWARGS_TAB_INDEX
 
 
 @pytest.fixture

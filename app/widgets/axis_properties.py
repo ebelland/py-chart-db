@@ -94,6 +94,11 @@ class AxisPropertiesWidget(BaseProperties):
 
     KWARGS_PANEL_MIN_HEIGHT: Final[int] = 120
 
+    #: Where the kwargs editor sits in the tab strip. Named because callers
+    #: and tests reach for that page directly, and it has moved once already
+    #: (the single "Axis options" page became Labels/Scale/Ticks).
+    KWARGS_TAB_INDEX: Final[int] = 3
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         # _repo/_figure_id/_figure/_redraw_callback come from BaseProperties.
@@ -142,8 +147,16 @@ class AxisPropertiesWidget(BaseProperties):
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Expanding,
         )
-        self._tabs.addTab(self._build_axis_options_section(), _("Axis options"))
-        self._tabs.addTab(self._build_kwargs_section(), _("Axis drawing (kwargs)"))
+        # One "Axis options" page used to hold all of this, and it was a
+        # column of thirty controls under three headings that only a scroll
+        # bar separated: the scale settings were four scrolls away from the
+        # tick settings that share their axis. Split by what the user came
+        # to change - what the axis says, how it counts, how it is drawn -
+        # each page short enough to be read without scrolling.
+        self._tabs.addTab(self._build_labels_tab(), _("Labels"))
+        self._tabs.addTab(self._build_scale_tab(), _("Scale"))
+        self._tabs.addTab(self._build_ticks_tab(), _("Ticks"))
+        self._tabs.addTab(self._build_kwargs_section(), _("Kwargs"))
         self._tabs.addTab(self._build_annotations_section(), _("Annotations"))
         root.addWidget(self._tabs, 1)
 
@@ -202,14 +215,15 @@ class AxisPropertiesWidget(BaseProperties):
         layout.addWidget(self._renderer_value)
         return section
 
-    def _build_axis_options_section(self) -> QWidget:
-        """Create editable axis option controls inside a local scroll area.
+    def _build_option_page(self, object_name: str) -> tuple[QScrollArea, QWidget, QVBoxLayout]:
+        """Return an option page: its scroll area, its card, and the layout.
 
         The axis properties panel itself must not be hosted by an outer
-        QScrollArea.  Only this long Axis options page needs scrolling because
-        it contains many controls.  Keeping the scroll area inside the tab lets
-        the QTabWidget and the top-level AxisPropertiesWidget expand to their
-        parent instead of advertising a very tall sizeHint.
+        QScrollArea. Each option page carries its own instead, so the
+        QTabWidget and the top-level AxisPropertiesWidget expand to their
+        parent rather than advertising the tallest page's sizeHint - and a
+        page longer than the panel scrolls on its own without dragging the
+        selector card above it out of view.
         """
         scroll = QScrollArea(self._tabs)
         scroll.setObjectName("axisOptionsScrollArea")
@@ -223,10 +237,7 @@ class AxisPropertiesWidget(BaseProperties):
             QSizePolicy.Policy.Expanding,
         )
 
-        # This is the real tab content.  It may be taller than the viewport;
-        # the scroll area above owns that overflow, not the whole properties
-        # panel and not the QTabWidget.
-        section = create_card_widget(scroll, "axisOptionsCard")
+        section = create_card_widget(scroll, object_name)
         section.setMinimumHeight(0)
         section.setSizePolicy(
             QSizePolicy.Policy.Expanding,
@@ -234,6 +245,17 @@ class AxisPropertiesWidget(BaseProperties):
         )
         layout = QVBoxLayout(section)
         apply_card_layout(layout)
+        scroll.setWidget(section)
+        return scroll, section, layout
+
+    def _build_labels_tab(self) -> QWidget:
+        """What this axis says, and where it sits in the figure.
+
+        The four text fields first, because they are what a figure is
+        usually opened to fix; the placement settings under a heading of
+        their own below them.
+        """
+        scroll, section, layout = self._build_option_page("axisOptionsCard")
 
         form = QFormLayout()
         stdSizeAndlayout(form)
@@ -271,43 +293,60 @@ class AxisPropertiesWidget(BaseProperties):
         share_layout.addWidget(self._sharey_check)
         share_layout.addStretch(1)
 
-        self._pickradius_spin = QDoubleSpinBox(section)
-        self._pickradius_spin.setSizePolicy(
-            QSizePolicy.Policy.Expanding,
-            QSizePolicy.Policy.Fixed,
-        )
-        self._pickradius_spin.setRange(0.0, 1000.0)
-        self._pickradius_spin.setSingleStep(0.5)
-        self._pickradius_spin.setDecimals(2)
-
+        # "Pick radius" used to be here, writing the axis' own ``pickradius``.
+        # The Kwargs page has offered ``picker`` - the same setting, in the
+        # same units, on the artists that are actually clicked - since the
+        # kwargs schema grew ARTIST_KWARGS, and two fields for one idea meant
+        # the losing one was whichever the user did not set. Removed here;
+        # nothing else about it changed, so an axis that already carries a
+        # pickradius still renders with it.
         form.addRow(_("Title"), self._axis_label_edit)
         form.addRow(_("X label"), self._x_label_edit)
         form.addRow(_("Y label"), self._y_label_edit)
         form.addRow(_("Z label"), self._z_label_edit)
-        form.addRow(_("Projection"), self._projection_combo)
-        form.addRow(_("Sharing"), share_row)
-        form.addRow(_("Pick radius"), self._pickradius_spin)
-        form.addRow(_("Visible"), self._hide_axis_check)
         layout.addLayout(form)
 
-        layout.addWidget(create_section_title(_("Grid position"), section))
-        layout.addLayout(self._build_span_form(section))
+        layout.addWidget(create_section_title(_("Position"), section))
+        placement = QFormLayout()
+        stdSizeAndlayout(placement)
+        placement.addRow(_("Projection"), self._projection_combo)
+        placement.addRow(_("Sharing"), share_row)
+        placement.addRow(_("Visible"), self._hide_axis_check)
+        placement.addRow(_("Span"), self._build_span_row(section))
+        layout.addLayout(placement)
+
+        layout.addStretch(1)
+        return scroll
+
+    def _build_scale_tab(self) -> QWidget:
+        """How this axis counts: scale, direction, and the range shown."""
+        scroll, section, layout = self._build_option_page("axisScaleCard")
 
         layout.addWidget(create_section_title(_("Scale and direction"), section))
         layout.addLayout(self._build_scale_form(section))
 
-        layout.addWidget(create_section_title(_("Ticks, grid and spines"), section))
-        layout.addLayout(self._build_decoration_form(section))
+        # Limits belong with the scale rather than with the ticks they used
+        # to sit under: both answer "what part of the data is on screen".
+        layout.addWidget(create_section_title(_("Limits"), section))
+        layout.addLayout(self._build_limits_form(section))
 
         layout.addStretch(1)
-        scroll.setWidget(section)
+        return scroll
+
+    def _build_ticks_tab(self) -> QWidget:
+        """How this axis is drawn: its ticks, its grid, its spines."""
+        scroll, section, layout = self._build_option_page("axisTicksCard")
+
+        self._build_decoration_widgets(section, layout)
+
+        layout.addStretch(1)
         return scroll
 
     # Matches the 1..6 range the Figure panel offers for rows/cols, so a span
     # can never claim more of the grid than the grid itself can have.
     MAX_GRID_SPAN: Final[int] = 6
 
-    def _build_span_form(self, section: QWidget) -> QFormLayout:
+    def _build_span_row(self, section: QWidget) -> QWidget:
         """Create the row/column span controls for non-uniform layouts.
 
         An axis normally fills one grid cell at its position. Raising either
@@ -315,10 +354,11 @@ class AxisPropertiesWidget(BaseProperties):
         across the top row of a 2x2 grid with two narrower axes below it.
         Overlapping another axis's cells falls back to a plain compact grid
         on render rather than drawing on top of it.
-        """
-        form = QFormLayout()
-        stdSizeAndlayout(form)
 
+        Returned as a row widget rather than as a form of its own: it joins
+        the Position form above it, whose label column it has to share or
+        else "Span" sits a few pixels off from "Sharing".
+        """
         self._row_span_spin = QSpinBox(section)
         self._col_span_spin = QSpinBox(section)
         for spin in (self._row_span_spin, self._col_span_spin):
@@ -341,9 +381,7 @@ class AxisPropertiesWidget(BaseProperties):
         span_layout.addSpacing(8)
         span_layout.addWidget(QLabel(_("Cols"), span_row))
         span_layout.addWidget(self._col_span_spin, 1)
-
-        form.addRow(_("Span"), span_row)
-        return form
+        return span_row
 
     def _build_scale_form(self, section: QWidget) -> QFormLayout:
         """Create the scale and direction controls.
@@ -414,11 +452,14 @@ class AxisPropertiesWidget(BaseProperties):
         self._update_scale_control_state()
         return form
 
-    def _build_decoration_form(self, section: QWidget) -> QFormLayout:
-        """Create the tick, grid and spine controls."""
-        form = QFormLayout()
-        stdSizeAndlayout(form)
+    def _build_decoration_widgets(self, section: QWidget, layout: QVBoxLayout) -> None:
+        """Add the tick, grid and spine controls to a page layout.
 
+        The two 3x2 grids are added at full width, with their name above
+        them rather than in a form's label column: three combos across
+        already fills a properties panel, and the ~90px that column took
+        was the difference between reading "Default" and reading "De".
+        """
         # Four grid settings and four tick settings: one per axis, per tick
         # class. One switch for the whole axes could not say "x major and y
         # minor", and - being a boolean - could not say "off" at all against a
@@ -458,11 +499,27 @@ class AxisPropertiesWidget(BaseProperties):
             spine_layout.addWidget(check)
         spine_layout.addStretch(1)
 
-        form.addRow(_("Grid"), self._build_setting_grid(section, self._grid_combos))
-        form.addRow(_("Ticks"), self._build_setting_grid(section, self._tick_combos))
+        layout.addWidget(create_section_title(_("Grid"), section))
+        layout.addWidget(self._build_setting_grid(section, self._grid_combos))
+        layout.addWidget(create_section_title(_("Ticks"), section))
+        layout.addWidget(self._build_setting_grid(section, self._tick_combos))
+
+        form = QFormLayout()
+        stdSizeAndlayout(form)
         form.addRow(_("Tick length"), self._tick_length_spin)
         form.addRow(_("X tick rotation"), self._x_tick_rotation_spin)
         form.addRow(_("Hide spines"), spine_row)
+        layout.addLayout(form)
+
+    def _build_limits_form(self, section: QWidget) -> QFormLayout:
+        """Create the visible-range controls.
+
+        The three ranges are only editable under the modes that use them,
+        which the mode combo drives - an always-editable "X range" that a
+        "fit to data" axis quietly ignores is worse than a disabled one.
+        """
+        form = QFormLayout()
+        stdSizeAndlayout(form)
 
         self._limits_mode_combo = QComboBox(section)
         self._configure_combo_width(self._limits_mode_combo, minimum_contents_length=18)
@@ -540,7 +597,12 @@ class AxisPropertiesWidget(BaseProperties):
             for column, axis in enumerate(axis_options.AXES, start=1):
                 layout.addWidget(combos[(axis, which)], row, column)
 
-        layout.setColumnStretch(len(axis_options.AXES) + 1, 1)
+        # The slack goes to the three combo columns, evenly. It used to go to
+        # a fourth, empty column, which left every combo at its minimum width
+        # - wide enough for "Fr" of "From style" - with the space it needed
+        # sitting unused to the right of it.
+        for column in range(1, len(axis_options.AXES) + 1):
+            layout.setColumnStretch(column, 1)
         return holder
 
     def _update_limit_control_state(self) -> None:
@@ -1167,7 +1229,6 @@ class AxisPropertiesWidget(BaseProperties):
             self._sharex_check,
             self._sharey_check,
             self._hide_axis_check,
-            self._pickradius_spin,
             self._btn_apply,
             self._renderer_value,
             self._tabs,
@@ -1298,7 +1359,6 @@ class AxisPropertiesWidget(BaseProperties):
             self._hide_axis_check.setChecked(
                 bool(options.get("hide_axis", options.get("hidden", False)))
             )
-            self._pickradius_spin.setValue(float(options.get("pickradius", 0.0) or 0.0))
             self._load_extended_axis_options(options)
             self._load_annotations(options)
 
@@ -1329,7 +1389,6 @@ class AxisPropertiesWidget(BaseProperties):
                 self._sharex_check,
                 self._sharey_check,
                 self._hide_axis_check,
-                self._pickradius_spin,
             )
             + self._extended_option_widgets()
             + self._annotation_widgets()
@@ -1347,7 +1406,6 @@ class AxisPropertiesWidget(BaseProperties):
             self._sharex_check.setChecked(False)
             self._sharey_check.setChecked(False)
             self._hide_axis_check.setChecked(False)
-            self._pickradius_spin.setValue(0.0)
             self._clear_extended_axis_options()
             self._clear_annotations()
         self._renderer_value.clear()
@@ -1499,7 +1557,6 @@ class AxisPropertiesWidget(BaseProperties):
             "sharex": bool(self._sharex_check.isChecked()),
             "sharey": bool(self._sharey_check.isChecked()),
             "hide_axis": bool(self._hide_axis_check.isChecked()),
-            "pickradius": float(self._pickradius_spin.value()),
             "renderer": self._renderer_value.text().strip(),
         }
         payload.update(self._extended_axis_options_payload())

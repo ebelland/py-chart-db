@@ -32,7 +32,7 @@ from app.styles.style import (
     stdSizeAndlayout,
 )
 from app.widgets.base_properties import BaseProperties
-from app.widgets.color_combo import MatplotlibColorCombo
+from app.widgets.color_combo import DEFAULT_COLOR_LABEL, MatplotlibColorCombo
 from app.widgets.line_combo import LineStyleCombo
 from app.widgets.marker_combo import MarkerStyleCombo
 from app.logs.logger import applogger
@@ -230,9 +230,14 @@ class SeriesPropertiesWidget(BaseProperties):
 
         self._linestyle_combo = LineStyleCombo(section)
         self._marker_combo = MarkerStyleCombo(section)
+        # "Default", not "(none)": an empty colour is not "this series has
+        # no colour", it is "let the style sheet's cycle pick one" - which
+        # is what the renderer does with it, and what the Line style and
+        # Marker combos next to it already call their own first entry.
         self._color_combo = MatplotlibColorCombo(
             section,
             include_none=True,
+            none_label=DEFAULT_COLOR_LABEL,
         )
 
         stdSizeAndlayout(self._linestyle_combo, minimum_contents_length=0)

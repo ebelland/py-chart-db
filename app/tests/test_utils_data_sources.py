@@ -21,7 +21,9 @@ from app.utils.data_sources import (
     _extension_for_web_source,
     filename_from_url,
     is_valid_web_url,
+    list_mysql_databases,
     list_mysql_tables,
+    list_postgres_databases,
     list_postgres_tables,
     list_sqlite_tables,
     read_from_link_source,
@@ -330,3 +332,112 @@ def test_a_server_source_with_a_password_reads(monkeypatch: pytest.MonkeyPatch) 
 def test_an_unknown_source_kind_raises() -> None:
     with pytest.raises(ValueError, match="Unknown source kind"):
         read_from_link_source({"kind": "ftp"}, {})
+
+
+# ----------------------------------------------------------------------
+# Asking a server which databases it has
+# ----------------------------------------------------------------------
+def test_list_postgres_databases_returns_the_names_and_closes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    conn = _postgres_connection(monkeypatch, [("analytics",), ("staging",)])
+    dbconn = DatabaseConnection(
+        kind="postgres", host="h", port=5432, database="analytics",
+        username="u", password="p",
+    )
+
+    assert list_postgres_databases(dbconn) == ["analytics", "staging"]
+    assert conn.closed is True
+
+
+def test_list_postgres_databases_asks_the_catalogue(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    executed: list[str] = []
+
+    class _RecordingConnection(_FakeConnection):
+        def cursor(self) -> _FakeCursor:
+            cursor = _FakeCursor([("analytics",)])
+            original = cursor.execute
+
+            def execute(sql: str) -> None:
+                executed.append(sql)
+                original(sql)
+
+            cursor.execute = execute  # type: ignore[method-assign]
+            return cursor
+
+    monkeypatch.setattr(
+        "pg8000.dbapi.connect", lambda **_kwargs: _RecordingConnection([])
+    )
+    dbconn = DatabaseConnection(kind="postgres", host="h", port=5432, database="d")
+
+    list_postgres_databases(dbconn)
+
+    assert "pg_database" in executed[0]
+    assert "datistemplate = false" in executed[0]
+    assert "has_database_privilege" in executed[0]
+
+
+def test_list_postgres_databases_falls_back_to_the_maintenance_database(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PostgreSQL has no connection without a database, so a wrong or empty
+    name would otherwise make "which databases are there?" unanswerable."""
+    tried: list[str] = []
+
+    def fake_connect(**kwargs: object) -> _FakeConnection:
+        tried.append(str(kwargs["database"]))
+        if kwargs["database"] != "postgres":
+            raise ConnectionError("database does not exist")
+        return _FakeConnection([("analytics",)])
+
+    monkeypatch.setattr("pg8000.dbapi.connect", fake_connect)
+    dbconn = DatabaseConnection(kind="postgres", host="h", port=5432, database="typo")
+
+    assert list_postgres_databases(dbconn) == ["analytics"]
+    assert tried == ["typo", "postgres"]
+
+
+def test_list_postgres_databases_raises_when_no_candidate_connects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The dialog turns this into "could not read from the database"; what it
+    must not do is look like an empty server."""
+    def fake_connect(**_kwargs: object) -> _FakeConnection:
+        raise ConnectionRefusedError("no route to host")
+
+    monkeypatch.setattr("pg8000.dbapi.connect", fake_connect)
+    dbconn = DatabaseConnection(kind="postgres", host="h", port=5432, database="d")
+
+    with pytest.raises(ConnectionRefusedError):
+        list_postgres_databases(dbconn)
+
+
+def test_list_mysql_databases_hides_the_servers_own_schemas(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    conn = _mysql_connection(
+        monkeypatch,
+        [("information_schema",), ("analytics",), ("sys",), ("mysql",),
+         ("performance_schema",), ("staging",)],
+    )
+    dbconn = DatabaseConnection(kind="mysql", host="h", port=3306, username="u")
+
+    assert list_mysql_databases(dbconn) == ["analytics", "staging"]
+    assert conn.closed is True
+
+
+def test_list_mysql_databases_names_no_database_to_connect_to(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """MySQL will say what it has before being told which one to use - which
+    is the order a user picking one from a list needs."""
+    conn = _mysql_connection(monkeypatch, [("analytics",)])
+    dbconn = DatabaseConnection(
+        kind="mysql", host="h", port=3306, database="whatever", username="u"
+    )
+
+    list_mysql_databases(dbconn)
+
+    assert "database" not in conn.calls["kwargs"]  # type: ignore[attr-defined]

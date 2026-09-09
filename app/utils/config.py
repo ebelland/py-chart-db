@@ -317,3 +317,19 @@ def get_import_data_dialog_config() -> dict[str, Any]:
 def set_import_data_dialog_config(dialog_cfg: dict[str, Any]) -> None:
     """Remember the entries of the import dialog."""
     set_section("import_data_dialog", dialog_cfg)
+
+
+def get_connect_database_config() -> dict[str, Any]:
+    """Return the last connection the connect-to-database dialog accepted.
+
+    Never a password: see ``DatabaseConnection``, which keeps them out of the
+    project file for the same reason they are kept out of this one - a
+    settings file is copied, synced and looked at, and none of those are
+    things to do with a credential.
+    """
+    return get_section("connect_database_dialog")
+
+
+def set_connect_database_config(dialog_cfg: dict[str, Any]) -> None:
+    """Remember the connection and table the user just picked."""
+    set_section("connect_database_dialog", dialog_cfg)

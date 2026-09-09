@@ -513,6 +513,11 @@
       "title": "Import from database",
       "text": "This database has no tables to import."
     },
+    "import.database_no_databases": {
+      "level": "warning",
+      "title": "Connect to database",
+      "text": "This server reported no databases you can open. Type the name if you know it."
+    },
     "import.database_no_table_selected": {
       "level": "warning",
       "title": "Import from database",
