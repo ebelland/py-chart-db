@@ -2809,7 +2809,24 @@ class SqliteRepo:
             self._undo_store = UndoStore(Path(self.db_path))
         return self._undo_store
 
-    def snapshot_for_undo(self, tables: Sequence[str], *, label: str) -> int | None:
+    #: The tables that hold what the properties panels and the operations
+    #: edit: the figures, their axes, their series, and the per-table notes
+    #: and links. Small enough that snapshotting all four is cheaper than
+    #: working out which of them an edit will reach.
+    DESCRIPTOR_TABLES: ClassVar[tuple[str, ...]] = (
+        "__figure_descriptors__",
+        "__axis_descriptors__",
+        "__series_descriptors__",
+        "__table_descriptors__",
+    )
+
+    def snapshot_for_undo(
+        self,
+        tables: Sequence[str],
+        *,
+        label: str,
+        entry_id: int | None = None,
+    ) -> int | None:
         """Record the state of *tables* before changing them.
 
         Call before opening the transaction that does the work: attaching
@@ -2817,10 +2834,17 @@ class SqliteRepo:
         nothing was recorded, which is not a failure the caller has to
         handle - the action goes ahead either way, it just cannot be taken
         back.
+
+        Pass the returned id back as *entry_id* to add more tables to the
+        same entry when what an action touches is only known in stages -
+        an operation that creates the axis it then writes a result table
+        to. One action, one entry, one step to undo it.
         """
         if self._con is None:
             return None
-        return self.undo_store.snapshot(self._con, tables, label=label)
+        return self.undo_store.snapshot(
+            self._con, tables, label=label, entry_id=entry_id
+        )
 
     def undo_entries(self) -> list[UndoEntry]:
         """What can be undone, most recent first."""

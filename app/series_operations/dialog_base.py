@@ -1355,11 +1355,29 @@ class SeriesOperationDialogBase(QDialog):
                 show_message(self, "series.no_series_selected", title=self.operation_label)
                 return False
 
+            # Before resolve_target_axis_id, which may *create* the axis or
+            # figure the results go on: a snapshot taken after it would have
+            # nothing to say about that axis, and undo would leave an empty
+            # one behind. The result tables are added to the same entry
+            # below, once their names are known - they depend on which axis
+            # this turned out to be.
+            undo_entry: int | None = None
+            if commit:
+                undo_entry = self._repo.snapshot_for_undo(
+                    self._repo.DESCRIPTOR_TABLES,
+                    label=f"Apply {self.operation_label}",
+                )
+
             # Most operations write back onto the axis their inputs came from.
             # One does not: see resolve_target_axis_id.
             axis_id = self.resolve_target_axis_id(int(axis_id_value), results)
 
             if commit:
+                self._repo.snapshot_for_undo(
+                    [self.result_table_name(axis_id, result) for result in results],
+                    label=f"Apply {self.operation_label}",
+                    entry_id=undo_entry,
+                )
                 self.cancel_operation_changes(refresh=False)
                 self.begin_preview_transaction()
                 self.apply_results_to_axis(axis_id, results)

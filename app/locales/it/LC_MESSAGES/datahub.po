@@ -4536,3 +4536,11 @@ msgstr "Annulla l'ultima modifica al database"
 
 msgid "Undo: {what}"
 msgstr "Annulla: {what}"
+
+
+msgid "Axis: {action}"
+msgstr "Asse: {action}"
+
+
+msgid "Reorder series"
+msgstr "Riordina le serie"

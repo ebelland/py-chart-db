@@ -89,24 +89,20 @@ N-19  GUI: toward a more standard, easy, intuitive interface
 P2 - VALUABLE
 ================================================================
 
-P2-14 renderer: il boilerplate duplicato appartiene a BaseAxisRenderer
-      Misurato: _merge_options esiste in 5 copie byte-identiche (broken_bar,
-      surface x2, table, text - piu' due varianti in bar e contour), e il
-      filtro "serie visibile, ruoli presenti, non vuota" e' riscritto in 15
-      renderer su 23. Sono ~55 righe che vanno sulla base come
-      merge_options() e valid_series(), lasciando a ogni renderer solo cio'
-      che disegna davvero. Due ore, e ogni renderer nuovo parte piu' corto.
-      Aggiornato 2026-09-09: ora sono 29 renderer, e i sei nuovi (stem,
-      quiver, stream, triplot, tripcolor, scatter 3D) hanno riscritto lo
-      stesso filtro un'altra volta ciascuno.
+FATTO 2026-09-10 (P2-14) renderer: boilerplate sulla base
+      valid_series() e single_series() su BaseAxisRenderer, _merge_options
+      cancellato in favore di merge_style() che gia' esisteva. 12 file,
+      -85 righe nette. Due test in test_shared_helpers.py impediscono che
+      le copie tornino; scatter e timeline restano fuori perche' leggono
+      "visible" dentro il loro loop, non filtrando una lista.
 
-P3-x  peaks dialog: "Mark peaks only" is a control that does nothing
-      Declared in SeriesPeaksDialog.PARAMS and read nowhere - grep for
-      mark_only finds the declaration and no consumer. Either it decides
-      whether the result series carries the measurement columns as well as
-      x/y (which is what the tooltip implies) or it goes. Noticed
-      2026-09-09 while writing the roots dialog, which deliberately does
-      not copy it.
+FATTO 2026-09-10 (P3-x) peaks dialog: "Mark peaks only" rimosso
+      Nessuna delle due letture sopravviveva a cio' che il dialog gia' fa:
+      la tabella dei risultati porta tutte le misure perche' il report si
+      costruisce da li', e la serie disegna marker perche' unire i picchi
+      traccerebbe una curva nel nulla. Non restava un terzo comportamento
+      da scegliere. Un test in test_statistics_selection.py cammina tutte
+      le operazioni e chiede chi legge ogni parametro dichiarato.
 
 P2-3  series operation: baseline correction (ALS or rubber-band)
       Pure numpy/scipy. Prerequisite for meaningful peak areas.
@@ -115,9 +111,15 @@ P2-4  ChartPanel: rubber-band region selection (RectangleSelector)
       The natural bridge between the chart and the operations: select a peak
       on screen, hand its limits to the integrator.
 
-P2-11 undo for descriptor edits
-      Operations write generated tables and deletes are final. Even a simple
-      command stack limited to descriptor edits is cheap insurance.
+FATTO 2026-09-10 (P2-11) undo per le modifiche ai descrittori
+      UndoStore copia le tabelle toccate in <progetto>.dhub.undo.db; ora
+      lo usano anche le sette scritture sui descrittori (proprieta' di
+      figura/asse/serie/overlay, riordino, eliminazione serie, azioni
+      sull'asse) e l'Apply delle operazioni. Quest'ultimo apre la voce
+      prima di resolve_target_axis_id - che puo' creare l'asse - e la
+      completa con il nome della tabella risultato: una azione, una voce,
+      un passo di undo. Il Preview non registra nulla: ha gia' il suo
+      savepoint. La voce di menu si aggiorna su aboutToShow.
 
 P2-12 series operations: inline preview plot beside the numeric results
       publish_results emits text/HTML only; a fit or a peak-find is far more

@@ -150,6 +150,7 @@ class UndoStore:
         tables: Iterable[str],
         *,
         label: str,
+        entry_id: int | None = None,
     ) -> int | None:
         """Record the current state of *tables*, and return the entry id.
 
@@ -157,14 +158,23 @@ class UndoStore:
         when nothing could be recorded - a snapshot that fails must not stop
         the action the user actually asked for, so the failure is logged and
         the action goes ahead without an undo entry rather than not at all.
+
+        Pass *entry_id* to add tables to an entry already opened, when what
+        an action will touch is only known in stages: applying an operation
+        may create the axis it writes to, and the name of the result table
+        depends on which axis that turned out to be. One action stays one
+        entry, which is what makes it undo in one step.
         """
         wanted = [str(name).strip() for name in tables if str(name).strip()]
         if not wanted:
-            return None
+            return entry_id
 
         try:
             with self._attached(connection):
-                entry_id = self._write_entry(connection, wanted, label=label)
+                if entry_id is None:
+                    entry_id = self._write_entry(connection, wanted, label=label)
+                else:
+                    self._append_tables(connection, entry_id, wanted)
                 self._prune(connection)
             return entry_id
         except Exception:  # noqa: BLE001 - never cost the user their action
@@ -183,8 +193,30 @@ class UndoStore:
             (label, datetime.now(timezone.utc).isoformat(timespec="seconds")),
         )
         entry_id = int(cursor.lastrowid or 0)
+        self._append_tables(connection, entry_id, tables)
+        return entry_id
+
+    def _append_tables(
+        self,
+        connection: sqlite3.Connection,
+        entry_id: int,
+        tables: Sequence[str],
+    ) -> None:
+        """Capture more tables into an entry, skipping any already in it."""
+        already = {
+            str(row[0])
+            for row in connection.execute(
+                f"SELECT table_name FROM {_UNDO_SCHEMA}.{_TABLES_TABLE} "
+                "WHERE entry_id = ?",
+                (entry_id,),
+            ).fetchall()
+        }
 
         for table in tables:
+            if table in already:
+                # The first capture is the one to keep: it is the state
+                # before the action started, which is where undo goes back to.
+                continue
             ddl = self._table_ddl(connection, table)
             if ddl is None:
                 # The action is about to create it; undoing means dropping it.
@@ -210,8 +242,6 @@ class UndoStore:
                 "VALUES (?, ?, 1, ?, ?)",
                 (entry_id, table, ddl, snapshot),
             )
-
-        return entry_id
 
     def _table_ddl(self, connection: sqlite3.Connection, table: str) -> str | None:
         """Return the statements that rebuild *table*, or None if it is absent.

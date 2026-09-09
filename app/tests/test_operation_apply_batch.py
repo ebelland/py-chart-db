@@ -277,3 +277,81 @@ def test_the_statistics_dialog_charts_what_it_measured() -> None:
     assert "create_chart_check.isChecked()" in body
     assert "def discard_operation_artifacts" in source
     assert "_remove_result_axis" in source
+
+
+# ----------------------------------------------------------------------
+# Applying an operation is one undoable step (todo.txt P2-11)
+# ----------------------------------------------------------------------
+def test_applying_an_operation_can_be_taken_back(qapp, repo, tmp_db_path) -> None:
+    """The result table and the series descriptor that draws it go back
+    together: the snapshot is opened before the target axis is resolved -
+    which may create it - and completed with the result table's name once
+    that is known."""
+    import numpy as np
+    import pandas as pd
+
+    from app.series_operations.roots_dialog import SeriesRootsDialog
+
+    repo.import_dataframe(
+        pd.DataFrame({"x": np.arange(60.0), "y": np.sin(np.arange(60) / 5.0)}),
+        table_name="w",
+        normalize_columns=False,
+    )
+    figure_id = int(repo.create_figure_descriptor(name="F", nrows=1, ncols=1))
+    axis_id = int(
+        repo.create_axis_descriptor(
+            figure_id=figure_id, axis_index=0, chart_type="Scatter Plot",
+            title="w", x_label="x", y_label="y", options={},
+        )
+    )
+    repo.create_series_descriptor(
+        axis_id=axis_id, series_index=0, name="s",
+        sql_query="SELECT x, y FROM w", roles={"x": "x", "y": "y"}, style={},
+    )
+    tables_before = sorted(repo.list_user_tables()["Table"])
+    series_before = len(repo.get_series(axis_id))
+
+    dialog = SeriesRootsDialog(repo=repo, figure_id=figure_id)
+    dialog._run_operation(commit=True)
+
+    assert len(repo.get_series(axis_id)) == series_before + 1
+    assert [entry.label for entry in repo.undo_entries()] == ["Apply Roots"]
+
+    repo.undo_last()
+
+    assert sorted(repo.list_user_tables()["Table"]) == tables_before
+    assert len(repo.get_series(axis_id)) == series_before
+    repo.undo_store.discard_file()
+
+
+def test_previewing_an_operation_records_nothing(qapp, repo, tmp_db_path) -> None:
+    """A preview is rolled back by its own savepoint. Recording it would
+    fill the undo stack with steps that never happened."""
+    import numpy as np
+    import pandas as pd
+
+    from app.series_operations.roots_dialog import SeriesRootsDialog
+
+    repo.import_dataframe(
+        pd.DataFrame({"x": np.arange(60.0), "y": np.sin(np.arange(60) / 5.0)}),
+        table_name="w",
+        normalize_columns=False,
+    )
+    figure_id = int(repo.create_figure_descriptor(name="F", nrows=1, ncols=1))
+    axis_id = int(
+        repo.create_axis_descriptor(
+            figure_id=figure_id, axis_index=0, chart_type="Scatter Plot",
+            title="w", x_label="x", y_label="y", options={},
+        )
+    )
+    repo.create_series_descriptor(
+        axis_id=axis_id, series_index=0, name="s",
+        sql_query="SELECT x, y FROM w", roles={"x": "x", "y": "y"}, style={},
+    )
+
+    dialog = SeriesRootsDialog(repo=repo, figure_id=figure_id)
+    dialog._run_operation(commit=False)
+
+    assert repo.undo_entries() == []
+    dialog.cancel_operation_changes(refresh=False)
+    repo.undo_store.discard_file()

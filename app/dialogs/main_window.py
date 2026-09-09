@@ -486,12 +486,69 @@ class MainWindow(QMainWindow):
             enabled=latest is not None,
         )
 
+    def _undo_actions(self) -> list[QAction]:
+        """Every Undo entry on screen: the rail's popup, and the macOS bar."""
+        menus = [self._app_menu]
+        if IS_MACOS:
+            menus.extend(
+                action.menu()
+                for action in self.menuBar().actions()
+                if action.menu() is not None
+            )
+
+        found: list[QAction] = []
+        for menu in menus:
+            if menu is None:
+                continue
+            try:
+                actions = menu.actions()
+            except RuntimeError:
+                # Rebuilding the macOS menu bar deletes the QMenu behind the
+                # File entry, and a shell of it can outlive that on the Python
+                # side. Nothing to refresh in a menu that is already gone.
+                continue
+            found.extend(
+                action for action in actions if str(action.data() or "") == "undo"
+            )
+        return found
+
+    def _refresh_undo_item(self) -> None:
+        """Re-read the undo stack just before the menu is shown.
+
+        Rather than rebuilding the menu after every change: an operation
+        dialog applying its results, or a table deleted from the source
+        list, would each have to remember to. A menu that asks when it
+        opens cannot be out of date.
+        """
+        entries = self._repo.undo_entries() if self._repo is not None else []
+        latest = entries[0] if entries else None
+        _icon, label, _tooltip = action_presentation("undo")
+        for action in self._undo_actions():
+            action.setText(
+                _("Undo: {what}").format(what=latest.label)
+                if latest is not None
+                else label
+            )
+            action.setEnabled(latest is not None)
+
+    def _snapshot_descriptors(self, label: str) -> None:
+        """Record the chart settings before an edit changes them.
+
+        Every descriptor table, not the one this edit will touch: they hold
+        a few rows each, so working out which is more expensive than
+        copying all four - and getting that wrong is an undo that restores
+        half of a change (todo.txt P2-11).
+        """
+        if self._repo is None:
+            return
+        self._repo.snapshot_for_undo(self._repo.DESCRIPTOR_TABLES, label=label)
+
     def _on_undo(self) -> None:
         """Take back the last recorded change, and show the result."""
         entry = self._repo.undo_last()
         if entry is None:
             applogger.info("There is nothing to undo.")
-            self._build_app_menu()
+            self._refresh_undo_item()
             return
 
         applogger.info("Undid: %s", entry.describe())
@@ -499,7 +556,9 @@ class MainWindow(QMainWindow):
         self._preview.clear()
         self._reload_tabs()
         self._update_properties_for_current_chart()
-        self._build_app_menu()
+        # The entry just consumed: refresh the label rather than rebuild the
+        # menu, which would delete the menu this was invoked from.
+        self._refresh_undo_item()
 
     def _recent_databases_item(self) -> MenuItem:
         """The Open recent submenu, built from user.json's own list.
@@ -578,6 +637,7 @@ class MainWindow(QMainWindow):
         """
         items = self._app_menu_items()
         self._app_menu = create_menu(self, items)
+        self._app_menu.aboutToShow.connect(self._refresh_undo_item)
 
         if IS_MACOS:
             self._build_macos_menu_bar(items)
@@ -605,6 +665,7 @@ class MainWindow(QMainWindow):
         menu_bar.clear()
 
         menu = menu_bar.addMenu(_("File"))
+        menu.aboutToShow.connect(self._refresh_undo_item)
         for item in items:
             if item is None:
                 menu.addSeparator()
@@ -1181,6 +1242,7 @@ class MainWindow(QMainWindow):
         if self._properties_figure_id is None:
             return
 
+        self._snapshot_descriptors(_("Figure properties"))
         options = self._properties_figure_options()
 
         for key, value in payload.items():
@@ -1254,6 +1316,7 @@ class MainWindow(QMainWindow):
         if axis_id_value is None:
             return
         axis_id = int(axis_id_value)
+        self._snapshot_descriptors(_("Axis: {action}").format(action=action))
         changed = False
         if action == "move_up":
             changed = self._move_axis_descriptor(axis_id, -1)
@@ -1286,6 +1349,7 @@ class MainWindow(QMainWindow):
         if axis_id_value is None:
             return
         axis_id = int(axis_id_value)
+        self._snapshot_descriptors(_("Axis properties"))
         options = self._repo.get_axis_options(axis_id) or {}
 
         for key, value in payload.items():
@@ -1327,6 +1391,7 @@ class MainWindow(QMainWindow):
             return
         axis_id = int(axis_id_value)
 
+        self._snapshot_descriptors(_("Overlay properties"))
         options = self._repo.get_axis_options(axis_id) or {}
         for key in ("annotations", "lines"):
             value = payload.get(key)
@@ -1348,6 +1413,7 @@ class MainWindow(QMainWindow):
         if axis_id_value is None:
             return
         axis_id = int(axis_id_value)
+        self._snapshot_descriptors(_("Reorder series"))
         options = self._repo.get_axis_options(axis_id) or {}
         options["series_order"] = [int(series_id) for series_id in ordered_ids]
         self._repo.set_axis_options(axis_id, options)
@@ -1355,6 +1421,7 @@ class MainWindow(QMainWindow):
         self._redraw_properties_chart()
 
     def _on_series_delete_requested(self, series_id: int) -> None:
+        self._snapshot_descriptors(_("Delete series"))
         self._repo.delete_series(int(series_id))
         self._reload_property_widgets()
         self._redraw_properties_chart()
@@ -1376,6 +1443,7 @@ class MainWindow(QMainWindow):
         else:
             applogger.error("Series id=%r has invalid style.", series_desc.id)
             return
+        self._snapshot_descriptors(_("Series properties"))
         # Same rule as the axis and figure handlers: everything the widget
         # sends is stored, minus the addressing keys.
         for key, value in payload.items():

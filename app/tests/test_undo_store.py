@@ -313,3 +313,135 @@ def test_undoing_drops_the_series_cache(repo_with_table: SqliteRepo) -> None:
 
     frame = repo_with_table.series_df("SELECT a, b FROM t1")
     assert list(frame.columns) == ["a", "b"]
+
+
+# ----------------------------------------------------------------------
+# Descriptor edits and applied operations (todo.txt P2-11)
+# ----------------------------------------------------------------------
+def test_an_entry_can_be_completed_after_it_is_opened(connection, store) -> None:
+    """Applying an operation may *create* the axis it writes to, and the
+    result table's name depends on which axis that turned out to be. So the
+    descriptors are captured first and the table added to the same entry -
+    one action, one entry, one step to undo it."""
+    entry_id = store.snapshot(
+        connection, ["__series_descriptors__"], label="Apply Roots"
+    )
+    connection.execute("INSERT INTO __series_descriptors__ (name) VALUES ('made')")
+
+    same = store.snapshot(
+        connection, ["result_table"], label="Apply Roots", entry_id=entry_id
+    )
+    connection.execute("CREATE TABLE result_table (x REAL)")
+
+    assert same == entry_id
+    assert len(store.entries(connection)) == 1
+
+    store.undo(connection)
+
+    assert "result_table" not in _tables(connection)
+    assert connection.execute(
+        "SELECT count(*) FROM __series_descriptors__"
+    ).fetchone()[0] == 1
+
+
+def test_completing_an_entry_keeps_the_first_capture(connection, store) -> None:
+    """The state before the action started is where undo goes back to, so a
+    table named twice is captured once."""
+    entry_id = store.snapshot(connection, ["data"], label="Apply")
+    connection.execute("DELETE FROM data")
+
+    store.snapshot(connection, ["data"], label="Apply", entry_id=entry_id)
+    store.undo(connection)
+
+    assert connection.execute("SELECT count(*) FROM data").fetchone()[0] == 2
+
+
+@pytest.fixture
+def window(qapp, repo: SqliteRepo, tmp_db_path: Path):
+    """A window on a figure with one axis and one series."""
+    import numpy as np
+
+    from app.dialogs.main_window import MainWindow
+    from app.logs.logger import applogger
+
+    repo.import_dataframe(
+        pd.DataFrame({"x": np.arange(10.0), "y": np.arange(10.0)}),
+        table_name="w",
+        normalize_columns=False,
+    )
+    figure_id = int(repo.create_figure_descriptor(name="F", nrows=1, ncols=1))
+    axis_id = int(
+        repo.create_axis_descriptor(
+            figure_id=figure_id, axis_index=0, chart_type="Scatter Plot",
+            title="t", x_label="x", y_label="y", options={},
+        )
+    )
+    series_id = int(
+        repo.create_series_descriptor(
+            axis_id=axis_id, series_index=0, name="s",
+            sql_query="SELECT x, y FROM w", roles={"x": "x", "y": "y"}, style={},
+        )
+    )
+    built = MainWindow(repo=repo, db_path=tmp_db_path)
+    built._properties_figure_id = figure_id
+    yield built, axis_id, series_id
+    built.close()
+    applogger.set_status_bar(None)
+    repo.undo_store.discard_file()
+
+
+def test_a_deleted_series_comes_back(window) -> None:
+    built, axis_id, series_id = window
+    built._on_series_delete_requested(series_id)
+    assert len(built._repo.get_series(axis_id)) == 0
+
+    built._on_undo()
+
+    assert len(built._repo.get_series(axis_id)) == 1
+
+
+def test_an_axis_edit_comes_back(window) -> None:
+    built, axis_id, _series_id = window
+    built._on_axis_options_requested({"axis_id": axis_id, "x_scale": "log"})
+    assert (built._repo.get_axis_options(axis_id) or {})["x_scale"] == "log"
+
+    built._on_undo()
+
+    assert (built._repo.get_axis_options(axis_id) or {}).get("x_scale") != "log"
+
+
+def test_each_edit_is_its_own_step(window) -> None:
+    """Two edits, two entries: undo takes back one action, not the session."""
+    built, axis_id, series_id = window
+    built._on_axis_options_requested({"axis_id": axis_id, "x_scale": "log"})
+    built._on_series_delete_requested(series_id)
+
+    assert [entry.label for entry in built._repo.undo_entries()] == [
+        "Delete series",
+        "Axis properties",
+    ]
+
+    built._on_undo()
+    assert len(built._repo.get_series(axis_id)) == 1
+    assert (built._repo.get_axis_options(axis_id) or {})["x_scale"] == "log"
+
+
+def test_the_menu_entry_names_the_next_step(window) -> None:
+    built, _axis_id, series_id = window
+    built._on_series_delete_requested(series_id)
+
+    built._refresh_undo_item()
+
+    assert [action.text() for action in built._undo_actions()] == [
+        "Undo: Delete series"
+    ]
+    assert all(action.isEnabled() for action in built._undo_actions())
+
+
+def test_the_menu_entry_is_disabled_with_nothing_to_undo(window) -> None:
+    built, _axis_id, _series_id = window
+
+    built._refresh_undo_item()
+
+    assert [action.text() for action in built._undo_actions()] == ["Undo"]
+    assert not any(action.isEnabled() for action in built._undo_actions())
