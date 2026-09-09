@@ -1724,6 +1724,54 @@ def apply_toolbox_header_metrics(
         button.setToolTip(button.text())
 
 
+#: What a QToolBox page inset from its edges: enough for the white cards
+#: inside it to read as floating on the page rather than as filling it,
+#: which is the whole point of a grey ground behind them.
+MARGIN_TOOLBOX_PAGE: tuple[int, int, int, int] = (10, 10, 10, 12)
+
+
+def apply_toolbox_page_metrics(
+    toolbox: QtWidgets.QToolBox,
+    *,
+    margins: tuple[int, int, int, int] = MARGIN_TOOLBOX_PAGE,
+) -> None:
+    """Give a QToolBox's pages a ground of their own, and room inside it.
+
+    Two things, both of which QSS alone cannot do here.
+
+    The *ground*: a page is a plain QWidget, so a stylesheet background on
+    it is parsed and never painted without ``WA_StyledBackground`` - the
+    long-standing Qt gotcha. The pages are marked ``toolboxPage`` and each
+    sheet then says what a page is: the window grey on macOS, where the
+    white cards inside it are System Settings' floating grouped boxes, and
+    white on Windows, where WinUI3 puts outlined cards on one continuous
+    white page. Without it the page inherited whatever was behind it and a
+    white card on a white page showed only its corners - which is how it
+    was reported.
+
+    The *room*: a page's own layout margins. QSS padding on a widget pads
+    the box its background is painted in, not the layout inside it, so the
+    inset that makes the cards float has to be set here.
+
+    Call after adding the items, like the header metrics.
+    """
+    for index in range(toolbox.count()):
+        page = toolbox.widget(index)
+        if page is None:
+            continue
+        page.setProperty("toolboxPage", True)
+        page.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        # Only where the page set none of its own: the properties panels
+        # already choose MARGIN_PANEL, and a helper called for the ground
+        # colour has no business overruling a margin somebody picked. A
+        # page with (0, 0, 0, 0) is one that never thought about it, which
+        # is exactly the flat-to-the-edges case this is here to fix.
+        layout = page.layout()
+        if layout is not None and layout.contentsMargins().isNull():
+            layout.setContentsMargins(*margins)
+        repolish_widget(page)
+
+
 def apply_dialog_shell(
     dialog: QtWidgets.QDialog,
     root_layout: QBoxLayout,

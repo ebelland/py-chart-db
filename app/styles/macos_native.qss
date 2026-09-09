@@ -269,6 +269,16 @@ QToolBox::tab:disabled {
   color: palette(mid);
 }
 
+/* A page is the grey ground the white cards on it float over - the
+   System Settings arrangement the properties panels already use. Without
+   this the page inherited whatever was behind it, and a white card on a
+   white page showed nothing but its own rounded corners. The inset that
+   keeps the cards off the edges is a layout margin, not padding here:
+   see style.apply_toolbox_page_metrics. */
+QWidget[toolboxPage="true"] {
+  background: palette(window);
+}
+
 /* -------------------------------
    Dialog padding
    Root layouts go through apply_dialog_shell(), which owns the

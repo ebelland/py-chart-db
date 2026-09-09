@@ -1011,6 +1011,14 @@ QToolBox::tab:disabled {
     color: rgba(@NEUTRAL_RGB@, 0.70);
 }
 
+/* A page is the white page WinUI3 puts its outlined cards on - the
+   opposite answer to macos_native.qss's grey ground, and deliberately so:
+   see that file's note on #basePropertiesPanel. Stated rather than
+   inherited, because a page with no rule takes whatever is behind it. */
+QWidget[toolboxPage="true"] {
+    background: palette(base);
+}
+
 QDialog
 {
   padding: 6px 8px;

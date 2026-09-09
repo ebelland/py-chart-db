@@ -102,3 +102,65 @@ def test_both_panels_leave_their_scroll_bars_alone(
     ):
         assert view.verticalScrollBar().style() is QApplication.style()
         assert view.horizontalScrollBar().style() is QApplication.style()
+
+
+# ----------------------------------------------------------------------
+# QToolBox pages
+# ----------------------------------------------------------------------
+def test_a_toolbox_page_gets_a_ground_and_room_to_float_its_cards(qapp) -> None:
+    """A page is a plain QWidget: a stylesheet background on one is parsed
+    and never painted without WA_StyledBackground, so the white cards on it
+    showed nothing but their own rounded corners against the white behind."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QToolBox, QVBoxLayout
+
+    from app.styles.style import (
+        MARGIN_TOOLBOX_PAGE,
+        apply_toolbox_page_metrics,
+    )
+
+    toolbox = QToolBox()
+    page = QWidget()
+    QVBoxLayout(page).setContentsMargins(0, 0, 0, 0)
+    toolbox.addItem(page, "Page")
+
+    apply_toolbox_page_metrics(toolbox)
+
+    assert page.property("toolboxPage") is True
+    assert page.testAttribute(Qt.WidgetAttribute.WA_StyledBackground)
+    assert page.layout().getContentsMargins() == MARGIN_TOOLBOX_PAGE
+
+
+def test_a_page_that_chose_its_own_margins_keeps_them(qapp) -> None:
+    """The properties panels pick MARGIN_PANEL; a helper called for the
+    ground colour has no business overruling a margin somebody chose."""
+    from PySide6.QtWidgets import QToolBox, QVBoxLayout
+
+    from app.styles.style import apply_toolbox_page_metrics
+
+    toolbox = QToolBox()
+    page = QWidget()
+    QVBoxLayout(page).setContentsMargins(6, 6, 6, 6)
+    toolbox.addItem(page, "Page")
+
+    apply_toolbox_page_metrics(toolbox)
+
+    assert page.layout().getContentsMargins() == (6, 6, 6, 6)
+    assert page.property("toolboxPage") is True, "the ground still applies"
+
+
+def test_both_sheets_say_what_a_toolbox_page_is(qapp) -> None:
+    """Opposite answers on purpose - grey on macOS, where white cards float
+    on a settings pane; white on Windows, which puts outlined cards on one
+    continuous page - and neither may be left to inheritance."""
+    from pathlib import Path
+
+    styles = Path(__file__).resolve().parent.parent / "styles"
+    for sheet, expected in (
+        ("macos_native.qss", "palette(window)"),
+        ("fluent_win11.qss", "palette(base)"),
+    ):
+        text = (styles / sheet).read_text(encoding="utf-8")
+        rule = text.split('QWidget[toolboxPage="true"]', 1)
+        assert len(rule) == 2, f"{sheet} does not style a toolbox page"
+        assert expected in rule[1].split("}", 1)[0], sheet

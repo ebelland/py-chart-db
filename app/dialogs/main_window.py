@@ -44,6 +44,7 @@ from app.styles.style import (
     action_presentation,
     SPLITTER_HANDLE_WIDTH,
     apply_toolbox_header_metrics,
+    apply_toolbox_page_metrics,
     create_card_widget,
     create_menu,
     create_menu_item,
@@ -205,6 +206,7 @@ class MainWindow(QMainWindow):
         # Section headers are sized from font metrics; QSS padding alone leaves
         # the labels clipped (see apply_toolbox_header_metrics).
         apply_toolbox_header_metrics(control)
+        apply_toolbox_page_metrics(control)
         self._connect_property_signals()
         self._clear_property_widgets()
         return control

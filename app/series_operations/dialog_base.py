@@ -32,6 +32,7 @@ from app.styles.style import (
     icon_from_svg_source,
     set_doc_link,
     apply_toolbox_header_metrics,
+    apply_toolbox_page_metrics,
     create_card_widget,
     create_action_button,
     create_section_title,
@@ -403,6 +404,7 @@ class SeriesOperationDialogBase(QDialog):
         left_toolbox.addItem(self.parameters_panel, _("Parameters"))
         left_toolbox.setCurrentIndex(0)
         apply_toolbox_header_metrics(left_toolbox)
+        apply_toolbox_page_metrics(left_toolbox)
         self.left_toolbox = left_toolbox
 
         right = create_card_widget(self, "operationResultsCard")
