@@ -118,6 +118,17 @@ QWidget[card="true"] {
   border-radius: 10px;
 }
 
+/* The Figure/Axis/Series properties panels (BaseProperties).
+   The window ground, not white: on macOS a settings/inspector pane is
+   grey with white grouped boxes floating on it - System Settings and the
+   Pages/Keynote inspectors both - and the cards below are those boxes.
+   fluent_win11.qss deliberately answers the other way (one white page
+   with outlined cards), which is WinUI3's own convention. Do not "fix"
+   this one to match Windows; see this file's header. */
+QWidget#basePropertiesPanel {
+  background: palette(window);
+}
+
 /* The dataset/series selector sits directly on top of a QTabWidget whose
    own pane is the same palette(base) white as every other card - an 8%
    hairline is the only thing telling them apart, which all but disappears

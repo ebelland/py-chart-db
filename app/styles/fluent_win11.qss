@@ -58,6 +58,17 @@ QFrame#ChartPanel {
     border-radius: 12px;
 }
 
+/* The Figure/Axis/Series properties panels (BaseProperties).
+   White, not the window grey: the cards inside are white too, so on grey
+   the panel read as grey gutters between white boxes - a different colour
+   in the margins, in the tab-bar strip and behind every gap. WinUI3's own
+   Settings app is one continuous page with outlined cards sitting on it,
+   which is what this makes it. macos_native.qss deliberately answers the
+   other way, since System Settings floats its grouped boxes on grey. */
+QWidget#basePropertiesPanel {
+    background: palette(base);
+}
+
 /* Elevated card surface */
 QFrame[elevated="true"],
 QWidget[elevated="true"] {

@@ -73,3 +73,43 @@ def test_each_editor_reports_a_real_content_sized_hint(qapp, widget_class) -> No
     hint = widget.sizeHint()
     assert hint.width() > 100
     assert hint.height() > 100
+
+
+# ----------------------------------------------------------------------
+# The ground the cards sit on
+# ----------------------------------------------------------------------
+def test_a_stylesheet_background_can_actually_paint(qapp) -> None:
+    """WA_StyledBackground, the Qt gotcha: without it a stylesheet
+    background on a plain QWidget subclass is parsed and never painted,
+    which is what makes QSS look like it "does not work" on custom
+    widgets. QFrame-based cards do not need it; this does."""
+    from PySide6.QtCore import Qt
+
+    assert BaseProperties().testAttribute(Qt.WidgetAttribute.WA_StyledBackground)
+
+
+@pytest.mark.parametrize("qss_name", ["fluent_win11.qss", "macos_native.qss"])
+def test_both_stylesheets_say_what_the_panel_ground_is(qss_name: str) -> None:
+    """base_properties.py's own comment promises a #basePropertiesPanel
+    rule in each sheet - it went one round without one, so it was
+    describing something that did not exist."""
+    from app.styles.style import _load_qss
+
+    qss, _path = _load_qss(qss_name)
+    assert qss is not None
+    assert "#basePropertiesPanel" in qss
+
+
+def test_the_two_platforms_answer_differently_on_purpose() -> None:
+    """White on Windows (WinUI3 Settings: outlined cards on one white
+    page), the window ground on macOS (System Settings: white grouped
+    boxes floating on grey). Matching them up would be the bug."""
+    from app.styles.style import _load_qss
+
+    def panel_rule(name: str) -> str:
+        qss, _path = _load_qss(name)
+        block = qss.split("#basePropertiesPanel", 1)[1]
+        return block.split("}", 1)[0]
+
+    assert "palette(base)" in panel_rule("fluent_win11.qss")
+    assert "palette(window)" in panel_rule("macos_native.qss")

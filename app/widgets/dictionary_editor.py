@@ -13,7 +13,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QHeaderView, QLineEdit, QSizePolicy, QSpinBox, QStyledItemDelegate, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QHBoxLayout, QHeaderView, QLineEdit, QSizePolicy, QSpinBox, QStyledItemDelegate, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget
 
 from app.widgets.color_combo import MatplotlibColorCombo
 from app.widgets.line_combo import LineStyleCombo
@@ -362,11 +362,23 @@ class DictEditorPanel(QWidget):
         layout = QVBoxLayout(self)
         stdSizeAndlayout(layout)
 
-        self.search_edit = QLineEdit(self)
+        # The search box lives on a row of its own rather than straight in
+        # the column, so a host can put its own controls beside it - see
+        # add_search_row_widget. AxisPropertiesWidget's "reset to style"
+        # button is the row's only other occupant today, and it belongs
+        # there rather than above: one strip of chrome over the tree reads
+        # as one thing to do with the tree, two read as two.
+        self._search_row = QWidget(self)
+        search_lay = QHBoxLayout(self._search_row)
+        search_lay.setContentsMargins(0, 0, 0, 0)
+        search_lay.setSpacing(8)
+
+        self.search_edit = QLineEdit(self._search_row)
         self.search_edit.setPlaceholderText(_("Search properties..."))
         stdSizeAndlayout(self.search_edit)
         self.search_edit.textChanged.connect(self._apply_filter)
-        layout.addWidget(self.search_edit, 0)
+        search_lay.addWidget(self.search_edit, 1)
+        layout.addWidget(self._search_row, 0)
 
         self.tree = QTreeWidget(self)
         self.tree.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -401,6 +413,17 @@ class DictEditorPanel(QWidget):
         header.resizeSection(1, _DEFAULT_VALUE_COLUMN_WIDTH)
         self.tree.setColumnWidth(0, _DEFAULT_PROPERTY_COLUMN_WIDTH)
         self.tree.setColumnWidth(1, _DEFAULT_VALUE_COLUMN_WIDTH)
+
+    def add_search_row_widget(self, widget: QWidget) -> None:
+        """Put *widget* on the search row, to the right of the search box.
+
+        For a host that has one control belonging to this whole editor
+        rather than to any one row of it - a "reset everything" button,
+        say. Reparented onto the row, so the host does not have to place
+        it and the two cannot drift apart.
+        """
+        widget.setParent(self._search_row)
+        self._search_row.layout().addWidget(widget, 0)
 
     def set_config(self, config: Mapping[str, object]) -> None:
         self.commit_pending_edits()

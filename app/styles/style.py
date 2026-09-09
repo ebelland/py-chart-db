@@ -1371,6 +1371,26 @@ def mark_editor_panel(widget: QWidget) -> QWidget:
     return widget
 
 
+def mark_icon_only(button: QtWidgets.QAbstractButton) -> QtWidgets.QAbstractButton:
+    """Drop a button's label and style it as a square icon button.
+
+    Both stylesheets have carried an ``[iconOnly="true"]`` rule for a
+    while - a 32x32 borderless square with a hover wash, the shape a
+    toolbar-ish button takes next to a field rather than in a row of
+    labelled buttons - and nothing in Python ever set the property, so no
+    button had ever actually looked like one.
+
+    The text is cleared rather than merely hidden: the label is what makes
+    a QPushButton ask for a wide sizeHint, and the tooltip (already set
+    from the action catalogue's description by create_action_button)
+    carries the meaning that the words were carrying.
+    """
+    button.setText("")
+    button.setProperty("iconOnly", True)
+    repolish_widget(button)
+    return button
+
+
 def create_action_button(
     parent: QWidget,
     action_id: str,

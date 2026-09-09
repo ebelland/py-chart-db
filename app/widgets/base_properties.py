@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
 
@@ -36,14 +37,20 @@ class BaseProperties(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        # A stable name so macos_native.qss / fluent_win11.qss can target
-        # every properties editor the same way without matching on plain
-        # QWidget - see the #basePropertiesPanel rule in each: transparent,
-        # so it never paints a surface of its own between the cards that
-        # already do (System Settings' and the WinUI3 Settings app's own
-        # inspector pages are a transparent page with individually
-        # card-framed sections on it, not a card-inside-a-card).
+        # A stable name so macos_native.qss / fluent_win11.qss can each say
+        # what the ground behind a properties panel's cards should be,
+        # without matching on plain QWidget. They answer differently on
+        # purpose: white on Windows, where the WinUI3 Settings app puts
+        # outlined cards on one continuous white page, and the window
+        # ground on macOS, where System Settings floats white grouped
+        # boxes on grey. See the #basePropertiesPanel rule in each.
         self.setObjectName("basePropertiesPanel")
+        # Without this a stylesheet background on a plain QWidget subclass
+        # is parsed and then never painted - the long-standing Qt gotcha
+        # that makes QSS look like it "does not work" on custom widgets.
+        # QFrame-based widgets (create_card_widget's cards) do not need it,
+        # which is why theirs worked and this one would not have.
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setSizePolicy(
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Expanding,

@@ -47,6 +47,7 @@ from app.styles.style import (
     create_card_widget,
     create_action_button,
     create_section_title,
+    mark_icon_only,
     stdSizeAndlayout,
     configure_combo_width,
 )
@@ -99,6 +100,8 @@ class AxisPropertiesWidget(BaseProperties):
         self._current_axis_id: int | None = None
         self._axis_map: dict[int, AxisDescriptorLike] = {}
         self._kwargs_editor: DictEditorPanel | None = None
+        # Rebuilt with the editor it sits on - see rebuild_kwargs_editor.
+        self._btn_reset_kwargs: QPushButton | None = None
         # Expanding/Expanding already set by BaseProperties.
         self.setMinimumHeight(0)
         self._build_ui()
@@ -959,23 +962,9 @@ class AxisPropertiesWidget(BaseProperties):
         layout = QVBoxLayout(section)
         stdSizeAndlayout(layout)
 
-        # DictEditorPanel.reset_to_defaults() already existed - every kwarg's
-        # schema default *is* the "leave this to the style sheet" sentinel
-        # (see kwarg_spec.DEFAULT) - it just had no button anywhere calling
-        # it, so the only way back to "stop overriding this" was retyping
-        # "default" into each row by hand. Resets the live editor only, the
-        # same as any other edit here: Apply still persists it.
-        reset_row = QHBoxLayout()
-        stdSizeAndlayout(reset_row)
-        reset_row.addStretch(1)
-        self._btn_reset_kwargs = create_action_button(
-            parent=section,
-            action_id="reset_kwargs_to_defaults",
-            action=self._reset_kwargs_to_defaults,
-            layout=reset_row,
-        )
-        layout.addLayout(reset_row)
-
+        # The reset button is not built here: it belongs on the editor's own
+        # search row (see rebuild_kwargs_editor), and the editor is rebuilt
+        # from scratch for every axis, so the button is too.
         self._kwargs_host = QFrame(section)
         self._kwargs_host.setObjectName("axisKwargsPanel")
         self._kwargs_host.setFrameShape(QFrame.Shape.NoFrame)
@@ -1085,6 +1074,29 @@ class AxisPropertiesWidget(BaseProperties):
         if values:
             editor.set_values(values)
             self._configure_kwargs_editor(editor)
+
+        # DictEditorPanel.reset_to_defaults() already existed - every kwarg's
+        # schema default *is* the "leave this to the style sheet" sentinel
+        # (see kwarg_spec.DEFAULT) - it just had no button anywhere calling
+        # it, so the only way back to "stop overriding this" was retyping
+        # "default" into each row by hand. Resets the live editor only, the
+        # same as any other edit here: Apply still persists it.
+        #
+        # Built per editor, and on the editor's own search row: one strip of
+        # chrome over the tree instead of two, and no button left behind on
+        # a tab showing "select an axis" with nothing to reset. It is owned
+        # by the editor from here on, so it dies with it on the next rebuild
+        # rather than being a stale pointer into a deleted panel.
+        self._btn_reset_kwargs = mark_icon_only(
+            create_action_button(
+                parent=editor,
+                action_id="reset_kwargs_to_defaults",
+                action=self._reset_kwargs_to_defaults,
+                layout=None,
+            )
+        )
+        editor.add_search_row_widget(self._btn_reset_kwargs)
+
         self._kwargs_editor = editor
         self.set_kwargs_widget(editor)
 

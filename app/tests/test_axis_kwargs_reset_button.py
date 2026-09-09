@@ -95,3 +95,40 @@ def test_resetting_with_no_editor_loaded_does_not_raise(qapp) -> None:
     """No axis connected yet - clicking Reset must be a no-op, not a crash."""
     built = AxisPropertiesWidget()
     built._reset_kwargs_to_defaults()
+
+
+def test_the_button_shares_the_editor_s_search_row(widget: AxisPropertiesWidget) -> None:
+    """One strip of chrome over the tree, not two: the button sits beside
+    "Search properties...", not on a row of its own above it."""
+    editor = widget._kwargs_editor
+    assert editor is not None
+
+    row = widget._btn_reset_kwargs.parentWidget()
+    assert row is editor.search_edit.parentWidget()
+    assert row.layout().indexOf(widget._btn_reset_kwargs) > row.layout().indexOf(
+        editor.search_edit
+    )
+
+
+def test_the_button_is_icon_only(widget: AxisPropertiesWidget) -> None:
+    """Beside a field rather than in a row of labelled buttons - the
+    tooltip carries what the words were carrying."""
+    button = widget._btn_reset_kwargs
+
+    assert button.text() == ""
+    assert button.property("iconOnly") is True
+    assert not button.icon().isNull()
+    assert button.toolTip()
+
+
+def test_rebuilding_the_editor_replaces_the_button_with_it(
+    widget: AxisPropertiesWidget,
+) -> None:
+    """The button is owned by the editor now, so it must be rebuilt with
+    it - a kept reference would be a pointer into a deleted panel."""
+    first = widget._btn_reset_kwargs
+    widget.rebuild_kwargs_editor(widget.current_axis_id())
+
+    assert widget._btn_reset_kwargs is not first
+    assert widget._btn_reset_kwargs.parentWidget() is not None
+    widget._btn_reset_kwargs.click()  # still wired, and does not crash
