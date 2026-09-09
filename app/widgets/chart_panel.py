@@ -495,7 +495,16 @@ class ChartPanel(QFrame):
             self._describe_patch(artist)
             return
 
-        indices = [int(index) for index in getattr(event, "ind", []) or []]
+        # ``or []`` would be the obvious way to default this, and it raises:
+        # ind is a NumPy array, and asking an array of more than one element
+        # whether it is true is ambiguous - so clicking a *group* of markers,
+        # the case this readout exists for, was the case that crashed. A
+        # single marker has one element, is unambiguous, and worked, which is
+        # why it survived. None is the only "no indices" ind can be.
+        raw_indices = getattr(event, "ind", None)
+        if raw_indices is None:
+            return
+        indices = [int(index) for index in np.atleast_1d(raw_indices)]
         if not indices:
             return
 

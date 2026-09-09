@@ -287,3 +287,52 @@ def test_the_window_shows_the_readout_in_the_status_bar() -> None:
 
     assert "panel.selection_changed.connect" in source
     assert "showMessage" in source[source.index("panel.selection_changed.connect") :]
+
+
+# ----------------------------------------------------------------------
+# What Matplotlib actually hands over
+# ----------------------------------------------------------------------
+# The tests above pass ``ind`` as a Python list, which is what makes them
+# readable and what let a crash live here: a real PickEvent carries a NumPy
+# array, and the handler defaulted it with ``getattr(event, "ind", []) or []``.
+# Asking an array of more than one element whether it is true is ambiguous, so
+# clicking a *group* of markers - the case the summary readout exists for -
+# raised ValueError from inside Matplotlib's callback registry. One marker is
+# one element, is unambiguous, and worked.
+def test_a_numpy_ind_with_several_indices_does_not_raise() -> None:
+    panel, emitted = _panel()
+    artist = _scatter([1.0, 2.0, 3.0], [10.0, 20.0, 60.0])
+
+    panel._on_pick(SimpleNamespace(artist=artist, ind=np.array([0, 1, 2])))
+
+    assert emitted == ["Batch A — 3 points, mean x: 2.000, mean y: 30.000"]
+
+
+def test_a_numpy_ind_with_one_index_reads_out_the_point() -> None:
+    panel, emitted = _panel()
+    artist = _scatter([1.0, 2.0, 3.0], [10.0, 20.0, 30.0])
+
+    panel._on_pick(SimpleNamespace(artist=artist, ind=np.array([1])))
+
+    assert emitted == ["Batch A — x: 2.000, y: 20.000"]
+
+
+def test_an_empty_numpy_ind_reads_out_nothing() -> None:
+    panel, emitted = _panel()
+    artist = _scatter([1.0, 2.0], [10.0, 20.0])
+
+    panel._on_pick(SimpleNamespace(artist=artist, ind=np.array([], dtype=int)))
+
+    assert emitted == []
+
+
+def test_an_event_with_no_ind_at_all_reads_out_nothing() -> None:
+    """A pick on an artist that carries no indices - the default this was
+    reaching for when it wrote ``or []``."""
+    panel, emitted = _panel()
+    artist = _scatter([1.0, 2.0], [10.0, 20.0])
+
+    panel._on_pick(SimpleNamespace(artist=artist, ind=None))
+    panel._on_pick(SimpleNamespace(artist=artist))
+
+    assert emitted == []
