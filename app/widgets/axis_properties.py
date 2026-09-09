@@ -9,7 +9,6 @@ renderer scanner imports with typed wrappers.
 from __future__ import annotations
 
 from collections.abc import Callable
-import json
 from typing import Any, Final, TypeAlias, cast
 
 from PySide6.QtCore import QEvent, QObject, QSignalBlocker, Qt, Signal
@@ -28,8 +27,6 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QSpinBox,
-    QTableWidget,
-    QTableWidgetItem,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -161,7 +158,6 @@ class AxisPropertiesWidget(BaseProperties):
         self._tabs.addTab(self._build_scale_tab(), _("Scale"))
         self._tabs.addTab(self._build_ticks_tab(), _("Ticks"))
         self._tabs.addTab(self._build_kwargs_section(), _("Kwargs"))
-        self._tabs.addTab(self._build_annotations_section(), _("Annotations"))
         root.addWidget(self._tabs, 1)
 
     def _build_axis_selector_section(self) -> QWidget:
@@ -839,189 +835,6 @@ class AxisPropertiesWidget(BaseProperties):
 
         return payload
 
-    # ------------------------------------------------------------------
-    # Annotations
-    # ------------------------------------------------------------------
-    ANNOTATION_TYPES: Final[tuple[str, ...]] = ("arrow", "text", "boxed text")
-
-    def _build_annotations_section(self) -> QWidget:
-        """Create an editable list of axis annotations.
-
-        Stored axis option format::
-
-            {
-                "annotations": [
-                    {
-                        "x": 1.0,
-                        "y": 2.0,
-                        "type": "arrow",
-                        "text": "Label",
-                        "kwargs": {"xytext": [10, 10], "textcoords": "offset points"},
-                    }
-                ]
-            }
-
-        ``kwargs`` is edited as JSON so Matplotlib options such as
-        ``arrowprops``, ``bbox``, ``xycoords``, ``textcoords``, ``ha`` and
-        ``va`` can be stored without adding a widget for every possible key.
-        """
-        section = create_card_widget(self, "axisAnnotationsCard")
-        layout = QVBoxLayout(section)
-        apply_card_layout(layout)
-
-        self._annotations_table = QTableWidget(0, 5, section)
-        self._annotations_table.setObjectName("axisAnnotationsTable")
-        self._annotations_table.setHorizontalHeaderLabels(
-            [_("X"), _("Y"), _("Type"), _("Text"), _("Kwargs JSON")]
-        )
-        self._annotations_table.setSizePolicy(
-            QSizePolicy.Policy.Expanding,
-            QSizePolicy.Policy.Expanding,
-        )
-        self._annotations_table.setMinimumHeight(self.KWARGS_PANEL_MIN_HEIGHT)
-        self._annotations_table.setToolTip(
-            _(
-                "Annotations are stored in axis options. Kwargs must be JSON, "
-                "for example: {\"xytext\": [10, 10], \"textcoords\": \"offset points\"}."
-            )
-        )
-        layout.addWidget(self._annotations_table, 1)
-
-        button_row = QWidget(section)
-        button_layout = QHBoxLayout(button_row)
-        stdSizeAndlayout(button_layout)
-        self._btn_add_annotation = QPushButton(_("Add annotation"), button_row)
-        self._btn_delete_annotation = QPushButton(_("Delete selected"), button_row)
-        self._btn_add_annotation.clicked.connect(self._add_annotation_row)
-        self._btn_delete_annotation.clicked.connect(self._delete_selected_annotation_rows)
-        button_layout.addWidget(self._btn_add_annotation)
-        button_layout.addWidget(self._btn_delete_annotation)
-        button_layout.addStretch(1)
-        layout.addWidget(button_row, 0)
-        return section
-
-    def _annotation_widgets(self) -> tuple[QWidget, ...]:
-        """Return annotation controls for signal blocking/enabling."""
-        return (
-            self._annotations_table,
-            self._btn_add_annotation,
-            self._btn_delete_annotation,
-        )
-
-    def _annotation_type_combo(self, value: str = "text") -> QComboBox:
-        """Create the annotation type editor."""
-        combo = QComboBox(self._annotations_table)
-        for annotation_type in self.ANNOTATION_TYPES:
-            combo.addItem(annotation_type, annotation_type)
-        index = combo.findData(value)
-        combo.setCurrentIndex(index if index >= 0 else 0)
-        return combo
-
-    def _new_table_item(self, value: object = "") -> QTableWidgetItem:
-        """Create an editable table item with a string value."""
-        item = QTableWidgetItem(str(value if value is not None else ""))
-        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
-        return item
-
-    def _add_annotation_row(
-        self,
-        annotation: dict[str, Any] | None = None,
-    ) -> None:
-        """Append one annotation to the table."""
-        annotation = dict(annotation or {})
-        row = self._annotations_table.rowCount()
-        self._annotations_table.insertRow(row)
-        kwargs = annotation.get("kwargs", {})
-        kwargs_text = ""
-        if isinstance(kwargs, dict) and kwargs:
-            kwargs_text = json.dumps(kwargs, ensure_ascii=False)
-        elif isinstance(kwargs, str):
-            kwargs_text = kwargs
-
-        self._annotations_table.setItem(row,0,self._new_table_item(annotation.get("x",0.0)))
-        self._annotations_table.setItem(row,1,self._new_table_item(annotation.get("y",0.0)))
-        self._annotations_table.setCellWidget(row,2,self._annotation_type_combo(str(annotation.get("type","text"))))
-        self._annotations_table.setItem(row,3,self._new_table_item(annotation.get("text","")))
-        self._annotations_table.setItem(row,4,self._new_table_item(kwargs_text))
-
-    def _delete_selected_annotation_rows(self) -> None:
-        """Delete selected annotation rows, or the current row if none selected."""
-        rows = {index.row() for index in self._annotations_table.selectedIndexes()}
-        if not rows and self._annotations_table.currentRow() >= 0:
-            rows = {self._annotations_table.currentRow()}
-        for row in sorted(rows, reverse=True):
-            self._annotations_table.removeRow(row)
-
-    def _load_annotations(self, options: dict[str, Any]) -> None:
-        """Populate the annotation table from axis options."""
-        self._annotations_table.setRowCount(0)
-        annotations = options.get("annotations", [])
-        if not isinstance(annotations, list):
-            applogger.warning("Invalid axis annotations=%r", annotations)
-            return
-        for item in annotations:
-            if isinstance(item, dict):
-                self._add_annotation_row(cast(dict[str, Any], item))
-
-    def _clear_annotations(self) -> None:
-        """Remove all annotation rows."""
-        self._annotations_table.setRowCount(0)
-
-    def _annotation_item_text(self, row: int, col: int) -> str:
-        """Return stripped text for one annotation table cell."""
-        item = self._annotations_table.item(row, col)
-        return item.text().strip() if item is not None else ""
-
-    def _annotations_payload(self) -> list[dict[str, Any]]:
-        """Return valid annotations from the table as axis-option payload."""
-        annotations: list[dict[str, Any]] = []
-        for row in range(self._annotations_table.rowCount()):
-            try:
-                x = float(self._annotation_item_text(row, 0))
-                y = float(self._annotation_item_text(row, 1))
-            except ValueError:
-                applogger.warning("Skipping annotation row %s with invalid x/y", row + 1)
-                continue
-
-            annotation_type = "text"
-            type_editor = self._annotations_table.cellWidget(row, 2)
-            if isinstance(type_editor, QComboBox):
-                annotation_type = str(type_editor.currentData() or type_editor.currentText()).lower()
-            if annotation_type not in self.ANNOTATION_TYPES:
-                applogger.warning(
-                    "Unknown annotation type %r on row %s; using text.",
-                    annotation_type,
-                    row + 1,
-                )
-                annotation_type = "text"
-
-            kwargs_text = self._annotation_item_text(row, 4)
-            kwargs: dict[str, Any] = {}
-            if kwargs_text:
-                try:
-                    parsed = json.loads(kwargs_text)
-                    if isinstance(parsed, dict):
-                        kwargs = cast(dict[str, Any], parsed)
-                    else:
-                        applogger.warning(
-                            "Skipping non-object annotation kwargs on row %s", row + 1
-                        )
-                except json.JSONDecodeError:
-                    applogger.warning(
-                        "Skipping invalid annotation kwargs JSON on row %s", row + 1
-                    )
-
-            annotations.append(
-                {
-                    "x": x,
-                    "y": y,
-                    "type": annotation_type,
-                    "text": self._annotation_item_text(row, 3),
-                    "kwargs": kwargs,
-                }
-            )
-        return annotations
-
     def _build_kwargs_section(self) -> QWidget:
         """Create the host section for DictEditorPanel."""
         section = create_card_widget(self, "axisKwargsCard")
@@ -1370,7 +1183,6 @@ class AxisPropertiesWidget(BaseProperties):
                 bool(options.get("hide_axis", options.get("hidden", False)))
             )
             self._load_extended_axis_options(options)
-            self._load_annotations(options)
 
         self._renderer_value.setText(renderer)
         self.renderer_changed.emit(renderer)
@@ -1401,7 +1213,6 @@ class AxisPropertiesWidget(BaseProperties):
                 self._hide_axis_check,
             )
             + self._extended_option_widgets()
-            + self._annotation_widgets()
         )
 
     def _clear_axis_fields(self) -> None:
@@ -1417,7 +1228,6 @@ class AxisPropertiesWidget(BaseProperties):
             self._sharey_check.setChecked(False)
             self._hide_axis_check.setChecked(False)
             self._clear_extended_axis_options()
-            self._clear_annotations()
         self._renderer_value.clear()
         self.renderer_changed.emit("")
 
@@ -1570,7 +1380,10 @@ class AxisPropertiesWidget(BaseProperties):
             "renderer": self._renderer_value.text().strip(),
         }
         payload.update(self._extended_axis_options_payload())
-        payload["annotations"] = self._annotations_payload()
+        # No "annotations" key: they moved to OverlayPropertiesWidget, and
+        # the window merges a payload into the stored options rather than
+        # replacing them - so leaving the key out leaves them alone, which
+        # is exactly right for a panel that no longer edits them.
         self.axis_options_requested.emit(payload)
 
     # ------------------------------------------------------------------

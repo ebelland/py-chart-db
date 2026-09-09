@@ -44,13 +44,10 @@ def _tab_titles(widget: AxisPropertiesWidget) -> list[str]:
 def test_the_options_page_is_split_by_what_it_sets(
     widget: AxisPropertiesWidget,
 ) -> None:
-    assert _tab_titles(widget) == [
-        "Labels",
-        "Scale",
-        "Ticks",
-        "Kwargs",
-        "Annotations",
-    ]
+    # Annotations is not here any more: it moved to
+    # OverlayPropertiesWidget, with the reference lines, because neither has
+    # anything to do with an axis's scale, ticks or drawing kwargs.
+    assert _tab_titles(widget) == ["Labels", "Scale", "Ticks", "Kwargs"]
 
 
 def test_the_kwargs_index_constant_points_at_the_kwargs_page(

@@ -377,19 +377,75 @@ class BaseAxisRenderer(Protocol):
     # Axis annotations
     # ------------------------------------------------------------------
     def apply_annotations(self, ax: Any, options: dict[str, Any]) -> None:
-        """Apply axis-level Matplotlib annotations stored in ``options``.
+        """Draw the decorations the descriptor asks for: annotations, lines.
 
         ``options["annotations"]`` is expected to be a list of dictionaries with
         ``x``, ``y``, ``type``, ``text`` and optional ``kwargs`` keys.  The
         helper deliberately keeps kwargs open-ended because ``Axes.annotate`` and
         ``Axes.text`` expose many useful placement and styling options.
+
+        Reference lines are drawn from here rather than from a call of their
+        own: every renderer already ends with ``apply_annotations``, and a
+        second method would have to be added to twenty-nine of them - one of
+        which would be forgotten, and the lines would then be missing from
+        that chart type for no reason anyone could see.
         """
         annotations = options.get("annotations", [])
-        if not isinstance(annotations, list):
+        if isinstance(annotations, list):
+            for annotation in annotations:
+                if isinstance(annotation, dict):
+                    self.apply_annotation(ax, annotation)
+
+        self.apply_reference_lines(ax, options)
+
+    def apply_reference_lines(self, ax: Any, options: dict[str, Any]) -> None:
+        """Draw the full-width/height lines stored in ``options["lines"]``.
+
+        Each entry is ``{"orientation": "vertical"|"horizontal", "value":
+        float, "kwargs": {...}}``. A threshold, a specification limit, a
+        target: things that belong to the *axes* rather than to any series,
+        which is why they are stored on the axis and not drawn as a
+        two-point series.
+
+        The value is in data coordinates and the line spans the axes, so it
+        stays put when the data changes underneath it - which is the whole
+        difference from drawing it as data.
+        """
+        lines = options.get("lines", [])
+        if not isinstance(lines, list):
             return
-        for annotation in annotations:
-            if isinstance(annotation, dict):
-                self.apply_annotation(ax, annotation)
+        for line in lines:
+            if isinstance(line, dict):
+                self.apply_reference_line(ax, line)
+
+    def apply_reference_line(self, ax: Any, line: dict[str, Any]) -> None:
+        """Draw one reference line, or nothing if it does not describe one."""
+        try:
+            value = float(line.get("value"))  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            applogger.warning(
+                "Skipping a reference line with no usable value: %r",
+                line.get("value"),
+                show_dialog=False,
+                raise_error=False,
+            )
+            return
+        if not np.isfinite(value):
+            return
+
+        kwargs = line.get("kwargs", {})
+        kwargs = dict(kwargs) if isinstance(kwargs, dict) else {}
+        # Not "_nolegend_": a threshold with a label is worth a legend entry,
+        # and one without a label already stays out of it. This only stops
+        # Matplotlib from inventing "_child3".
+        kwargs.setdefault("label", "_nolegend_" if not kwargs.get("label") else kwargs["label"])
+
+        orientation = str(line.get("orientation", "vertical") or "vertical").lower()
+        draw = ax.axhline if orientation.startswith("h") else ax.axvline
+        try:
+            draw(value, **kwargs)
+        except Exception:  # noqa: BLE001 - a bad kwarg costs the line, not the chart
+            applogger.exception("A reference line could not be drawn: %r", line)
 
     def apply_annotation(self, ax: Any, annotation: dict[str, Any]) -> None:
         """Apply one text, boxed text or arrow annotation to *ax*."""

@@ -4484,3 +4484,35 @@ msgstr "Per attraversamento. Brent e TOMS 748 raramente ne servono dieci; il lim
 
 msgid "Keeps the first crossings in x order when a noisy series crosses the level hundreds of times."
 msgstr "Mantiene i primi attraversamenti in ordine di x quando una serie rumorosa attraversa il livello centinaia di volte."
+
+
+msgid "Overlay properties"
+msgstr "Proprieta' sovrapposizioni"
+
+
+msgid "Axis"
+msgstr "Asse"
+
+
+msgid "Axis {id}"
+msgstr "Asse {id}"
+
+
+msgid "No axis selected"
+msgstr "Nessun asse selezionato"
+
+
+msgid "Lines"
+msgstr "Linee"
+
+
+msgid "Add line"
+msgstr "Aggiungi linea"
+
+
+msgid "Orientation"
+msgstr "Orientamento"
+
+
+msgid "A vertical or horizontal line across the whole axes, at a value in data coordinates. Kwargs must be JSON, for example: {\"color\": \"red\", \"linestyle\": \"--\", \"label\": \"limit\"}."
+msgstr "Una linea verticale o orizzontale su tutti gli assi, a un valore in coordinate dati. I kwargs devono essere JSON, per esempio: {"color": "red", "linestyle": "--", "label": "limit"}."

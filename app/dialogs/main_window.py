@@ -32,6 +32,7 @@ from app.dialogs.load_demo_dialog import LoadDemoDialog
 from app.dialogs.credits_dialog import CreditsDialog
 from app.dialogs.query_builder_dialog import QueryBuilderDialog
 from app.widgets.axis_properties import AxisPropertiesWidget
+from app.widgets.overlay_properties import OverlayPropertiesWidget
 from app.widgets.figure_properties import FigurePropertiesWidget
 from app.widgets.series_properties import SeriesPropertiesWidget
 from app.widgets.series_operation import SeriesOperationWidget
@@ -178,6 +179,7 @@ class MainWindow(QMainWindow):
         self._figure_widget = FigurePropertiesWidget(self)
         self._axis_widget = AxisPropertiesWidget(self)
         self._series_widget = SeriesPropertiesWidget(self)
+        self._overlay_widget = OverlayPropertiesWidget(self)
 
         control = QToolBox(self)
         control.setObjectName("propertiesToolBox")
@@ -192,6 +194,12 @@ class MainWindow(QMainWindow):
         self._series_properties_index = control.addItem(
             self._series_widget,
             _("Series properties"),
+        )
+        # Last: annotations and reference lines are the finishing pass on a
+        # chart, done once the data, the axes and the series are right.
+        self._overlay_properties_index = control.addItem(
+            self._overlay_widget,
+            _("Overlay properties"),
         )
         control.setCurrentIndex(self._figure_properties_index)
         # Section headers are sized from font metrics; QSS padding alone leaves
@@ -214,6 +222,9 @@ class MainWindow(QMainWindow):
         self._series_widget.series_options_requested.connect(self._on_series_options_requested)
         self._series_widget.series_order_requested.connect(self._on_series_order_requested)
         self._series_widget.series_delete_requested.connect(self._on_series_delete_requested)
+        self._overlay_widget.overlay_options_requested.connect(
+            self._on_overlay_options_requested
+        )
 
     def _configure_tabs(self) -> None:
         """Make the chart tabs shrink-friendly in both directions.
@@ -838,7 +849,12 @@ class MainWindow(QMainWindow):
         self._properties_figure = figure
         self._properties_redraw_callback = redraw_callback
         self._properties_panel = panel
-        for widget in (self._figure_widget, self._axis_widget, self._series_widget):
+        for widget in (
+            self._figure_widget,
+            self._axis_widget,
+            self._series_widget,
+            self._overlay_widget,
+        ):
             widget.set_connected_figure(
                 repo=self._repo,
                 figure_id=figure_id,
@@ -851,6 +867,7 @@ class MainWindow(QMainWindow):
             )
         current_axis_id = self._axis_widget.current_axis_id()
         self._series_widget.set_current_axis_id(current_axis_id)
+        self._overlay_widget.set_axis(current_axis_id)
         self._axis_widget.rebuild_kwargs_editor(current_axis_id)
 
     def _clear_property_widgets(self) -> None:
@@ -864,6 +881,7 @@ class MainWindow(QMainWindow):
         self._figure_widget.clear_connected_figure()
         self._axis_widget.clear_connected_figure()
         self._series_widget.clear_connected_figure()
+        self._overlay_widget.clear_connected_figure()
         self._axis_widget.rebuild_kwargs_editor(None)
 
     def _redraw_properties_chart(self) -> None:
@@ -887,7 +905,12 @@ class MainWindow(QMainWindow):
         if self._properties_figure_id is None or self._properties_figure is None:
             return
         current_axis_id = self._axis_widget.current_axis_id()
-        for widget in (self._figure_widget, self._axis_widget, self._series_widget):
+        for widget in (
+            self._figure_widget,
+            self._axis_widget,
+            self._series_widget,
+            self._overlay_widget,
+        ):
             widget.set_connected_figure(
                 repo=self._repo,
                 figure_id=self._properties_figure_id,
@@ -899,6 +922,7 @@ class MainWindow(QMainWindow):
                 self._properties_panel.resize_mode, self._properties_panel.set_resize_mode
             )
         self._series_widget.set_current_axis_id(current_axis_id)
+        self._overlay_widget.set_axis(current_axis_id)
         self._axis_widget.rebuild_kwargs_editor(current_axis_id)
 
     def _properties_figure_options(self) -> dict[str, Any]:
@@ -1088,6 +1112,10 @@ class MainWindow(QMainWindow):
 
     def _on_axis_selected(self, axis_id: int) -> None:
         self._series_widget.set_current_axis_id(axis_id)
+        # One axis selector in the application: the overlays panel edits
+        # whichever axis this one is on rather than carrying a second combo
+        # that could disagree with it.
+        self._overlay_widget.set_axis(axis_id)
         self._axis_widget.rebuild_kwargs_editor(axis_id)
 
     def _on_axis_renderer_changed(self, _renderer_name: str) -> None:
@@ -1156,6 +1184,35 @@ class MainWindow(QMainWindow):
             options["axis_kwargs"] = axis_kwargs
         else:
             options.pop("axis_kwargs", None)
+        self._repo.set_axis_options(axis_id, options)
+        self._redraw_properties_chart()
+
+    def _on_overlay_options_requested(self, payload: dict[str, Any]) -> None:
+        """Persist the annotations and reference lines of one axis.
+
+        Its own handler rather than the axis one: that payload describes a
+        whole axis - renderer, projection, hide_axis - and is written as
+        such, so a partial one sent through it would clear what it left
+        out. This writes exactly the two keys it owns.
+        """
+        axis_id_value = payload.get("axis_id")
+        if axis_id_value is None:
+            return
+        axis_id = int(axis_id_value)
+
+        options = self._repo.get_axis_options(axis_id) or {}
+        for key in ("annotations", "lines"):
+            value = payload.get(key)
+            if not isinstance(value, list):
+                continue
+            # An empty list means "there are none now", which is a real
+            # edit - the user deleted the last row - so the key is removed
+            # rather than stored as [].
+            if value:
+                options[key] = value
+            else:
+                options.pop(key, None)
+
         self._repo.set_axis_options(axis_id, options)
         self._redraw_properties_chart()
 
