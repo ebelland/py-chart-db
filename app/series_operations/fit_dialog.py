@@ -789,8 +789,8 @@ class SeriesFitDialog(SeriesOperationDialogBase):
         # Same three repairs as before - drop non-finite, sort by x, average
         # repeated x - but reported rather than silent.
         x_prepared, target_prepared = self.prepare_input_xy(
-            pd.to_numeric(frame[x_col], errors="coerce").to_numpy(dtype=float),
-            pd.to_numeric(frame[y_col], errors="coerce").to_numpy(dtype=float),
+            self.numeric_x(frame[x_col], source_name),
+            self.numeric_y(frame[y_col]),
             label=source_name,
         )
 

@@ -55,6 +55,7 @@ from scipy.cluster import vq
 from app.data.data_source import parse_roles
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
+from app.utils.coercion import to_numeric_axis
 from app.utils.messages import show_message
 from app.series_operations.dialog_base import (
     ResultSeriesSpec,
@@ -474,8 +475,13 @@ def _safe_numeric_matrix(frame: pd.DataFrame, columns: Sequence[str]) -> tuple[n
     if missing:
         applogger.error(f"Missing selected feature columns: {', '.join(missing)}", show_dialog=True, raise_error=True)
 
-    numeric = frame.loc[:, list(columns)].apply(pd.to_numeric, errors="coerce")
-    matrix = numeric.to_numpy(dtype=float)
+    # to_numeric_axis per column, not a bare pd.to_numeric over all of them:
+    # a timestamp feature - and x is the commonest feature there is - would
+    # come back all-NaN, and clustering would then refuse a table of a
+    # thousand rows with "at least two finite rows are required".
+    matrix = np.column_stack(
+        [to_numeric_axis(frame[column]) for column in columns]
+    ) if list(columns) else np.empty((len(frame), 0), dtype=float)
     mask = np.asarray(np.isfinite(matrix).all(axis=1), dtype=bool).reshape(-1)
 
     if int(mask.sum()) < 2:
@@ -1207,8 +1213,8 @@ class SeriesClusterDialog(SeriesOperationDialogBase):
         # observation matrix rather than f(x), the only checks that fire here
         # are the universal ones - repeated x is two ordinary observations.
         self.validate_input_xy(
-            pd.to_numeric(frame[x_col], errors="coerce").to_numpy(dtype=float),
-            pd.to_numeric(frame[y_col], errors="coerce").to_numpy(dtype=float),
+            self.numeric_x(frame[x_col], name),
+            self.numeric_y(frame[y_col]),
             label=name,
             raise_on_error=False,
         )

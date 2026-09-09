@@ -485,7 +485,10 @@ class SeriesSpectralDialog(SeriesOperationDialogBase):
 
         x_column = str(roles.get("x", "x") or "x")
         if x_column in frame.columns:
-            x_values = pd.to_numeric(frame[x_column], errors="coerce").to_numpy(dtype=float)
+            # Seconds for a dated series, which is what a spectrum of one
+            # needs: the sampling interval it reads off this is then in
+            # seconds and its frequencies in Hz.
+            x_values = self.numeric_x(frame[x_column], name)
         else:
             x_values = np.arange(y_values.size, dtype=float)
 

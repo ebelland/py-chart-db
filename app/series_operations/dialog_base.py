@@ -38,7 +38,7 @@ from app.styles.style import (
     stdSizeAndlayout,
 )
 from app.logs.logger import applogger
-from app.utils.coercion import to_numeric_axis
+from app.utils.coercion import coerce_axis, to_numeric_axis
 from app.utils.series_validation import (
     SeriesIssue,
     clean_xy,
@@ -155,6 +155,13 @@ class SeriesOperationDialogBase(QDialog):
         self._preview_axis_ids: set[int] = set()
         self._preview_table_names: set[str] = set()
         self._preview_active = False
+        # Source series name -> was its x a timestamp column? Filled by
+        # series_xy as each series is read, and read back by
+        # restore_temporal_x when the result is written, so a result lands
+        # on the same axis its source is drawn on. Keyed by name because
+        # that is the one thing a result carries back from the series it
+        # came from.
+        self._temporal_x_sources: dict[str, bool] = {}
         self.series_selector = AxisSeriesSelector(self._repo, self._figure_id, self)
         # Every operation is opened on one figure and keeps it: create_result_
         # axis adds to self._figure_id, so a combo that could change figures
@@ -696,10 +703,38 @@ class SeriesOperationDialogBase(QDialog):
             y_col = numeric[1] if len(numeric) > 1 else x_col
 
         return self.prepare_input_xy(
-            pd.to_numeric(frame[x_col], errors="coerce").to_numpy(dtype=float),
-            pd.to_numeric(frame[y_col], errors="coerce").to_numpy(dtype=float),
+            self.numeric_x(frame[x_col], name),
+            self.numeric_y(frame[y_col]),
             label=name,
         )
+
+    def numeric_x(self, column: Any, name: str = "") -> np.ndarray:
+        """Return an x column as floats, timestamps included, and remember.
+
+        Not ``pd.to_numeric``: a timestamp column run through that becomes
+        all-NaN, and the operation then reports "0 usable points" about a
+        series of sixty perfectly good ones. Every operation but the
+        outlier one did that to every dated series -
+        ``app/utils/coercion`` was written for exactly this and only that
+        one dialog was calling it.
+
+        Whether the column *was* temporal is remembered against the series
+        name, so :meth:`restore_temporal_x` can put the result back on the
+        axis it came from rather than at x = 1 700 000 000.
+        """
+        if name:
+            _coerced, is_temporal = coerce_axis(column)
+            self._temporal_x_sources[name] = bool(is_temporal)
+        return to_numeric_axis(column)
+
+    def numeric_y(self, column: Any) -> np.ndarray:
+        """Return a y column as floats, timestamps included.
+
+        Nothing to remember: a result's y is a computed quantity - a
+        derivative, a residual, a count - and is written as the number it
+        is even when the source was a duration or a time of day.
+        """
+        return to_numeric_axis(column)
 
     def result_to_frame(self, result: Any) -> Any:
         """Return the pandas DataFrame to save for one result."""
@@ -762,8 +797,43 @@ class SeriesOperationDialogBase(QDialog):
 
     def write_result_table(self, table_name: str, result: Any) -> None:
         """Persist one operation result to a normal SQLite table."""
-        frame = self.result_to_frame(result)
+        frame = self.restore_temporal_x(self.result_to_frame(result), result)
         self._repo.import_dataframe(frame, table_name=table_name, normalize_columns=False)
+
+    def restore_temporal_x(self, frame: Any, result: Any) -> Any:
+        """Write a result's x back in the units its source was read in.
+
+        An operation does its arithmetic on seconds since the epoch, because
+        subtracting two timestamps is what every one of them needs. Writing
+        that back would put the result on the chart at x = 1 700 000 000
+        while the series it came from is drawn as dates - the right answer,
+        plotted somewhere unreadable.
+
+        So a result computed from a dated series gets dated x values back.
+        The renderers read them the same way they read the source (see
+        ``coercion.coerce_axis``), which is what puts the two on one axis.
+        """
+        source = str(getattr(result, "source_name", "") or "")
+        if not self._temporal_x_sources.get(source):
+            return frame
+
+        for column in ("x", "left_x", "right_x"):
+            if column not in getattr(frame, "columns", []):
+                continue
+            try:
+                frame[column] = pd.to_datetime(
+                    pd.to_numeric(frame[column], errors="coerce"),
+                    unit="s",
+                    errors="coerce",
+                )
+            except (TypeError, ValueError):
+                applogger.warning(
+                    "Could not write %s back as timestamps; leaving it numeric.",
+                    column,
+                    show_dialog=False,
+                    raise_error=False,
+                )
+        return frame
 
     def remove_previous_generated_series(self, axis_id: int) -> int:
         """Delete generated descriptors for this operation on the selected axis."""

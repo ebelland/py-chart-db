@@ -569,8 +569,8 @@ class SeriesInterpolateDialog(SeriesOperationDialogBase):
         # readings at one x was interpolated through neither and nothing in the
         # interface ever mentioned it.
         x_data, y_data = self.prepare_input_xy(
-            pd.to_numeric(df[x_col], errors="coerce").to_numpy(dtype=float),
-            pd.to_numeric(df[y_col], errors="coerce").to_numpy(dtype=float),
+            self.numeric_x(df[x_col], series.name),
+            self.numeric_y(df[y_col]),
             label=series.name,
         )
 

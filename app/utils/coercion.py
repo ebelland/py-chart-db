@@ -7,9 +7,13 @@ rows.  That is exactly what outlier detection did to every time series.
 
 Two functions, because two callers want different things from the same
 column: a renderer wants datetimes so the axis can be formatted as dates, and
-a statistical operation wants numbers so it can subtract them.
+a statistical operation wants numbers so it can subtract them.  A third,
+``parse_datetimes``, is the parsing both of them share - and the reason it
+is a function rather than one call to ``pd.to_datetime`` is written on it.
 """
 from __future__ import annotations
+
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -39,7 +43,59 @@ def coerce_axis(values: pd.Series) -> tuple[pd.Series, bool]:
     if numeric.notna().any():
         return numeric, False
 
-    return pd.to_datetime(values, errors="coerce"), True
+    return parse_datetimes(values), True
+
+
+def parse_datetimes(values: pd.Series) -> pd.Series:
+    """Parse a column of timestamps, whatever shape its entries are in.
+
+    ``pd.to_datetime`` on its own infers *one* format from the first entry
+    and coerces everything that does not match it to NaT.  A column whose
+    entries differ only in precision - "2024-01-01 00:00:00" beside
+    "2024-01-16 16:58:38.426808", which is exactly what SQLite gives back
+    after storing computed timestamps - therefore comes back as one date
+    and a column of NaT, silently.
+
+    So the formats are tried in order of how much they cost:
+
+    1. ``ISO8601``, which accepts any amount of precision and is *faster*
+       than the guessing path (12 ms against 21 for 200 000 rows) because
+       it has nothing to guess.  This is the case for anything SQLite
+       wrote and for most of what is imported.
+    2. The guessing path, for the non-ISO layouts people really do have -
+       "01/02/2024", "Jan 5 2024".
+    3. ``mixed``, which parses each entry on its own.  Slowest, and the
+       only thing that reads a column with genuinely different layouts in
+       it.
+
+    The first attempt that loses no non-null value wins; if none is clean,
+    the one that lost the fewest does.
+    """
+    best: pd.Series | None = None
+    best_lost = -1
+    present = values.notna()
+
+    for attempt in ({"format": "ISO8601"}, {}, {"format": "mixed"}):
+        try:
+            with warnings.catch_warnings():
+                # "Could not infer format, so each element will be parsed
+                # individually" - which is the guessing attempt doing exactly
+                # what it is here to do. Warning about a fallback that was
+                # asked for tells the user nothing they can act on.
+                warnings.simplefilter("ignore", UserWarning)
+                parsed = pd.to_datetime(values, errors="coerce", **attempt)
+        except (TypeError, ValueError):
+            continue
+
+        lost = int((present & parsed.isna()).sum())
+        if lost == 0:
+            return parsed
+        if best is None or lost < best_lost:
+            best, best_lost = parsed, lost
+
+    if best is None:  # pragma: no cover - to_datetime raising three times
+        return pd.to_datetime(pd.Series([pd.NaT] * len(values), index=values.index))
+    return best
 
 
 def to_numeric_axis(values: pd.Series) -> np.ndarray:

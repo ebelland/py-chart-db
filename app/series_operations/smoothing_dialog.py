@@ -1234,8 +1234,8 @@ class SeriesSmoothingDialog(SeriesOperationDialogBase):
         if values_col and values_col not in columns:
             values_col = ""
 
-        x_values = pd.to_numeric(frame[x_col], errors="coerce").to_numpy(dtype=float)
-        y_values = pd.to_numeric(frame[y_col], errors="coerce").to_numpy(dtype=float)
+        x_values = self.numeric_x(frame[x_col], name)
+        y_values = self.numeric_y(frame[y_col])
         z_values = None
         values = None
         if z_col:

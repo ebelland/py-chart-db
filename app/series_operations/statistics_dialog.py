@@ -580,7 +580,7 @@ class SeriesStatisticsDialog(SeriesOperationDialogBase):
         """Return optional numeric X values, or row order when X is categorical."""
         x_column = str(roles.get("x", "")).strip()
         if x_column and x_column in frame.columns:
-            x_values = pd.to_numeric(frame[x_column], errors="coerce").to_numpy(dtype=float)
+            x_values = self.numeric_x(frame[x_column])
             if np.isfinite(x_values[finite_y]).any():
                 return x_values[finite_y]
         return np.arange(1, int(np.sum(finite_y)) + 1, dtype=float)
