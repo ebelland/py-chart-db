@@ -6,16 +6,6 @@ Ranked by priority. P0 = wrong results or blocked work, P3 = nice to have.
 P0 - BUGS: wrong output, or work that cannot proceed
 ================================================================
 
-FATTO 2026-09-09 (P0-11) renderer: mappatura colori vettorizzata
-      Misurato su questa macchina, prima -> dopo: continuo 100k 670ms ->
-      1.9ms, 300k 2076ms -> 3.9ms; interi 100k 48ms -> 1.5ms, 300k 144ms ->
-      3.8ms. Il percorso continuo ora restituisce un array RGBA (n,4)
-      invece di una lista di tuple - e' quello che matplotlib vuole - e
-      tre call site che chiedevano la verita' di una lista sono stati
-      corretti. first_color_from_values restituisce ancora una tupla:
-      e' un singolo colore e viene testato con "if color:".
-      Test: app/tests/test_color_mapping.py, che verifica che la colormap
-      sia chiamata una volta sola invece di misurare i millisecondi.
 
 ================================================================
 NEW - requested after the review
@@ -51,62 +41,6 @@ N-3   attribute control charts (p, np, c, u)
 UI - reported while testing (2026-09)
 ================================================================
 
-N-15  figure layout, shared axes: hide the axis title too, not just the tick
-      labels [DONE]
-      Matplotlib's own "sharex per column, sharey per row" gallery example
-      (matplotlib.org/stable/gallery/subplots_axes_and_figures/
-      shared_axis_demo) has no per-panel title at all - one suptitle only -
-      which is part of why it reads as attached rather than as several
-      separate charts. render_figure.py's _clear_redundant_shared_axis_labels
-      already blanks xlabel/ylabel on interior shared axes (is_last_row()/
-      is_first_col()); extend the same treatment to the axis *title*,
-      cleared wherever the axis is not spec.is_first_row(). Checked: every
-      current shared-grid demo (Anscombe, Penguins, Lissajous is NOT
-      shared - see its own axis_options note) already carries the same name
-      in its series' legend too, so the interior title is redundant with
-      the legend already on screen, not information lost.
-      [DONE: title cleared via ax.set_title("") for any shared axis where
-      not spec.is_first_row(). Verified on Anscombe (rows 3/4 lose the
-      title, keep the legend) and Penguins (Gentoo). New test
-      test_only_the_first_row_keeps_its_axis_title in
-      test_shared_axes_contiguous.py.]
-
-N-16  axis properties: a "revert to defaults (rcParams)" button [DONE]
-      Mirrors what P0-6 (DONE) already added to the Line style/Marker
-      combos in Series properties - a way to say "stop overriding this,
-      let the style sheet decide" for the rest of an axis's own options
-      too, not just typing "Default" back into each control by hand.
-      [DONE, and simpler than expected: DictEditorPanel.reset_to_defaults()
-      already existed (every kwarg's schema default already is
-      kwarg_spec.DEFAULT) - nothing in axis_properties.py ever called it.
-      Added a "Reset to style" button above the "Axis drawing (kwargs)"
-      tab's editor, wired to it. Resets the live editor only, same as any
-      other row edit here - Apply still persists it. New action
-      reset_kwargs_to_defaults, 4 tests in
-      test_axis_kwargs_reset_button.py.]
-
-N-17  axis properties: layout and information density
-      - Add spacing between the QToolBox tab strip (Axis options / Kwargs /
-        Annotations) and the dataset/series selector above it - currently
-        touching. [DONE: root layout spacing 8px -> 14px.]
-      - Frame the dataset selector separately from the tabbed section below
-        it, rather than the two reading as one block. [DONE - and the real
-        cause was bigger than this one panel: fluent_win11.qss selected
-        cards by objectName (#Card/#card), which create_card_widget()
-        never sets - it sets the property card=true instead, so EVERY
-        card-styled section in the app rendered with no surface/border/
-        radius at all on Fluent and Dark (dark reuses this file). Fixed the
-        selector to [card="true"], matching macos_native.qss, which already
-        did this correctly. axisSelectorCard also gets its own faint tint
-        now (macos_native.qss) since its card sits directly on a
-        same-white QTabWidget pane, where even a working hairline border
-        all but disappears white-on-white. Regression test:
-        test_every_stylesheet_actually_styles_create_card_widget.]
-      - "rationalize and simplify axis options" - no concrete list yet;
-        needs a pass over what axis_options.py currently exposes to find
-        what overlaps, what is dead, and what a person actually reaches for
-        first. STILL OPEN.
-
 N-18  style: corner-rounding artifact on nested rounded panels (e.g. series
       operations dialogs)
       Screenshot showed a small wedge of the plain white background showing
@@ -116,50 +50,6 @@ N-18  style: corner-rounding artifact on nested rounded panels (e.g. series
       a fix: likely a child widget painting square behind a parent's
       rounded QSS border-radius, or two adjacent cards' curves not meeting
       cleanly at a T-junction.
-
-N-20  Figure/Axis/Series properties: share a BaseProperties base class [DONE]
-      Started by hand (a QWidget subclass whose __init__ called
-      self.setLayout(QVBoxLayout())) and made all three widgets tiny
-      (22x22): a QWidget accepts exactly one layout, so every subclass's
-      own QVBoxLayout(self) in its _build_ui() silently lost to the one the
-      base had already claimed, leaving each panel's real controls built
-      but never attached to anything the widget would actually size itself
-      by. Fixed and finished properly:
-      - BaseProperties (app/widgets/base_properties.py) sets no layout -
-        every subclass still owns its own _build_ui(). It does own the
-        four attributes all three read/wrote identically (_repo,
-        _figure_id, _figure, _redraw_callback) and set_connected_figure/
-        clear_connected_figure, which were three near-identical copies.
-        _before_reload() is the one extension point a subclass needs
-        (FigurePropertiesWidget pushes this figure's own DPI/size into
-        rcParams there, before the fields that read it reload).
-      - Regression tests in test_base_properties.py pin the layout bug
-        specifically (each editor's own layout must have content,
-        sizeHint must not be QWidget's bare default) so this class of
-        mistake cannot silently return.
-      - Along the way: adjusting BaseProperties' QSS surfaced that
-        fluent_win11.qss's card selector (#Card/#card, an object name)
-        never matched create_card_widget()'s actual output (property
-        card=true) - see N-17's note, same root cause, fixed there.
-        BaseProperties itself got #basePropertiesPanel (transparent, so it
-        never paints a surface between the cards that already do - matches
-        how System Settings and the WinUI3 Settings app are themselves a
-        transparent page with individually card-framed sections on it).
-      - Also reconsidered N-17's "force Fusion" fix while here: forcing it
-        app-wide (the first version) would have overridden every native
-        Aqua/Fluent control macos_native.qss deliberately leaves unstyled,
-        undoing its own stated design. Rescoped to
-        apply_fusion_for_item_view_styling(view), applied only to
-        TableListPanel's and TablePreviewPanel's own QTableView - the two
-        views that actually style QAbstractItemView selection/headers
-        directly - via QWidget.setStyle() rather than
-        QApplication.setStyle(). Tests for both changes verify via a
-        setStyle() spy, not by reading widget.style() back afterwards:
-        once any app-wide stylesheet is active, Qt wraps a widget's true
-        style in a private QStyleSheetStyle proxy whose
-        metaObject().className() always reads "QStyleSheetStyle"
-        regardless of what it wraps - reading it back would look identical
-        whether the fix is in place or not.
 
 N-19  GUI: toward a more standard, easy, intuitive interface
       Requested generically ("una GUI piu' standard, facile ed intuitiva");
@@ -236,15 +126,6 @@ P2-12 series operations: inline preview plot beside the numeric results
 ================================================================
 P3 - LATER
 ================================================================
-
-P3-1  figure: mosaic layouts (subplot_mosaic-style named regions)
-      [was: "add other layouts to figure" - partly done]
-      Manual spacing and the four Matplotlib layout engines are now exposed.
-      Note for whoever picks this up: GridSpec is NOT a layout engine and does
-      not belong in that combo. It is how axes are created, which
-      _create_axes_from_gridspec already does for every figure, and it is what
-      gives an axis its row_span/col_span - both already have UI. The genuinely
-      missing thing is naming regions and letting axes claim them.
 
 P3-4  custom function table generation
 
