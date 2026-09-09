@@ -438,25 +438,21 @@ class SeriesStatisticsDialog(SeriesOperationDialogBase):
         return rows
 
     def _rows_for_statistics(self) -> list[Any]:
-        """Return rows that should participate in this statistics run.
+        """Return the checked rows. Only those, and all of them.
 
-        The dialog still respects checked rows.  For multi-series models, if the
-        selector reports only one checked row while the axis contains several
-        visible series, use the visible axis series instead.  This covers the
-        common workflow where the dialog is opened from a single active chart
-        series but the requested statistics model needs pairs.
+        This used to substitute *every visible series on the axis* whenever
+        one row was checked and the model was one that needs pairs -
+        reasoning that the dialog is often opened from a single active
+        series while the requested test needs two. The result was that
+        unchecking two of three series changed nothing: all three were
+        still measured, still reported, and the checkbox that had just
+        been cleared was contradicted on screen.
+
+        A guess about intent does not get to overrule an explicit action.
+        A model that needs two samples and has one says so instead - the
+        report ends with that note - which is a thing the user can act on.
         """
-        checked = self._checked_series_rows()
-        model = str(self.model_combo.currentData() or "all")
-        if len(checked) >= 2 or model not in {"all", "paired", "correlation"}:
-            return checked
-
-        current_axis_series = getattr(self.series_selector, "current_axis_series", None)
-        if current_axis_series is None:
-            return checked
-
-        visible = list(current_axis_series() or [])
-        return visible if len(visible) > len(checked) else checked
+        return self._checked_series_rows()
 
     def _selected_samples(self) -> list[SeriesStatsSample]:
         """Return numeric samples for all selected rows.
@@ -1127,7 +1123,7 @@ class SeriesStatisticsDialog(SeriesOperationDialogBase):
             parts.append(
                 report_html.note(
                     "Paired-sample and correlation sections need at least two "
-                    "series on the selected axis."
+                    "selected series; check another one in the Series list."
                 )
             )
 
