@@ -393,6 +393,13 @@
       "SegoeFluent": "E8F1",
       "ThemeIcon": "insert-link"
     },
+    "undo": {
+      "text": "Undo",
+      "description": "Take back the last change to the database",
+      "SFSymbol": "arrow.uturn.backward",
+      "SegoeFluent": "E7A7",
+      "ThemeIcon": "edit-undo"
+    },
     "up": {
       "text": "Up",
       "description": "Up",

@@ -4524,3 +4524,15 @@ msgstr "Apri recenti"
 
 msgid "Clear menu"
 msgstr "Svuota il menu"
+
+
+msgid "Undo"
+msgstr "Annulla"
+
+
+msgid "Take back the last change to the database"
+msgstr "Annulla l'ultima modifica al database"
+
+
+msgid "Undo: {what}"
+msgstr "Annulla: {what}"

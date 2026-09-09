@@ -27,6 +27,7 @@ from pandas._typing import DtypeArg
 
 import app.data.descriptors
 from app.data.data_source import DataSource, is_identifier, quote_identifier
+from app.data.undo_store import UndoEntry, UndoStore
 from app.logs.logger import applogger
 from app.utils.config import load_config
 from functools import wraps
@@ -309,6 +310,11 @@ class SqliteRepo:
     # Row counts behind series_row_count(), invalidated the same way and at
     # the same time as _series_cache - see that field's docstring.
     _series_row_count_cache: dict[str, int] = field(default_factory=dict)
+
+    # Built on first use rather than in __post_init__: a repository is
+    # created for a great many things that never change a table, and the
+    # store is only a path until one of them does.
+    _undo_store: UndoStore | None = None
 
 
     # =====================================================================
@@ -2787,6 +2793,56 @@ class SqliteRepo:
                     (int(axis_index), _dumps_json(options), int(axis_id)),
                 )
 
+    # =====================================================================
+    # Undo
+    # =====================================================================
+    @property
+    def undo_store(self) -> UndoStore:
+        """The per-project snapshot store, made on first use.
+
+        Keyed to this repository's own file, so two projects open one after
+        the other never see each other's history.
+        """
+        if self._undo_store is None or self._undo_store.path.parent != Path(
+            self.db_path
+        ).parent:
+            self._undo_store = UndoStore(Path(self.db_path))
+        return self._undo_store
+
+    def snapshot_for_undo(self, tables: Sequence[str], *, label: str) -> int | None:
+        """Record the state of *tables* before changing them.
+
+        Call before opening the transaction that does the work: attaching
+        the undo database is not allowed inside one. Returns None when
+        nothing was recorded, which is not a failure the caller has to
+        handle - the action goes ahead either way, it just cannot be taken
+        back.
+        """
+        if self._con is None:
+            return None
+        return self.undo_store.snapshot(self._con, tables, label=label)
+
+    def undo_entries(self) -> list[UndoEntry]:
+        """What can be undone, most recent first."""
+        if self._con is None:
+            return []
+        return self.undo_store.entries(self._con)
+
+    def undo_last(self) -> UndoEntry | None:
+        """Undo the most recent recorded action and return what it was.
+
+        Everything cached about the database is dropped afterwards: the
+        rows behind a series may have just been replaced wholesale, and a
+        cache that survived that would serve the state the user has
+        undone.
+        """
+        if self._con is None:
+            return None
+        entry = self.undo_store.undo(self._con)
+        if entry is not None:
+            self.invalidate_series_cache()
+        return entry
+
     def close(self) -> None:
         """Close the database connection (call on app shutdown)."""
         con = self._con
@@ -2866,6 +2922,14 @@ class SqliteRepo:
         if not table:
             return
         assert self._con is not None
+
+        # Before the transaction, not inside it: the undo store attaches its
+        # own database, which SQLite does not allow mid-transaction. Both
+        # tables, because this deletes both - the data, and the series
+        # descriptors that drew it.
+        self.snapshot_for_undo(
+            [table, "__series_descriptors__"], label=f"Delete table '{table}'"
+        )
 
         with self.transaction(immediate=True):
             self._con.execute(f"DROP TABLE IF EXISTS {_quote_ident(table)}")
@@ -3114,6 +3178,13 @@ class SqliteRepo:
             applogger.error("Cannot delete rowid.")
         if column_name == "Hide":
             applogger.error("Column 'Hide' is managed by Data Hub and cannot be deleted.")
+
+        # A dropped column takes its data with it and SQLite has no way back,
+        # which is what makes this worth a snapshot of the whole table.
+        self.snapshot_for_undo(
+            [table_name], label=f"Delete column '{column_name}' from '{table_name}'"
+        )
+
         self._con.execute(
             f"ALTER TABLE {_quote_ident(table_name)} DROP COLUMN {_quote_ident(column_name)}"
         )

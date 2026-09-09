@@ -451,6 +451,7 @@ class MainWindow(QMainWindow):
             action_menu_item("query_builder", self._on_query_builder),
             action_menu_item("load_demo", self._on_load_demo),
             None,
+            self._undo_item(),
             action_menu_item("optimize_db", self._on_optimize_db),
             None,
             action_menu_item("settings", self._on_settings),
@@ -458,6 +459,47 @@ class MainWindow(QMainWindow):
             action_menu_item("user_manual", self._on_user_manual),
             action_menu_item("credits", self._on_credits),
         ]
+
+    def _undo_item(self) -> MenuItem:
+        """The Undo entry, naming the change it will take back.
+
+        "Undo" alone would not say whether it is about to bring back a
+        column, a table or a chart - and this undoes one recorded action
+        against the database, not the last thing the user touched
+        anywhere. Naming it is what keeps the two from being confused.
+        """
+        entries = self._repo.undo_entries() if self._repo is not None else []
+        latest = entries[0] if entries else None
+        _icon, label, tooltip = action_presentation("undo")
+        text = (
+            _("Undo: {what}").format(what=latest.label)
+            if latest is not None
+            else label
+        )
+        return MenuItem(
+            text=text,
+            tooltip=tooltip,
+            icon="undo",
+            shortcut="Ctrl+Z",
+            callback=self._on_undo,
+            action_id="undo",
+            enabled=latest is not None,
+        )
+
+    def _on_undo(self) -> None:
+        """Take back the last recorded change, and show the result."""
+        entry = self._repo.undo_last()
+        if entry is None:
+            applogger.info("There is nothing to undo.")
+            self._build_app_menu()
+            return
+
+        applogger.info("Undid: %s", entry.describe())
+        self._table_panel.reload()
+        self._preview.clear()
+        self._reload_tabs()
+        self._update_properties_for_current_chart()
+        self._build_app_menu()
 
     def _recent_databases_item(self) -> MenuItem:
         """The Open recent submenu, built from user.json's own list.
