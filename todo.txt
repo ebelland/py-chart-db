@@ -11,18 +11,19 @@ P0 - BUGS: wrong output, or work that cannot proceed
 NEW - requested after the review
 ================================================================
 
-N-5   sqlite_repo: 3048 lines in one module
-      Contesto misurato 2026-08: 50.837 righe di codice applicativo, e i
-      cinque file sopra le 1.500 righe sono sqlite_repo 3.048, chart_panel
-      2.214, style 1.939, fit_dialog 1.760, cluster_dialog 1.722. Le
-      series_operations da sole sono 14.121 righe su 15 file. Questo item
-      resta il piu' grosso, ma P2-14 e' quello che rende piu' corto il
-      codice che si scrive dopo.
-      Split by subject rather than by size - connection and pragmas, tables
-      and import links, descriptors, saved queries, maintenance - and keep
-      SqliteRepo as the one class the application talks to, so no call site
-      changes. The dataclass with a mutable OrderedDict field and the series
-      cache belong with the connection, not with the descriptors.
+FATTO 2026-09-10 (N-5) sqlite_repo diviso per materia
+      3.303 -> 749 righe. In app/data/repo/: tables 1.282, descriptors 645,
+      queries 331, maintenance 211, _common 263 (decoratore, helper SQL,
+      SavedQuery, DatabaseReport). Mixin con __slots__ = (), quindi la
+      dataclass concreta conserva i suoi slot e un typo su un attributo
+      continua a sollevare. Nessun call site cambiato: SqliteRepo e
+      DatabaseReport si importano da app.data.sqlite_repo come prima.
+      Restano con la connessione, come chiedeva l'item: campi, pragma,
+      cache delle serie, savepoint di preview, transazioni, undo.
+      Guardie in test_repo_parts.py, inclusa una sulla dimensione dei
+      moduli: era quello il punto.
+      Nota: chart_panel (2.214), style (1.939), fit_dialog (1.760) e
+      cluster_dialog (1.722) restano sopra le 1.500 righe.
 
 FATTO 2026-09-10 (N-8) linee verticali/orizzontali dal menu contestuale
       Il click destro dentro un axes offre due voci che nominano il valore
