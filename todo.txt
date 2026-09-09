@@ -206,6 +206,14 @@ P2-14 renderer: il boilerplate duplicato appartiene a BaseAxisRenderer
       quiver, stream, triplot, tripcolor, scatter 3D) hanno riscritto lo
       stesso filtro un'altra volta ciascuno.
 
+P3-x  peaks dialog: "Mark peaks only" is a control that does nothing
+      Declared in SeriesPeaksDialog.PARAMS and read nowhere - grep for
+      mark_only finds the declaration and no consumer. Either it decides
+      whether the result series carries the measurement columns as well as
+      x/y (which is what the tooltip implies) or it goes. Noticed
+      2026-09-09 while writing the roots dialog, which deliberately does
+      not copy it.
+
 P2-3  series operation: baseline correction (ALS or rubber-band)
       Pure numpy/scipy. Prerequisite for meaningful peak areas.
 

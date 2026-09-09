@@ -29,7 +29,7 @@ import pandas as pd
 from PySide6.QtWidgets import QFormLayout, QVBoxLayout, QWidget
 from scipy.signal import find_peaks, peak_prominences, peak_widths
 
-from app.data.data_source import parse_roles, row_value
+from app.data.data_source import row_value
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
 from app.series_operations.parameter_spec import BoolParam, ChoiceParam, FloatParam, IntParam
@@ -286,7 +286,7 @@ class SeriesPeaksDialog(SeriesOperationDialogBase):
         for row in self.selected_series():
             name = str(row_value(row, "name", "series_name", default="Series"))
             try:
-                x_values, y_values = self._series_xy(row, name)
+                x_values, y_values = self.series_xy(row, name)
                 results.append(self._find_one(name, x_values, y_values, model, params))
             except Exception as exc:
                 errors.append(f"{name}: {exc}")
@@ -297,36 +297,6 @@ class SeriesPeaksDialog(SeriesOperationDialogBase):
             applogger.warning(message, show_dialog=False, raise_error=False)
 
         return results
-
-    def _series_xy(self, row: Any, name: str) -> tuple[np.ndarray, np.ndarray]:
-        sql_query = str(row_value(row, "sql_query", "query", "sql", default="")).strip()
-        if not sql_query:
-            raise ValueError("the series has no SQL query")
-
-        frame = self._repo.query_df(sql_query)
-        if frame.empty:
-            raise ValueError("the series query returned no rows")
-
-        roles = parse_roles(row_value(row, "roles", default={}))
-        columns = [str(column) for column in frame.columns]
-        numeric = [
-            str(column)
-            for column in frame.columns
-            if pd.api.types.is_numeric_dtype(frame[column])
-        ]
-
-        x_col = str(roles.get("x") or "")
-        y_col = str(roles.get("y") or "")
-        if x_col not in columns:
-            x_col = numeric[0] if numeric else columns[0]
-        if y_col not in columns:
-            y_col = numeric[1] if len(numeric) > 1 else x_col
-
-        return self.prepare_input_xy(
-            pd.to_numeric(frame[x_col], errors="coerce").to_numpy(dtype=float),
-            pd.to_numeric(frame[y_col], errors="coerce").to_numpy(dtype=float),
-            label=name,
-        )
 
     def _find_one(
         self,

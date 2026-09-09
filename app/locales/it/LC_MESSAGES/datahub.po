@@ -4388,3 +4388,99 @@ msgstr "Impossibile scaricare {url}:\n{error}"
 msgid "{url} does not look like a web address. It should start with http:// or https://."
 msgstr "{url} non sembra un indirizzo web. Deve iniziare con http:// o https://."
 
+
+
+msgid "Roots"
+msgstr "Radici"
+
+
+msgid "Find where a series crosses a level"
+msgstr "Trova dove una serie attraversa un livello"
+
+
+msgid "Solver"
+msgstr "Risolutore"
+
+
+msgid "Solver:"
+msgstr "Risolutore:"
+
+
+msgid "Iterations"
+msgstr "Iterazioni"
+
+
+msgid "Residual"
+msgstr "Residuo"
+
+
+msgid "rising"
+msgstr "in salita"
+
+
+msgid "falling"
+msgstr "in discesa"
+
+
+msgid "truncated"
+msgstr "troncato"
+
+
+msgid "level {level}"
+msgstr "livello {level}"
+
+
+msgid "How each bracketed crossing is refined. The three bracketing solvers cannot leave the interval they were given; Newton can, and is checked afterwards."
+msgstr "Come viene raffinato ogni attraversamento delimitato. I tre risolutori con intervallo non possono uscire dall'intervallo ricevuto; Newton si', e per questo il risultato viene verificato."
+
+
+msgid "The series never crosses this level. Check the level against the data's range - a crossing no two samples straddle cannot be found from these samples."
+msgstr "La serie non attraversa mai questo livello. Controlla il livello rispetto all'intervallo dei dati: un attraversamento che nessuna coppia di campioni delimita non e' individuabile da questi campioni."
+
+
+msgid "Level:"
+msgstr "Livello:"
+
+
+msgid "The y value to solve for. 0 finds the zeros; any other value finds where the series crosses that level, which is the same problem shifted."
+msgstr "Il valore di y da risolvere. 0 trova gli zeri; qualsiasi altro valore trova dove la serie attraversa quel livello, che e' lo stesso problema traslato."
+
+
+msgid "Between samples:"
+msgstr "Tra i campioni:"
+
+
+msgid "What the series is assumed to do between two points. Linear claims nothing the samples do not; the two curved options fit a smooth signal better and can overshoot a noisy one into crossings that are not there."
+msgstr "Cosa si assume che la serie faccia tra due punti. La retta non afferma nulla oltre ai campioni; le due opzioni curve seguono meglio un segnale regolare e possono oltrepassare un segnale rumoroso creando attraversamenti inesistenti."
+
+
+msgid "Straight line"
+msgstr "Retta"
+
+
+msgid "Cubic spline"
+msgstr "Spline cubica"
+
+
+msgid "Monotone cubic (PCHIP)"
+msgstr "Cubica monotona (PCHIP)"
+
+
+msgid "Tolerance (digits):"
+msgstr "Tolleranza (cifre):"
+
+
+msgid "How many decimal places of x the solver has to settle before it stops. Nine is far below the precision of any measured x; the cost of raising it is a few iterations."
+msgstr "Quante cifre decimali di x il risolutore deve stabilizzare prima di fermarsi. Nove e' ben sotto la precisione di qualsiasi x misurata; alzarla costa qualche iterazione."
+
+
+msgid "Maximum iterations:"
+msgstr "Iterazioni massime:"
+
+
+msgid "Per crossing. Brent and TOMS 748 rarely need ten; the limit is what stops a pathological bracket from hanging the dialog."
+msgstr "Per attraversamento. Brent e TOMS 748 raramente ne servono dieci; il limite serve a evitare che un intervallo patologico blocchi la finestra."
+
+
+msgid "Keeps the first crossings in x order when a noisy series crosses the level hundreds of times."
+msgstr "Mantiene i primi attraversamenti in ordine di x quando una serie rumorosa attraversa il livello centinaia di volte."

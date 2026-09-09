@@ -22,7 +22,9 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QComboBox, QDialog, QFormLayout, QHBoxLayout, QSizePolicy, QSplitter, QToolBox, QVBoxLayout, QWidget
 import numpy as np
+import pandas as pd
 
+from app.data.data_source import parse_roles, row_value
 from app.data.sqlite_repo import SqliteRepo
 from app.widgets.axis_series_selector import AxisSeriesSelector
 from app.styles.style import (
@@ -651,6 +653,53 @@ class SeriesOperationDialogBase(QDialog):
             )
 
         return x_clean, y_clean
+
+    def series_xy(self, row: Any, name: str) -> tuple[np.ndarray, np.ndarray]:
+        """Run one selected series' SQL and return its x/y, cleaned.
+
+        Byte-identical copies of this lived in the calculus, control-chart
+        and peaks dialogs, and a fourth was about to be written for the root
+        finder - see todo.txt P2-14. Every operation needs the same three
+        steps and makes the same two decisions, so both live here:
+
+        *Which columns.* The series' own roles first, since that is what the
+        chart draws. A role naming a column the query no longer returns
+        falls back to the first two numeric columns rather than raising: the
+        query is edited far more often than the roles are, and the numbers
+        are usually still there under different names.
+
+        *What to do with the rows.* :meth:`prepare_input_xy`, which repairs
+        exactly what this operation's INPUT_* flags declare it needs and
+        reports whatever it changed.
+        """
+        sql_query = str(row_value(row, "sql_query", "query", "sql", default="")).strip()
+        if not sql_query:
+            raise ValueError("the series has no SQL query")
+
+        frame = self._repo.query_df(sql_query)
+        if frame.empty:
+            raise ValueError("the series query returned no rows")
+
+        roles = parse_roles(row_value(row, "roles", default={}))
+        columns = [str(column) for column in frame.columns]
+        numeric = [
+            str(column)
+            for column in frame.columns
+            if pd.api.types.is_numeric_dtype(frame[column])
+        ]
+
+        x_col = str(roles.get("x") or "")
+        y_col = str(roles.get("y") or "")
+        if x_col not in columns:
+            x_col = numeric[0] if numeric else columns[0]
+        if y_col not in columns:
+            y_col = numeric[1] if len(numeric) > 1 else x_col
+
+        return self.prepare_input_xy(
+            pd.to_numeric(frame[x_col], errors="coerce").to_numpy(dtype=float),
+            pd.to_numeric(frame[y_col], errors="coerce").to_numpy(dtype=float),
+            label=name,
+        )
 
     def result_to_frame(self, result: Any) -> Any:
         """Return the pandas DataFrame to save for one result."""
