@@ -193,13 +193,7 @@ class PieAxisRenderer(BaseAxisRenderer):
 
     def render_axis(self, ax: Any, series: list[SeriesData], options: dict) -> None:
         """Draw the first visible series as a pie."""
-        drawable = [
-            sd
-            for sd in series
-            if (sd.style or {}).get("visible", True)
-            and self.ensure_required_roles(sd.df)
-            and not sd.df.empty
-        ]
+        drawable = self.valid_series(series)
         if not drawable:
             return
 

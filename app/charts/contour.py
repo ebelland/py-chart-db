@@ -283,7 +283,9 @@ class ContourAxisRenderer(BaseAxisRenderer):
         options: dict[str, Any] | None = None,
     ) -> None:
         axis_options = options or {}
-        sd = self._single_series(series)
+        sd = self.single_series(
+            series, reason="the second field would cover the first"
+        )
         if sd is None:
             return
 
@@ -308,7 +310,7 @@ class ContourAxisRenderer(BaseAxisRenderer):
         self._draw_contours(
             ax,
             (x_grid, y_grid, z_grid),
-            self._merge_options(axis_options, sd.style or {}),
+            self.merge_style(axis_options, sd.style or {}),
         )
         self.apply_annotations(ax, axis_options)
 
@@ -537,45 +539,6 @@ class ContourAxisRenderer(BaseAxisRenderer):
     # ------------------------------------------------------------------
     # Series and option plumbing
     # ------------------------------------------------------------------
-    def _single_series(self, series: list[SeriesData]) -> SeriesData | None:
-        """Return the one series to draw, or None when there is nothing to draw.
-
-        A contour map is one scalar field over the plot area: a second one
-        drawn on the same axes covers the first rather than being compared
-        with it, so the extras are reported and skipped instead.
-        """
-        valid = [
-            sd
-            for sd in series
-            if (sd.style or {}).get("visible", True)
-            and self.ensure_required_roles(sd.df)
-            and not sd.df.empty
-        ]
-        if not valid:
-            return None
-
-        if len(valid) > 1:
-            applogger.info(
-                "%s renders one series; %d more selected on this axis were "
-                "not drawn - the second field would cover the first.",
-                self.Name,
-                len(valid) - 1,
-            )
-        return valid[0]
-
-    def _merge_options(
-        self,
-        axis_options: dict[str, Any],
-        style: dict[str, Any],
-    ) -> dict[str, Any]:
-        merged = dict(axis_options or {})
-        axis_kwargs = dict(merged.get("axis_kwargs", {}) or {})
-        axis_kwargs.update(style.get("axis_kwargs", {}) or {})
-        for key, value in style.items():
-            if key != "axis_kwargs":
-                merged[key] = value
-        merged["axis_kwargs"] = axis_kwargs
-        return merged
 
 
 class ContourScatteredAxisRenderer(ContourAxisRenderer, BaseAxisRenderer):
@@ -610,7 +573,9 @@ class ContourScatteredAxisRenderer(ContourAxisRenderer, BaseAxisRenderer):
         options: dict[str, Any] | None = None,
     ) -> None:
         axis_options = options or {}
-        sd = self._single_series(series)
+        sd = self.single_series(
+            series, reason="the second field would cover the first"
+        )
         if sd is None:
             return
 
@@ -630,7 +595,7 @@ class ContourScatteredAxisRenderer(ContourAxisRenderer, BaseAxisRenderer):
             self._draw_contours(
                 ax,
                 (x, y, z),
-                self._merge_options(axis_options, sd.style or {}),
+                self.merge_style(axis_options, sd.style or {}),
             )
         except (RuntimeError, ValueError) as exc:
             # Collinear points have no triangles to contour across, and

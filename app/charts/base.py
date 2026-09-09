@@ -297,6 +297,67 @@ class BaseAxisRenderer(Protocol):
         return merged
 
 
+    def valid_series(
+        self,
+        series: list["SeriesData"],
+        *,
+        require_roles: bool = True,
+        require_rows: bool = True,
+    ) -> list["SeriesData"]:
+        """Return the series worth drawing: visible, mapped, and not empty.
+
+        The same three conditions were written out in fifteen renderers and
+        then in six more as they were added (todo.txt P2-14), which is
+        twenty-one places for one of them to be forgotten - and the one
+        that gets forgotten is ``visible``, because a hidden series looks
+        exactly like a series until you hide it.
+
+        ``require_roles`` is off for a renderer that draws whatever columns
+        it is given rather than named ones - the Table renderer - and
+        ``require_rows`` for one that has something to say about an empty
+        frame.
+        """
+        return [
+            sd
+            for sd in series
+            if (sd.style or {}).get("visible", True)
+            and (not require_roles or self.ensure_required_roles(sd.df))
+            and (not require_rows or not sd.df.empty)
+        ]
+
+    def single_series(
+        self,
+        series: list["SeriesData"],
+        *,
+        reason: str = "",
+        **kwargs: Any,
+    ) -> "SeriesData | None":
+        """Return the one series to draw, reporting the ones skipped.
+
+        For the renderers that declare ``MaxSeries = 1``: a contour map, a
+        surface, a pie, a filled mesh. A second one drawn over the first
+        covers it rather than being compared with it, so the extras are
+        named in the log instead of silently vanishing - "nothing happened
+        when I ticked the second series" is otherwise a mystery from the
+        outside.
+
+        *reason* completes the sentence "the extras were not drawn - ...",
+        because why differs: a surface occludes, a pie has one circle to
+        divide, a stream plot's lines would cross.
+        """
+        valid = self.valid_series(series, **kwargs)
+        if not valid:
+            return None
+
+        if len(valid) > 1:
+            applogger.info(
+                "%s draws one series; %d more on this axis were not drawn%s",
+                self.Name,
+                len(valid) - 1,
+                f" - {reason}." if reason else ".",
+            )
+        return valid[0]
+
     def ensure_required_roles(self,df:pd.DataFrame) ->bool:
         """Return True when *df* carries every column this renderer needs.
 

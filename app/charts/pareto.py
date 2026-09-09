@@ -176,13 +176,7 @@ class ParetoAxisRenderer(BarAxisRenderer, BaseAxisRenderer):
     ) -> None:
         """Draw the sorted bars, then the cumulative percentage over them."""
         axis_options = options or {}
-        visible = [
-            sd
-            for sd in series
-            if (sd.style or {}).get("visible", True)
-            and self.ensure_required_roles(sd.df)
-            and not sd.df.empty
-        ]
+        visible = self.valid_series(series)
         if not visible:
             return
 

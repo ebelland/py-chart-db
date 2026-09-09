@@ -89,13 +89,7 @@ class StackplotAxisRenderer(BaseAxisRenderer):
         base_kwargs = self.get_kwargs(options)
         show_legend = bool(base_kwargs.pop("show_legend", True))
 
-        usable = [
-            sd
-            for sd in series
-            if (sd.style or {}).get("visible", True)
-            and self.ensure_required_roles(sd.df)
-            and not sd.df.empty
-        ]
+        usable = self.valid_series(series)
         if not usable:
             return
 

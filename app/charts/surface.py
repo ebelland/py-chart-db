@@ -178,25 +178,11 @@ class SurfaceAxisRenderer(BaseAxisRenderer):
         options: dict[str, Any] | None = None,
     ) -> None:
         axis_options = options or {}
-        valid_series = [
-            sd
-            for sd in series
-            if (sd.style or {}).get("visible", True)
-            and self.ensure_required_roles(sd.df)
-            and not sd.df.empty
-        ]
-        if not valid_series:
+        sd = self.single_series(
+            series, reason="two surfaces on one set of axes occlude each other"
+        )
+        if sd is None:
             return
-
-        if len(valid_series) > 1:
-            applogger.info(
-                "Surface Plot renders one series; %d more selected on this "
-                "axis were not drawn - two surfaces sharing one set of axes "
-                "would occlude each other.",
-                len(valid_series) - 1,
-            )
-
-        sd = valid_series[0]
         merged = self.merge_style(axis_options, sd.style or {})
         grid = pivot_to_grid(sd.df)
         if grid is None:
@@ -299,24 +285,11 @@ class TriSurfaceAxisRenderer(BaseAxisRenderer):
         options: dict[str, Any] | None = None,
     ) -> None:
         axis_options = options or {}
-        valid_series = [
-            sd
-            for sd in series
-            if (sd.style or {}).get("visible", True)
-            and self.ensure_required_roles(sd.df)
-            and not sd.df.empty
-        ]
-        if not valid_series:
+        sd = self.single_series(
+            series, reason="two surfaces on one set of axes occlude each other"
+        )
+        if sd is None:
             return
-
-        if len(valid_series) > 1:
-            applogger.info(
-                "Surface Plot (Scattered) renders one series; %d more "
-                "selected on this axis were not drawn.",
-                len(valid_series) - 1,
-            )
-
-        sd = valid_series[0]
         merged = self.merge_style(axis_options, sd.style or {})
         x, y, z = finite_xyz(sd.df)
         if x.size < 3:

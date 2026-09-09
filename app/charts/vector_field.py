@@ -337,23 +337,11 @@ class StreamAxisRenderer(BaseAxisRenderer):
         options: dict[str, Any] | None = None,
     ) -> None:
         axis_options = options or {}
-        drawable = [
-            sd
-            for sd in series
-            if (sd.style or {}).get("visible", True)
-            and self.ensure_required_roles(sd.df)
-            and not sd.df.empty
-        ]
-        if not drawable:
+        sd = self.single_series(
+            series, reason="streamlines from two fields cross and mean nothing"
+        )
+        if sd is None:
             return
-        if len(drawable) > 1:
-            applogger.info(
-                "Stream Plot draws one field; %d more on this axis were not "
-                "drawn - streamlines from two fields cross and mean nothing.",
-                len(drawable) - 1,
-            )
-
-        sd = drawable[0]
         grid = self._field_grid(sd)
         if grid is None:
             return

@@ -249,3 +249,64 @@ def test_the_cap_is_not_forwarded_to_matplotlib(qapp) -> None:
     """Axes.table has no max_rows keyword and would raise on one."""
     assert _table_axes(10, {"max_rows": 5}).tables
 
+
+
+# ----------------------------------------------------------------------
+# The shared filter (todo.txt P2-14)
+# ----------------------------------------------------------------------
+def _series(name, columns=("x", "y"), rows=1, **style):
+    import pandas as pd
+
+    from app.charts.base import SeriesData
+
+    frame = pd.DataFrame({column: [1.0] * rows for column in columns})
+    return SeriesData(name=name, df=frame, style=dict(style))
+
+
+def _renderer():
+    from app.charts.scatter import ScatterAxisRenderer
+
+    return ScatterAxisRenderer()
+
+
+def test_valid_series_keeps_the_ones_worth_drawing() -> None:
+    renderer = _renderer()
+    series = [
+        _series("drawn"),
+        _series("hidden", visible=False),
+        _series("empty", rows=0),
+        _series("unmapped", columns=("q",)),
+    ]
+
+    assert [sd.name for sd in renderer.valid_series(series)] == ["drawn"]
+
+
+def test_a_renderer_that_needs_no_roles_can_say_so() -> None:
+    """The Table renderer draws whatever columns the query returned."""
+    renderer = _renderer()
+    series = [_series("unmapped", columns=("q",))]
+
+    assert renderer.valid_series(series, require_roles=False)
+    assert renderer.valid_series(series) == []
+
+
+def test_single_series_returns_the_first_and_reports_the_rest(caplog) -> None:
+    """"Nothing happened when I ticked the second series" is a mystery from
+    the outside unless the log says why."""
+    import logging
+
+    renderer = _renderer()
+    series = [_series("first"), _series("second"), _series("third")]
+
+    with caplog.at_level(logging.INFO):
+        chosen = renderer.single_series(series, reason="a pie has one circle")
+
+    assert chosen.name == "first"
+    assert "2 more" in caplog.text
+    assert "a pie has one circle" in caplog.text
+
+
+def test_single_series_is_none_when_there_is_nothing_to_draw() -> None:
+    renderer = _renderer()
+
+    assert renderer.single_series([_series("hidden", visible=False)]) is None

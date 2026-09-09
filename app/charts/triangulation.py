@@ -264,23 +264,11 @@ class TripcolorAxisRenderer(BaseAxisRenderer):
         options: dict[str, Any] | None = None,
     ) -> None:
         axis_options = options or {}
-        drawable = [
-            sd
-            for sd in series
-            if (sd.style or {}).get("visible", True)
-            and self.ensure_required_roles(sd.df)
-            and not sd.df.empty
-        ]
-        if not drawable:
+        sd = self.single_series(
+            series, reason="a second filled mesh would cover the first"
+        )
+        if sd is None:
             return
-        if len(drawable) > 1:
-            applogger.info(
-                "Triangular Color Mesh draws one field; %d more on this axis "
-                "were not drawn - a second filled mesh would cover the first.",
-                len(drawable) - 1,
-            )
-
-        sd = drawable[0]
         x, y, z = finite_xyz(sd.df)
         if _too_few_points(sd.name, x.size):
             return

@@ -109,19 +109,13 @@ class TextAxisRenderer(BaseAxisRenderer):
         options: dict[str, Any] | None = None,
     ) -> None:
         axis_options = options or {}
-        valid_series = [
-            sd
-            for sd in series
-            if (sd.style or {}).get("visible", True)
-            and self.ensure_required_roles(sd.df)
-            and not sd.df.empty
-        ]
+        valid_series = self.valid_series(series)
         if not valid_series:
             return
 
         texts = []
         for layer_index, sd in enumerate(valid_series):
-            merged = self._merge_options(axis_options, sd.style or {})
+            merged = self.merge_style(axis_options, sd.style or {})
             texts.extend(self._place_series(ax, sd, merged, layer_index))
 
         if not texts:
@@ -175,12 +169,3 @@ class TextAxisRenderer(BaseAxisRenderer):
             )
         return texts
 
-    def _merge_options(self, axis_options: dict[str, Any], style: dict[str, Any]) -> dict[str, Any]:
-        merged = dict(axis_options or {})
-        axis_kwargs = dict(merged.get("axis_kwargs", {}) or {})
-        axis_kwargs.update(style.get("axis_kwargs", {}) or {})
-        for key, value in style.items():
-            if key != "axis_kwargs":
-                merged[key] = value
-        merged["axis_kwargs"] = axis_kwargs
-        return merged

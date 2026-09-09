@@ -146,3 +146,42 @@ def test_doc_links_are_built_by_the_helper() -> None:
     assert offenders == [], (
         f"these files build <a href> markup by hand; use set_doc_link: {offenders}"
     )
+
+
+# ----------------------------------------------------------------------
+# The renderer boilerplate (todo.txt P2-14)
+# ----------------------------------------------------------------------
+def test_no_renderer_writes_the_visible_series_filter_by_hand() -> None:
+    """"Visible, roles present, not empty" was written out in twenty-one
+    renderers - twenty-one places for one of them to be forgotten, and the
+    one forgotten is always ``visible``, because a hidden series looks
+    exactly like a series until you hide it."""
+    pattern = re.compile(r"""\(sd\.style or \{\}\)\.get\(\s*["']visible["']""")
+    charts = APP_DIR / "charts"
+    offenders = [
+        str(path.relative_to(APP_DIR))
+        for path in sorted(charts.glob("*.py"))
+        if path.name != "base.py" and pattern.search(path.read_text(encoding="utf-8"))
+    ]
+
+    # scatter and timeline read the flag one series at a time inside their
+    # own loops rather than filtering a list, which valid_series() does not
+    # replace - they are the exceptions, and they are named here so a new
+    # copy in a new renderer is not.
+    assert offenders == ["charts/scatter.py", "charts/timeline.py"], offenders
+
+
+def test_option_merging_is_defined_once() -> None:
+    """Five byte-identical copies of _merge_options existed; the base has
+    always had merge_style, which does the same and more."""
+    charts = APP_DIR / "charts"
+    offenders = [
+        str(path.relative_to(APP_DIR))
+        for path in sorted(charts.glob("*.py"))
+        if "_merge_options" in path.read_text(encoding="utf-8")
+    ]
+
+    assert offenders == [], (
+        "these renderers merge options by hand; use "
+        f"BaseAxisRenderer.merge_style instead: {offenders}"
+    )

@@ -134,22 +134,16 @@ class TableAxisRenderer(BaseAxisRenderer):
         options: dict[str, Any] | None = None,
     ) -> None:
         axis_options = options or {}
-        valid_series = [
-            sd
-            for sd in series
-            if (sd.style or {}).get("visible", True) and not sd.df.empty
-        ]
-        if not valid_series:
+        # require_roles=False: this renderer draws whatever columns the
+        # query returned rather than named ones, so there are no roles to
+        # be missing.
+        sd = self.single_series(
+            series,
+            reason="a table fills the axes",
+            require_roles=False,
+        )
+        if sd is None:
             return
-
-        if len(valid_series) > 1:
-            applogger.info(
-                "Table renders one series; %d more selected on this axis were "
-                "not drawn.",
-                len(valid_series) - 1,
-            )
-
-        sd = valid_series[0]
         merged = self.merge_style(axis_options, sd.style or {})
         df, headers = self._columns_to_draw(sd)
         if df.empty or not headers:

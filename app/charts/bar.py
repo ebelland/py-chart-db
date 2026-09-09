@@ -213,13 +213,7 @@ class BarAxisRenderer(BaseAxisRenderer):
         every later bar left by one.
         """
         axis_options = options or {}
-        valid_series = [
-            sd
-            for sd in series
-            if (sd.style or {}).get("visible", True)
-            and self.ensure_required_roles(sd.df)
-            and not sd.df.empty
-        ]
+        valid_series = self.valid_series(series)
         if not valid_series:
             return
 
