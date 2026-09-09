@@ -14,6 +14,7 @@ from typing import Any, Final, TypeAlias, cast
 
 from PySide6.QtCore import QEvent, QObject, QSignalBlocker, Qt, Signal
 from PySide6.QtWidgets import (
+    QAbstractButton,
     QCheckBox,
     QComboBox,
     QDoubleSpinBox,
@@ -106,7 +107,10 @@ class AxisPropertiesWidget(BaseProperties):
         self._axis_map: dict[int, AxisDescriptorLike] = {}
         self._kwargs_editor: DictEditorPanel | None = None
         # Rebuilt with the editor it sits on - see rebuild_kwargs_editor.
-        self._btn_reset_kwargs: QPushButton | None = None
+        # create_action_button() and mark_icon_only() return a generic button
+        # instance rather than a QPushButton specifically, so the attribute must
+        # match that broader Qt type.
+        self._btn_reset_kwargs: QAbstractButton | None = None
         # Expanding/Expanding already set by BaseProperties.
         self.setMinimumHeight(0)
         self._build_ui()
@@ -583,7 +587,11 @@ class AxisPropertiesWidget(BaseProperties):
         """
         holder = QWidget(section)
         layout = QGridLayout(holder)
-        stdSizeAndlayout(layout)
+        # ``stdSizeAndlayout`` is typed for box/form/scroll widgets, not grid
+        # layouts. Apply the same compact spacing directly here so the grid can
+        # stay narrow without tripping the static checker.
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
 
         for column, axis in enumerate(axis_options.AXES, start=1):
             label = QLabel(axis.upper(), holder)
@@ -1149,7 +1157,7 @@ class AxisPropertiesWidget(BaseProperties):
         # a tab showing "select an axis" with nothing to reset. It is owned
         # by the editor from here on, so it dies with it on the next rebuild
         # rather than being a stale pointer into a deleted panel.
-        self._btn_reset_kwargs = mark_icon_only(
+        reset_button = mark_icon_only(
             create_action_button(
                 parent=editor,
                 action_id="reset_kwargs_to_defaults",
@@ -1157,7 +1165,9 @@ class AxisPropertiesWidget(BaseProperties):
                 layout=None,
             )
         )
-        editor.add_search_row_widget(self._btn_reset_kwargs)
+        if reset_button is not None:
+            self._btn_reset_kwargs = reset_button
+            editor.add_search_row_widget(reset_button)
 
         self._kwargs_editor = editor
         self.set_kwargs_widget(editor)

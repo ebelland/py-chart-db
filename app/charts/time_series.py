@@ -533,7 +533,11 @@ class TimeSeriesAxisRenderer(BaseAxisRenderer):
                     or pd.isna(frame.iloc[end]["y"])
                     or pd.isna(frame.iloc[end + 1]["x"])
                     or pd.isna(frame.iloc[end + 1]["y"])
-                    or resolved_colors[end] != color
+                    # array_equal, not !=: a resolved colour is a palette
+                    # string on the discrete path and a row of four floats
+                    # on the continuous one, and comparing two rows with !=
+                    # gives an array rather than an answer.
+                    or not np.array_equal(resolved_colors[end], color)
                 ):
                     break
                 end += 1

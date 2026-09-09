@@ -553,7 +553,12 @@ class FigurePropertiesWidget(BaseProperties):
         # actually columns.
         self._margin_spins = {}
         grid = QGridLayout()
-        stdSizeAndlayout(grid)
+        # ``stdSizeAndlayout`` is typed for QWidget/QBoxLayout/QFormLayout/
+        # scroll-area and text-editor widgets, not for a bare QGridLayout.
+        # Set the standard margins/spacing here instead of routing through the
+        # helper so the manual spacing grid keeps the app's spacing rhythm.
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setSpacing(8)
         for column in (0, 2):
             grid.setColumnStretch(column, 0)
         for column in (1, 3):

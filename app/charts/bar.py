@@ -356,7 +356,9 @@ class BarAxisRenderer(BaseAxisRenderer):
                 df["color"],
                 fallback_color=fallback_color,
             )
-            if colors:
+            # len(), not truthiness: the continuous path returns an (n, 4)
+            # RGBA array, and asking an array whether it is true raises.
+            if len(colors):
                 kwargs["color"] = colors
                 kwargs.pop("facecolor", None)
                 return

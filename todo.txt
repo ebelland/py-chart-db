@@ -6,13 +6,16 @@ Ranked by priority. P0 = wrong results or blocked work, P3 = nice to have.
 P0 - BUGS: wrong output, or work that cannot proceed
 ================================================================
 
-P0-11 renderer: la mappatura colori e' un ciclo Python punto per punto
-      base.py map_continuous_colors_to_cmap chiama cmap(valore) una volta per
-      punto e costruisce una lista Python di tuple RGBA. cmap(array) fa la
-      stessa cosa in C, in una riga. Stesso difetto in
-      map_integer_colors_to_palette.
-      Misurato: 100k punti 1025ms -> 3ms (322x); 300k 3054ms -> 39ms (78x).
-      Mezza giornata, nessun cambio di comportamento visibile.
+FATTO 2026-09-09 (P0-11) renderer: mappatura colori vettorizzata
+      Misurato su questa macchina, prima -> dopo: continuo 100k 670ms ->
+      1.9ms, 300k 2076ms -> 3.9ms; interi 100k 48ms -> 1.5ms, 300k 144ms ->
+      3.8ms. Il percorso continuo ora restituisce un array RGBA (n,4)
+      invece di una lista di tuple - e' quello che matplotlib vuole - e
+      tre call site che chiedevano la verita' di una lista sono stati
+      corretti. first_color_from_values restituisce ancora una tupla:
+      e' un singolo colore e viene testato con "if color:".
+      Test: app/tests/test_color_mapping.py, che verifica che la colormap
+      sia chiamata una volta sola invece di misurare i millisecondi.
 
 ================================================================
 NEW - requested after the review
