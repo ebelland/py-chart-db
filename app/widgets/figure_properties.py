@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.charts import layout_presets
 from app.charts.render_figure import OPT_DOWNSAMPLE_THRESHOLD
 from app.dialogs.edit_mpl_styles_dialog import (
     MplStyleEditorDialog,
@@ -79,6 +80,18 @@ class FigurePropertiesWidget(BaseProperties):
     style_changed = Signal(str)
     grid_layout_requested = Signal(int, int)
     figure_options_requested = Signal(dict)
+    #: Emitted with one of app.charts.layout_presets.PRESETS.
+    layout_preset_requested = Signal(str)
+
+    #: (label, preset constant) for the layout preset combo, in the order
+    #: offered. Grid first, since it is what a new figure already looks
+    #: like - re-picking it is how another preset gets undone.
+    LAYOUT_PRESETS: tuple[tuple[str, str], ...] = (
+        ("Grid", layout_presets.GRID),
+        ("Shared axes (grid)", layout_presets.SHARED_GRID),
+        ("Main + secondary (grid)", layout_presets.MAIN_AND_SECONDARY),
+        ("Overlapping (twin Y)", layout_presets.OVERLAPPING),
+    )
 
     # Sentinel combo entry that opens a native file picker instead of naming a
     # style. Keeps "browse anywhere" available even though the dropdown itself
@@ -300,6 +313,47 @@ class FigurePropertiesWidget(BaseProperties):
         grid_lay.addWidget(QLabel(_("Cols"), grid_row))
         grid_lay.addWidget(self._ncols_combo, 1)
         grid_section_lay.addWidget(grid_row)
+
+        # A preset writes row_span/col_span/sharex/sharey/twin_of across
+        # every axis at once - the rows/cols above only ever set a uniform
+        # grid, which is one of the four this offers rather than the whole
+        # of what an axis's own options can already express.
+        #
+        # Picking one applies it there and then, with no button of its own:
+        # the same way the Display combo just above already works, and
+        # unlike the Rows/Cols combos, whose value is part of what the
+        # panel's Apply writes. It deliberately does NOT ride on Apply -
+        # this combo always reloads showing "Grid" (a preset is a one-shot
+        # rearrangement, not a stored figure property), so an Apply pressed
+        # for some unrelated edit would silently flatten a hand-built
+        # layout back to a uniform grid.
+        preset_row = QWidget(grid_section)
+        preset_lay = QHBoxLayout(preset_row)
+        preset_lay.setContentsMargins(0, 0, 0, 0)
+        preset_lay.setSpacing(8)
+
+        self._layout_preset_combo = QComboBox(preset_row)
+        # A placeholder first row, carrying no preset, and the row this
+        # combo is put back to after every apply (see
+        # _reset_layout_preset_combo). Two things need it: picking the
+        # same preset twice in a row has to work - "Grid" is how another
+        # preset gets undone, and currentIndexChanged does not fire when
+        # the index has not changed - and a combo left showing "Overlapping"
+        # would otherwise claim to describe a figure it merely rearranged
+        # once, including after switching to a different chart.
+        self._layout_preset_combo.addItem(_("Apply a preset…"), None)
+        for label, preset in self.LAYOUT_PRESETS:
+            self._layout_preset_combo.addItem(_(label), preset)
+        self._configure_combo_width(self._layout_preset_combo, minimum_contents_length=20)
+        self._layout_preset_combo.setToolTip(
+            _("Arrange every axis in this figure using the chosen layout.")
+        )
+        self._layout_preset_combo.currentIndexChanged.connect(
+            self._on_layout_preset_selected
+        )
+        preset_lay.addWidget(QLabel(_("Layout"), preset_row))
+        preset_lay.addWidget(self._layout_preset_combo, 1)
+        grid_section_lay.addWidget(preset_row)
 
         lay.addWidget(grid_section)
 
@@ -526,6 +580,7 @@ class FigurePropertiesWidget(BaseProperties):
         self._fig_frameon.setChecked(True)
         self._fig_layout_mode.setCurrentIndex(0)
         self._downsample_combo.setCurrentIndex(0)
+        self._reset_layout_preset_combo()
         self._load_margins_into_spins({})
         self._name_edit.clear()
         super().clear_connected_figure()
@@ -538,6 +593,7 @@ class FigurePropertiesWidget(BaseProperties):
             self._btn_edit,
             self._nrows_combo,
             self._ncols_combo,
+            self._layout_preset_combo,
             self._fig_dpi,
             self._fig_width_cm,
             self._fig_height_cm,
@@ -611,6 +667,7 @@ class FigurePropertiesWidget(BaseProperties):
             self._fig_frameon.setChecked(True)
             self._fig_layout_mode.setCurrentIndex(0)
             self._downsample_combo.setCurrentIndex(0)
+            self._reset_layout_preset_combo()
             self._load_margins_into_spins({})
             self._set_enabled_state(False)
             return
@@ -665,6 +722,10 @@ class FigurePropertiesWidget(BaseProperties):
         self._downsample_combo.setCurrentIndex(
             max(0, self._downsample_combo.findData(downsample_threshold))
         )
+        # Nothing to restore: a preset is an action this panel performed
+        # once, not a property the figure carries, so there is no "current
+        # preset" a descriptor could tell us about.
+        self._reset_layout_preset_combo()
 
         self._set_enabled_state(True)
 
@@ -838,6 +899,40 @@ class FigurePropertiesWidget(BaseProperties):
         nrows = int(self._nrows_combo.currentData() or 1)
         ncols = int(self._ncols_combo.currentData() or 1)
         self.grid_layout_requested.emit(nrows, ncols)
+
+    def _on_layout_preset_selected(self, _index: int) -> None:
+        """Request the chosen preset, applied across every axis in the figure.
+
+        Unlike ``_apply_grid_layout`` (a uniform rows x cols the person
+        chose), a preset computes its own grid size from how many axes the
+        figure has - see app.charts.layout_presets - so there is nothing
+        here to read from the Rows/Cols combos.
+
+        Guarded on a connected figure: ``_reload_from_descriptor`` resets
+        this combo to "Grid" whenever a different chart is selected, and a
+        reset that arrived while nothing was connected would otherwise
+        rearrange whichever figure happened to be connected next.
+        """
+        if self._repo is None or self._figure_id is None:
+            return
+        preset = self._layout_preset_combo.currentData()
+        if not preset:
+            return
+        self.layout_preset_requested.emit(str(preset))
+
+    def _reset_layout_preset_combo(self) -> None:
+        """Put the preset combo back on its placeholder row, silently.
+
+        Signals blocked: this runs from the reload that the apply itself
+        triggers, and an unblocked reset would read as the user picking
+        the placeholder - harmless today (it carries no preset) but only
+        by accident.
+        """
+        self._layout_preset_combo.blockSignals(True)
+        try:
+            self._layout_preset_combo.setCurrentIndex(0)
+        finally:
+            self._layout_preset_combo.blockSignals(False)
 
     def _rcparams_dpi(self) -> int:
         try:

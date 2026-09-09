@@ -21,6 +21,7 @@ from PySide6.QtGui import (
     QDesktopServices,
     QIcon,
 )
+from app.charts import layout_presets
 from app.dialogs.log_viewer_dialog import LogViewerDialog
 from app.data.sqlite_repo import SqliteRepo
 from app.widgets.chart_panel import ChartPanel
@@ -204,6 +205,7 @@ class MainWindow(QMainWindow):
         """Connect property widgets to main-window persistence handlers."""
         self._figure_widget.style_changed.connect(self._on_figure_style_changed)
         self._figure_widget.grid_layout_requested.connect(self._on_grid_layout_requested)
+        self._figure_widget.layout_preset_requested.connect(self._on_layout_preset_requested)
         self._figure_widget.figure_options_requested.connect(self._on_figure_options_requested)
         self._axis_widget.axis_selected.connect(self._on_axis_selected)
         self._axis_widget.renderer_changed.connect(self._on_axis_renderer_changed)
@@ -985,6 +987,34 @@ class MainWindow(QMainWindow):
             nrows=int(nrows),
             ncols=int(ncols),
         )
+        self._redraw_properties_chart()
+
+    def _on_layout_preset_requested(self, preset: str) -> None:
+        """Arrange every axis of the current figure using *preset*.
+
+        The grid size and every axis's row_span/col_span/sharex/sharey/
+        twin_of come entirely from layout_presets.plan_layout - this only
+        supplies the one thing it cannot know on its own: which axes the
+        figure actually has, in the order the axis panel lists them.
+        """
+        if self._properties_figure_id is None:
+            return
+        figure_id = int(self._properties_figure_id)
+        axis_ids = [
+            axis_id
+            for axis_id, _axis_index, _title in self._repo.list_axes_for_figure(figure_id)
+        ]
+        plan = layout_presets.plan_layout(preset, axis_ids)
+        self._repo.apply_axis_layout(
+            figure_id=figure_id,
+            nrows=plan.nrows,
+            ncols=plan.ncols,
+            placements=[
+                (placement.axis_id, placement.axis_index, placement.options)
+                for placement in plan.axes
+            ],
+        )
+        self._reload_property_widgets()
         self._redraw_properties_chart()
 
     # Figure payload keys handled outside the generic copy below.
