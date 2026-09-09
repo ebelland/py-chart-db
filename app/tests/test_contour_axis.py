@@ -17,6 +17,7 @@ import pytest
 from matplotlib.figure import Figure
 
 from app.charts.base import SeriesData
+from app.charts import contour as contour_module
 from app.charts.contour import ContourAxisRenderer, ContourScatteredAxisRenderer
 from app.charts.grids import finite_xyz, pivot_to_grid
 
@@ -424,3 +425,94 @@ def test_duplicates_do_not_trip_the_row_count_check() -> None:
 
     assert pivot_to_grid(frame) is not None
 
+
+
+# ----------------------------------------------------------------------
+# Marking the samples the contours came from
+# ----------------------------------------------------------------------
+def test_no_sample_markers_unless_they_are_asked_for() -> None:
+    """A contour map is bands and lines; the markers are an addition to it."""
+    _fig, ax = _render(ContourAxisRenderer(), _grid_frame(side=8))
+
+    assert len(ax.lines) == 0
+
+
+def test_the_markers_are_one_per_grid_cell() -> None:
+    """The gridded renderer hands meshgrids to the shared drawing code, so
+    what it marks is every cell of the pivoted grid."""
+    _fig, ax = _render(
+        ContourAxisRenderer(), _grid_frame(side=8), {"show_points": True}
+    )
+
+    assert len(ax.lines) == 1
+    assert len(ax.lines[0].get_xdata()) == 8 * 8
+
+
+def test_the_scattered_renderer_marks_the_points_it_was_given() -> None:
+    """Where it matters most: a triangulated map looks equally smooth
+    whether it was built from nine points or nine hundred."""
+    _fig, ax = _render(
+        ContourScatteredAxisRenderer(), _scattered_frame(points=150),
+        {"show_points": True},
+    )
+
+    assert len(ax.lines[0].get_xdata()) == 150
+
+
+def test_the_markers_take_the_shape_size_and_colour_asked_for() -> None:
+    _fig, ax = _render(
+        ContourScatteredAxisRenderer(),
+        _scattered_frame(points=50),
+        {
+            "show_points": True,
+            "point_marker": "x",
+            "point_size": 6.0,
+            "point_color": "#ff0000",
+        },
+    )
+
+    markers = ax.lines[0]
+    assert markers.get_marker() == "x"
+    assert markers.get_markersize() == 6.0
+    assert markers.get_color() == "#ff0000"
+    assert markers.get_linestyle() == "None", "the samples are marks, not a path"
+
+
+def test_the_markers_default_to_the_colour_the_overlay_lines_use() -> None:
+    """Both sit on the filled bands, where a colormapped colour vanishes."""
+    _fig, ax = _render(
+        ContourScatteredAxisRenderer(), _scattered_frame(points=50),
+        {"show_points": True},
+    )
+
+    assert ax.lines[0].get_color() == contour_module._OVERLAY_LINE_COLOR
+
+
+def test_the_markers_stay_out_of_the_legend() -> None:
+    """They annotate the one series rather than being a series of their own."""
+    _fig, ax = _render(
+        ContourScatteredAxisRenderer(), _scattered_frame(points=50),
+        {"show_points": True},
+    )
+
+    handles, _labels = ax.get_legend_handles_labels()
+    assert handles == []
+
+
+def test_too_many_samples_are_left_unmarked() -> None:
+    """A 500x500 grid is a quarter of a million markers: minutes of drawing
+    for a solid black rectangle, which is not what the option is for."""
+    side = 160  # 25 600 samples, past MAX_POINT_MARKERS
+    assert side * side > contour_module.MAX_POINT_MARKERS
+
+    _fig, ax = _render(
+        ContourAxisRenderer(), _grid_frame(side=side), {"show_points": True}
+    )
+
+    assert len(ax.lines) == 0
+
+
+def test_the_marker_options_never_reach_matplotlib() -> None:
+    """They are read here; contourf would refuse them as unknown keywords."""
+    for name in ("show_points", "point_marker", "point_size", "point_color"):
+        assert name in contour_module._RENDERER_ONLY_KWARGS

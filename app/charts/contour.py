@@ -46,13 +46,26 @@ _RENDERER_ONLY_KWARGS: tuple[str, ...] = (
     "label_inline",
     "colorbar",
     "colorbar_label",
+    "show_points",
+    "point_marker",
+    "point_size",
+    "point_color",
 )
 
 #: Line colour used for the contour lines drawn over filled bands when none
 #: was chosen.  Matplotlib would colour them from the same colormap as the
 #: bands underneath, which makes them all but invisible - the one case where
-#: the default has to differ from Matplotlib's own.
+#: the default has to differ from Matplotlib's own.  The sample markers take
+#: it too, and for the same reason: they sit on the bands.
 _OVERLAY_LINE_COLOR = "black"
+
+#: Above this many samples the markers are not drawn.  A contour map is often
+#: a 500 x 500 grid, and a quarter of a million markers is minutes of drawing
+#: for a solid black rectangle that says nothing about where the samples are -
+#: which is the only reason to turn them on.  Same principle as
+#: grids.MAX_GRID_CELLS: refuse with a message naming the way out rather than
+#: eventually draw something useless.
+MAX_POINT_MARKERS: int = 20_000
 
 
 class ContourAxisRenderer(BaseAxisRenderer):
@@ -215,6 +228,49 @@ class ContourAxisRenderer(BaseAxisRenderer):
             "group": "Colorbar",
             "description": "Label written alongside the colorbar. Empty leaves it unlabelled.",
         },
+        # Where the numbers actually came from. A contour map is an
+        # interpolation - between grid cells, or across triangles - and it
+        # looks equally smooth whether it was drawn from ten thousand samples
+        # or from nine. Marking them says which, and on the scattered
+        # renderer it also shows where the hull ends and why.
+        "show_points": {
+            "default": False,
+            "type": bool,
+            "group": "Points",
+            "description": (
+                "Mark the sampled points the contours were computed from. "
+                "Off by default: on a dense grid it is every cell."
+            ),
+        },
+        "point_marker": {
+            "default": ".",
+            "type": str,
+            "group": "Points",
+            "description": (
+                "Marker drawn at each sample, as a Matplotlib marker code - "
+                "'.', 'o', '+', 'x'. A dot is the one that stays legible "
+                "when the samples are close together."
+            ),
+        },
+        "point_size": {
+            "default": 3.0,
+            "type": float,
+            "min": 0.1,
+            "max": 30.0,
+            "step": 0.5,
+            "group": "Points",
+            "description": "Marker size, in points.",
+        },
+        "point_color": {
+            "default": None,
+            "type": str,
+            "kind": "color",
+            "group": "Points",
+            "description": (
+                "Marker colour. Empty means black, which reads on most "
+                "colormaps; pick one explicitly over a dark map."
+            ),
+        },
     }
 
     # ------------------------------------------------------------------
@@ -295,6 +351,53 @@ class ContourAxisRenderer(BaseAxisRenderer):
 
         if bool(self.opt("colorbar", options)):
             self._colorbar(ax, band_set if band_set is not None else line_set, options)
+
+        if bool(self.opt("show_points", options)):
+            self._draw_points(ax, data, options)
+
+    def _draw_points(
+        self, ax: Any, data: tuple[Any, ...], options: dict[str, Any]
+    ) -> None:
+        """Mark the samples the contours were computed from.
+
+        Shared by both renderers, and the shapes take care of themselves:
+        the gridded one passes meshgrids and the scattered one passes the
+        raw columns, and ``ravel`` turns either into the list of sample
+        positions. Drawn last so the markers sit over the bands rather than
+        under them, and left out of the legend - they are an annotation of
+        the one series, not a series of their own.
+        """
+        x = np.asarray(data[0], dtype=float).ravel()
+        y = np.asarray(data[1], dtype=float).ravel()
+        if x.size == 0:
+            return
+
+        if x.size > MAX_POINT_MARKERS:
+            applogger.info(
+                "Sample markers were not drawn: %s samples, past the %s this "
+                "draws without stalling. They are meant for a map built from "
+                "few enough points that where they are matters.",
+                f"{x.size:,}",
+                f"{MAX_POINT_MARKERS:,}",
+            )
+            return
+
+        marker = str(self.opt("point_marker", options) or ".").strip() or "."
+        color = str(self.opt("point_color", options) or "").strip()
+        try:
+            size = float(str(self.opt("point_size", options) or 3.0))
+        except (TypeError, ValueError):
+            size = 3.0
+
+        ax.plot(
+            x,
+            y,
+            linestyle="none",
+            marker=marker,
+            markersize=size,
+            color=color or _OVERLAY_LINE_COLOR,
+            label="_nolegend_",
+        )
 
     # ------------------------------------------------------------------
     # Options

@@ -576,6 +576,11 @@ def _showcase_definitions() -> list[dict[str, Any]]:
                 "title": "Contour Plot (Scattered)",
                 "cmap": "magma",
                 "line_overlay": False,
+                # On here rather than on the gridded showcase: this is the
+                # renderer where the samples are worth seeing, since the map
+                # covers their hull and stops there.
+                "show_points": True,
+                "point_color": "#ffffff",
             },
             "series": [
                 ("ripple", "SELECT x, y, z FROM src_scatter3d", {}),
