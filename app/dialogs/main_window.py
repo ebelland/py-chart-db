@@ -21,14 +21,13 @@ from PySide6.QtGui import (
     QDesktopServices,
     QIcon,
 )
-from app.charts import layout_presets
 from app.dialogs.log_viewer_dialog import LogViewerDialog
 from app.data.sqlite_repo import SqliteRepo
 from app.widgets.chart_panel import ChartPanel
 from app.dialogs.create_chart_dialog import NewPlotTabDialog
 from app.dialogs.import_data_dialog import ImportDataDialog, is_importable
 from app.data.demo_project import copy_demo_project
-from app.dialogs.create_demo_dialog import CreateDemoDialog
+from app.dialogs.load_demo_dialog import LoadDemoDialog
 from app.dialogs.credits_dialog import CreditsDialog
 from app.dialogs.query_builder_dialog import QueryBuilderDialog
 from app.widgets.axis_properties import AxisPropertiesWidget
@@ -205,7 +204,6 @@ class MainWindow(QMainWindow):
         """Connect property widgets to main-window persistence handlers."""
         self._figure_widget.style_changed.connect(self._on_figure_style_changed)
         self._figure_widget.grid_layout_requested.connect(self._on_grid_layout_requested)
-        self._figure_widget.layout_preset_requested.connect(self._on_layout_preset_requested)
         self._figure_widget.figure_options_requested.connect(self._on_figure_options_requested)
         self._axis_widget.axis_selected.connect(self._on_axis_selected)
         self._axis_widget.renderer_changed.connect(self._on_axis_renderer_changed)
@@ -427,7 +425,7 @@ class MainWindow(QMainWindow):
             action_menu_item("save_as", self._on_save_as),
             action_menu_item("import", self._on_import_data),
             action_menu_item("query_builder", self._on_query_builder),
-            action_menu_item("create_demo", self._on_create_demo),
+            action_menu_item("load_demo", self._on_load_demo),
             None,
             action_menu_item("optimize_db", self._on_optimize_db),
             None,
@@ -989,34 +987,6 @@ class MainWindow(QMainWindow):
         )
         self._redraw_properties_chart()
 
-    def _on_layout_preset_requested(self, preset: str) -> None:
-        """Arrange every axis of the current figure using *preset*.
-
-        The grid size and every axis's row_span/col_span/sharex/sharey/
-        twin_of come entirely from layout_presets.plan_layout - this only
-        supplies the one thing it cannot know on its own: which axes the
-        figure actually has, in the order the axis panel lists them.
-        """
-        if self._properties_figure_id is None:
-            return
-        figure_id = int(self._properties_figure_id)
-        axis_ids = [
-            axis_id
-            for axis_id, _axis_index, _title in self._repo.list_axes_for_figure(figure_id)
-        ]
-        plan = layout_presets.plan_layout(preset, axis_ids)
-        self._repo.apply_axis_layout(
-            figure_id=figure_id,
-            nrows=plan.nrows,
-            ncols=plan.ncols,
-            placements=[
-                (placement.axis_id, placement.axis_index, placement.options)
-                for placement in plan.axes
-            ],
-        )
-        self._reload_property_widgets()
-        self._redraw_properties_chart()
-
     # Figure payload keys handled outside the generic copy below.
     _FIGURE_PAYLOAD_NON_OPTIONS: frozenset[str] = frozenset({"name", "layout"})
 
@@ -1261,35 +1231,30 @@ class MainWindow(QMainWindow):
             applogger.exception("Failed to create database: %s", exc)
             show_message(self, "database.create_failed", error=exc)
 
-    def _on_create_demo(self) -> None:
+    def _on_load_demo(self) -> None:
         """Copy one of the shipped, pre-built demo projects, and open it.
 
-        Where to save it is asked exactly like "New" asks - the demo is a
-        real project, no different from one built by hand, and the sample
-        data it is worth showing to someone is not something this app should
-        assume they want left in some fixed folder.
+        No "where to save it" dialog: that was the one step between picking a
+        demo and seeing it, for a file whose name already says what it is and
+        that nobody is expected to keep - the same reasoning that lets a first
+        run open straight into a fixed, well-known path with no dialog of its
+        own (see app.utils.startup.DEFAULT_DATABASE_NAME). Loading the same
+        demo again overwrites its previous copy in place, which is the point:
+        it puts back the pristine version rather than asking what to call a
+        second one. Someone who wants to keep a demo under its own name has
+        Save As for that once it is open, same as any other project.
         """
-        picker = CreateDemoDialog(self)
+        picker = LoadDemoDialog(self)
         if not picker.exec() or picker.chosen is None:
             return
         demo = picker.chosen
 
-        base_dir = str(self._db_path.parent) if self._db_path else str(Path.home())
-        file_path, _unused = QFileDialog.getSaveFileName(
-            self,
-            _("Save demo project"),
-            str(Path(base_dir) / demo.path_name),
-            "Data Hub DB (*.dhub)",
-        )
-        if not file_path:
-            return
-
-        target = SqliteRepo.ensure_dhub_extension(Path(file_path))
-        applogger.info("Copying demo project %r to %s", demo.file_name, target)
+        target = Path.home() / demo.path_name
+        applogger.info("Loading demo project %r into %s", demo.file_name, target)
         try:
             copy_demo_project(demo, target)
         except Exception as exc:  # noqa: BLE001
-            applogger.exception("Failed to copy demo project: %s", exc)
+            applogger.exception("Failed to load demo project: %s", exc)
             show_message(self, "demo.build_failed", error=exc)
             return
 

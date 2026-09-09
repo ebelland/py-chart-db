@@ -1,7 +1,7 @@
 """A shared-scale grid should read as one instrument split into panels.
 
-Two things the earlier label_outer() fix did not cover, both reported after
-it shipped:
+Three things the earlier label_outer() fix did not cover, each reported
+after the previous one shipped:
 
 * The panels still had Matplotlib's default gap between them - label_outer()
   only hides tick numbers, it says nothing about spacing, so two subplots
@@ -9,6 +9,9 @@ it shipped:
 * Each panel kept its own copy of the axis label *text* ("body mass (g)",
   "Count") - a separate artist from the tick numbers label_outer() strips,
   so the interior panels still repeated it even once the numbers were gone.
+* Each panel also kept its own title, repeated down every row - unlike
+  Matplotlib's own shared-axis gallery example, which has no per-panel
+  title at all, one suptitle only.
 """
 from __future__ import annotations
 
@@ -68,6 +71,44 @@ def test_shared_axes_close_the_grid_spacing(repo: SqliteRepo) -> None:
     assert gridspec.hspace == 0.0
 
 
+def test_sharing_between_non_adjacent_axes_does_not_close_unrelated_gaps(
+    repo: SqliteRepo,
+) -> None:
+    """Two axes may share a scale without sitting next to each other - a
+    row/col-spanning "Main + secondary" layout is exactly this. Gridspec has
+    one gap for the whole grid, so closing it for a distant pair would also
+    close it between two axes that share nothing at all.
+    """
+    figure_id = repo.create_figure_descriptor(
+        name="F", nrows=2, ncols=2, options={"layout_mode": "constrained"}
+    )
+    # axis 0 (top-left) and axis 3 (bottom-right) share - diagonal, not
+    # adjacent in either direction. axes 1 and 2 share nothing with anyone.
+    specs = [
+        (0, {}),
+        (1, {}),
+        (2, {}),
+        (3, {"sharex": True, "sharey": True}),
+    ]
+    for index, options in specs:
+        axis_id = repo.create_axis_descriptor(
+            figure_id=figure_id, axis_index=index, chart_type="Scatter Plot",
+            title=f"ax{index}", x_label="X", y_label="Y", options=options,
+        )
+        repo.create_series_descriptor(
+            axis_id=axis_id, series_index=0, name="s",
+            sql_query="SELECT x, y FROM t", roles={"x": "x", "y": "y"}, style={},
+        )
+    fig = Figure()
+    render_figure_from_descriptor(
+        figure=fig, descriptor=repo.load_figure_descriptor(figure_id), repo=repo
+    )
+
+    gridspec = fig.axes[0].get_gridspec()
+    assert gridspec.wspace != 0.0
+    assert gridspec.hspace != 0.0
+
+
 def test_a_figure_with_no_shared_axes_keeps_the_default_spacing(
     repo: SqliteRepo,
 ) -> None:
@@ -115,6 +156,25 @@ def test_only_the_edge_axis_keeps_its_axis_label_text(repo: SqliteRepo) -> None:
 
     assert bottom_right.get_xlabel() == "X label"  # last row
     assert bottom_right.get_ylabel() == ""         # not first col
+
+
+def test_only_the_first_row_keeps_its_axis_title(repo: SqliteRepo) -> None:
+    """Matplotlib's own shared-axis gallery example has no per-panel title
+    at all, one suptitle only - a title sits at the top of a panel, so
+    (unlike xlabel/ylabel, which follow the "outer edge") it is kept only
+    on the first row of each column."""
+    figure_id = _shared_2x2_figure(repo, figure_options={"layout_mode": "constrained"})
+    fig = Figure()
+    render_figure_from_descriptor(
+        figure=fig, descriptor=repo.load_figure_descriptor(figure_id), repo=repo
+    )
+
+    top_left, top_right, bottom_left, bottom_right = fig.axes
+
+    assert top_left.get_title() == "ax0"      # first row
+    assert top_right.get_title() == "ax1"     # first row
+    assert bottom_left.get_title() == ""      # not first row
+    assert bottom_right.get_title() == ""     # not first row
 
 
 def test_tick_numbers_stay_hidden_on_the_interior_edges(repo: SqliteRepo) -> None:

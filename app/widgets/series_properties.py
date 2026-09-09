@@ -31,6 +31,7 @@ from app.styles.style import (
     create_section_title,
     stdSizeAndlayout,
 )
+from app.widgets.base_properties import BaseProperties
 from app.widgets.color_combo import MatplotlibColorCombo
 from app.widgets.line_combo import LineStyleCombo
 from app.widgets.marker_combo import MarkerStyleCombo
@@ -45,7 +46,7 @@ SeriesDescriptorLike = Any
 SQL_QUERY_VISIBLE_LINES = 6
 
 
-class SeriesPropertiesWidget(QWidget):
+class SeriesPropertiesWidget(BaseProperties):
     """Compact editor for series descriptor style/options."""
 
     series_selected = Signal(int)
@@ -60,10 +61,7 @@ class SeriesPropertiesWidget(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
 
-        self._repo: Any | None = None
-        self._figure_id: int | None = None
-        self._figure: Any | None = None
-        self._redraw_callback: Any | None = None
+        # _repo/_figure_id/_figure/_redraw_callback come from BaseProperties.
         self._current_axis_id: int | None = None
         self._current_series_id: int | None = None
         self._series_map: dict[int, SeriesDescriptorLike] = {}
@@ -269,34 +267,19 @@ class SeriesPropertiesWidget(QWidget):
     # Public API
     # ------------------------------------------------------------------
 
-    def set_connected_figure(
-        self,
-        repo: Any,
-        figure_id: int,
-        figure: Any,
-        redraw_callback: Any | None = None,
-    ) -> None:
-        """Attach a figure and load series from its descriptor."""
-        self._repo = repo
-        self._figure_id = int(figure_id)
-        self._figure = figure
-        self._redraw_callback = redraw_callback
-        self._reload_from_descriptor()
-        self._set_enabled_state(True)
+    # set_connected_figure is BaseProperties': attach the four attributes,
+    # then call _reload_from_descriptor() below, which already ends by
+    # enabling or disabling this editor's own controls itself.
 
     def clear_connected_figure(self) -> None:
         """Reset UI and disable editing."""
-        self._repo = None
-        self._figure_id = None
-        self._figure = None
-        self._redraw_callback = None
         self._current_axis_id = None
         self._current_series_id = None
         self._series_map.clear()
         self._series_title.setText(_("Series"))
         self._clear_series_combo()
         self._clear_series_fields()
-        self._set_enabled_state(False)
+        super().clear_connected_figure()
 
     def set_current_axis_id(self, axis_id: int | None) -> None:
         """Limit the series selector to one axis."""

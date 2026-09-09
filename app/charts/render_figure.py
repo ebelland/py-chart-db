@@ -96,6 +96,7 @@ def render_figure_from_descriptor(
 
     with _figure_style_context(descriptor):
         _apply_figure_options(figure, descriptor)
+        downsample_threshold = _figure_downsample_threshold(descriptor)
 
         all_axes = list(descriptor.axes or [])
         twin_targets = _twin_targets(all_axes)
@@ -156,7 +157,11 @@ def render_figure_from_descriptor(
             # for one (base axes, then their twins).
             ax._dhub_axis_id = int(axis_desc.id)  # noqa: SLF001 - our own attribute, not matplotlib's
 
-            series_list = _build_series_data_list(repo=repo, axis_desc=axis_desc)
+            series_list = _build_series_data_list(
+                repo=repo,
+                axis_desc=axis_desc,
+                downsample_threshold=downsample_threshold,
+            )
             chart_type = str(axis_desc.chart_type or "").strip()
             renderer = get_renderer(chart_type)
             if renderer is None:
@@ -416,8 +421,6 @@ def _create_axes_grid(
     # shared partner created later, so acting inside the loop could act on a
     # pairing that had not been discovered yet.
     shared_axes: set[Any] = set()
-    has_sharex = False
-    has_sharey = False
 
     for axis_desc, axis_index in axes_with_positions:
         axis_index = int(axis_index)
@@ -456,8 +459,6 @@ def _create_axes_grid(
         if "sharex" in kwargs or "sharey" in kwargs:
             shared_axes.add(ax)
             shared_axes.update(kwargs[key] for key in ("sharex", "sharey") if key in kwargs)
-            has_sharex = has_sharex or "sharex" in kwargs
-            has_sharey = has_sharey or "sharey" in kwargs
 
         if first_ax is None:
             first_ax = ax
@@ -468,18 +469,7 @@ def _create_axes_grid(
     # numbers agreeing. Matches Matplotlib's own convention for this (see the
     # sharex/sharey examples in the subplots_axes_and_figures gallery, which
     # pair sharex/sharey with gridspec_kw={"hspace": 0, "wspace": 0}).
-    #
-    # One value each for the whole grid - a GridSpec has no per-row/per-column
-    # gap - so a sharex pairing (typically axes stacked in a column) closes
-    # every row gap, and a sharey pairing (typically axes side by side in a
-    # row) closes every column gap. A figure in "Manual" layout mode
-    # overrides this afterwards with its own explicit margins, which is the
-    # right precedence: this is only a default for the automatic layout
-    # engines, never a fight with a value the user actually set.
-    if has_sharex:
-        gridspec.update(hspace=0.0)
-    if has_sharey:
-        gridspec.update(wspace=0.0)
+    _close_gaps_between_shared_neighbours(gridspec, axes_flat)
 
     for ax in shared_axes:
         ax.label_outer()
@@ -487,18 +477,90 @@ def _create_axes_grid(
     return axes_flat, shared_axes
 
 
+def _close_gaps_between_shared_neighbours(gridspec: Any, axes_flat: list[Any]) -> None:
+    """Zero a GridSpec's row/column gap only where every neighbour agrees.
+
+    A GridSpec has one wspace and one hspace for the whole grid, not a gap
+    per row or column, so this cannot be "close the gap here but not there" -
+    the earlier version zeroed both the moment *any* axis anywhere shared an
+    axis with *any* other, which also closed the gap between two axes that
+    happened to sit next to each other but shared nothing at all, as soon as
+    the figure had a sharex/sharey pairing anywhere in it. Zeroing now
+    requires every actually-adjacent pair - touching edges, in the row or
+    column direction that gap runs - to be in the same Matplotlib sharex (for
+    hspace) or sharey (for wspace) group; one adjacent pair that disagrees
+    leaves that gap at the engine's own default rather than mislabel an
+    unrelated pair as attached.
+
+    "Adjacent" is read from each axis's own SubplotSpec rather than from the
+    axis_index grid, so a row/col-spanning axis (Main + secondary, say) is
+    handled the same as a plain 1x1 one.
+    """
+    axes = [ax for ax in axes_flat if ax is not None]
+
+    vertical_pairs: list[tuple[Any, Any]] = []
+    horizontal_pairs: list[tuple[Any, Any]] = []
+    for i, a in enumerate(axes):
+        spec_a = a.get_subplotspec()
+        if spec_a is None:
+            continue
+        for b in axes[i + 1 :]:
+            spec_b = b.get_subplotspec()
+            if spec_b is None:
+                continue
+            cols_overlap = (
+                spec_a.colspan.start < spec_b.colspan.stop
+                and spec_b.colspan.start < spec_a.colspan.stop
+            )
+            rows_overlap = (
+                spec_a.rowspan.start < spec_b.rowspan.stop
+                and spec_b.rowspan.start < spec_a.rowspan.stop
+            )
+            touching_vertically = (
+                spec_a.rowspan.stop == spec_b.rowspan.start
+                or spec_b.rowspan.stop == spec_a.rowspan.start
+            )
+            touching_horizontally = (
+                spec_a.colspan.stop == spec_b.colspan.start
+                or spec_b.colspan.stop == spec_a.colspan.start
+            )
+            if cols_overlap and touching_vertically:
+                vertical_pairs.append((a, b))
+            if rows_overlap and touching_horizontally:
+                horizontal_pairs.append((a, b))
+
+    if vertical_pairs and all(
+        a.get_shared_x_axes().joined(a, b) for a, b in vertical_pairs
+    ):
+        gridspec.update(hspace=0.0)
+    if horizontal_pairs and all(
+        a.get_shared_y_axes().joined(a, b) for a, b in horizontal_pairs
+    ):
+        gridspec.update(wspace=0.0)
+
+
 def _clear_redundant_shared_axis_labels(shared_axes: set[Any]) -> None:
-    """Blank the axis label text label_outer() leaves standing.
+    """Blank the axis label text and title label_outer() leaves standing.
 
     label_outer() (called in _create_axes_grid, right after each axis is
     created) only strips tick *numbers*; the axis label text - "body mass
-    (g)", "Count" - is a separate artist it never touches, and every panel
-    in a shared row/column keeps repeating it. This runs after every axis
-    has been drawn and given its label by _apply_axis_runtime_options,
-    which is what a call this early would otherwise be overwritten by:
-    blanked here, on exactly the same edges label_outer() already used, so
-    the one label left standing is the one whose tick numbers are also
-    there.
+    (g)", "Count" - and the axis title are separate artists it never
+    touches, and every panel in a shared row/column keeps repeating both.
+    This runs after every axis has been drawn and given its label/title by
+    _apply_axis_runtime_options, which is what a call this early would
+    otherwise be overwritten by: blanked here, on exactly the same x/y
+    edges label_outer() already used, so the one label left standing is the
+    one whose tick numbers are also there.
+
+    The title uses a different edge: it sits at the top of a panel, so it
+    is kept only on the first row of each column rather than on the "outer"
+    edge xlabel/ylabel use - Matplotlib's own shared-axis gallery example
+    (subplots_axes_and_figures/shared_axis_demo) has no per-panel title at
+    all, one suptitle only, which is part of why it reads as one attached
+    instrument rather than several separate charts. Safe to clear: every
+    shared-grid demo that gives each panel a distinguishing title also
+    carries the same name in that panel's own legend, so nothing is lost,
+    only the repetition.
     """
     for ax in shared_axes:
         spec = ax.get_subplotspec()
@@ -508,15 +570,35 @@ def _clear_redundant_shared_axis_labels(shared_axes: set[Any]) -> None:
             ax.set_xlabel("")
         if not spec.is_first_col():
             ax.set_ylabel("")
+        if not spec.is_first_row():
+            ax.set_title("")
 
 
 # ----------------------------------------------------------------------
 # Series loading
 # ----------------------------------------------------------------------
+#: Figure option key for the row-count above which a series query is
+#: decimated before it ever reaches pandas - see _figure_downsample_threshold
+#: and SqliteRepo.downsampled_series_df. 0 (the default) disables it: an
+#: opt-in per figure, not a behaviour every render pays for.
+OPT_DOWNSAMPLE_THRESHOLD = "downsample_threshold"
+
+
+def _figure_downsample_threshold(descriptor: FigureDescriptor) -> int:
+    """Return this figure's configured downsample threshold, 0 if disabled."""
+    options = descriptor.options if isinstance(descriptor.options, dict) else {}
+    try:
+        threshold = int(options.get(OPT_DOWNSAMPLE_THRESHOLD, 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, threshold)
+
+
 def _build_series_data_list(
     *,
     repo: SqliteRepo,
     axis_desc: AxisDescriptor,
+    downsample_threshold: int = 0,
 ) -> list[SeriesData]:
     """Build the list of visible series for one axis."""
     output: list[SeriesData] = []
@@ -526,7 +608,9 @@ def _build_series_data_list(
         if not bool(style.get("visible", True)):
             continue
 
-        df = _load_series_df(repo=repo, series_desc=series_desc)
+        df = _load_series_df(
+            repo=repo, series_desc=series_desc, downsample_threshold=downsample_threshold
+        )
         roles = series_desc.roles if isinstance(series_desc.roles, dict) else {}
         output.append(
             SeriesData(
@@ -544,12 +628,14 @@ def _load_series_df(
     *,
     repo: SqliteRepo,
     series_desc: SeriesDescriptor,
+    downsample_threshold: int = 0,
 ) -> pd.DataFrame:
     """Load one series DataFrame from its SQL query.
 
-    Goes through ``SqliteRepo.series_df`` so repeated renders of an unchanged
-    database are served from cache: SQLite row materialisation is ~89 % of the
-    render cost and cannot be optimised away in pure Python.
+    Goes through ``SqliteRepo.series_df`` (or ``downsampled_series_df`` when
+    a threshold is set) so repeated renders of an unchanged database are
+    served from cache: SQLite row materialisation is ~89 % of the render
+    cost and cannot be optimised away in pure Python.
     """
     sql = str(series_desc.sql_query or "").strip()
     if not sql:
@@ -561,6 +647,8 @@ def _load_series_df(
         return pd.DataFrame()
 
     try:
+        if downsample_threshold > 0:
+            return repo.downsampled_series_df(sql, threshold=downsample_threshold)
         return repo.series_df(sql)
     except Exception:
         applogger.exception(

@@ -245,7 +245,7 @@ def test_the_axis_grid_and_tick_choices_are_translated() -> None:
 
 
 def test_the_demo_project_names_and_summaries_are_translated() -> None:
-    """The Create demo picker reads both from DEMO_PROJECTS as data.
+    """The Load demo picker reads both from DEMO_PROJECTS as data.
 
     Same blind spot as the fit-mode choices above: no literal at the call
     site, so xgettext and the main sweep cannot see them.

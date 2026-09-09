@@ -51,6 +51,7 @@ from app.styles.style import (
     configure_combo_width,
 )
 from app.utils.messages import ask
+from app.widgets.base_properties import BaseProperties
 from app.widgets.dictionary_editor import DictEditorPanel
 
 AxisDescriptorLike: TypeAlias = Any
@@ -78,7 +79,7 @@ def _plain_options(value: object) -> dict[str, Any]:
         return dict(cast(dict[str, Any], value))
     return {}
 
-class AxisPropertiesWidget(QWidget):
+class AxisPropertiesWidget(BaseProperties):
     """Compact editor for axis descriptor properties.
 
     The widget intentionally works with the current descriptor schema. Missing
@@ -94,18 +95,12 @@ class AxisPropertiesWidget(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._repo: Any | None = None
-        self._figure_id: int | None = None
-        self._figure: Any | None = None
-        self._redraw_callback: Any | None = None
+        # _repo/_figure_id/_figure/_redraw_callback come from BaseProperties.
         self._current_axis_id: int | None = None
         self._axis_map: dict[int, AxisDescriptorLike] = {}
         self._kwargs_editor: DictEditorPanel | None = None
+        # Expanding/Expanding already set by BaseProperties.
         self.setMinimumHeight(0)
-        self.setSizePolicy(
-            QSizePolicy.Policy.Expanding,
-            QSizePolicy.Policy.Expanding,
-        )
         self._build_ui()
         self.clear_connected_figure()
 
@@ -129,10 +124,14 @@ class AxisPropertiesWidget(QWidget):
         """Build the editor widget tree."""
         root = QVBoxLayout(self)
         root.setContentsMargins(*MARGIN_PANEL)
-        root.setSpacing(8)
+        # Wider than stdSizeAndlayout's usual 8px: the selector card's own
+        # rounded border reads as a border rather than a stray hairline only
+        # with room to breathe on both sides of it - at 8px it sat close
+        # enough to the tab strip below that the two read as one block.
+        root.setSpacing(14)
         root.addWidget(self._build_axis_selector_section(), 0)
 
-        self._tabs = QTabWidget(self)
+        self._tabs = QTabWidget(self, tabShape=QTabWidget.TabShape.Rounded )
         self._tabs.setObjectName("axisPropertiesTabs")
         self._tabs.setDocumentMode(True)
         self._tabs.setMinimumHeight(0)
@@ -960,6 +959,23 @@ class AxisPropertiesWidget(QWidget):
         layout = QVBoxLayout(section)
         stdSizeAndlayout(layout)
 
+        # DictEditorPanel.reset_to_defaults() already existed - every kwarg's
+        # schema default *is* the "leave this to the style sheet" sentinel
+        # (see kwarg_spec.DEFAULT) - it just had no button anywhere calling
+        # it, so the only way back to "stop overriding this" was retyping
+        # "default" into each row by hand. Resets the live editor only, the
+        # same as any other edit here: Apply still persists it.
+        reset_row = QHBoxLayout()
+        stdSizeAndlayout(reset_row)
+        reset_row.addStretch(1)
+        self._btn_reset_kwargs = create_action_button(
+            parent=section,
+            action_id="reset_kwargs_to_defaults",
+            action=self._reset_kwargs_to_defaults,
+            layout=reset_row,
+        )
+        layout.addLayout(reset_row)
+
         self._kwargs_host = QFrame(section)
         self._kwargs_host.setObjectName("axisKwargsPanel")
         self._kwargs_host.setFrameShape(QFrame.Shape.NoFrame)
@@ -985,34 +1001,20 @@ class AxisPropertiesWidget(QWidget):
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-    def set_connected_figure(
-        self,
-        repo: Any,
-        figure_id: int,
-        figure: Any,
-        redraw_callback: Any | None = None,
-    ) -> None:
-        """Attach a figure and load axes from its descriptor."""
-        self._repo = repo
-        self._figure_id = int(figure_id)
-        self._figure = figure
-        self._redraw_callback = redraw_callback
-        self._reload_from_descriptor()
+    # set_connected_figure is BaseProperties': attach the four attributes,
+    # then call _reload_from_descriptor() below, which already ends by
+    # enabling or disabling this editor's own controls itself.
 
     def clear_connected_figure(self) -> None:
         """Reset UI and disable editing."""
         self.setUpdatesEnabled(False)
         try:
-            self._repo = None
-            self._figure_id = None
-            self._figure = None
-            self._redraw_callback = None
             self._current_axis_id = None
             self._axis_map.clear()
             with QSignalBlocker(self._axis_combo):
                 self._axis_combo.clear()
             self._clear_axis_fields()
-            self._set_enabled_state(False)
+            super().clear_connected_figure()
         finally:
             self.setUpdatesEnabled(True)
 
@@ -1093,6 +1095,17 @@ class AxisPropertiesWidget(QWidget):
         self._kwargs_editor.commit_pending_edits()
         values = cast(dict[str, Any], self._kwargs_editor.get_values())
         return {key: value for key, value in values.items() if value != ""}
+
+    def _reset_kwargs_to_defaults(self) -> None:
+        """Reset every row of the kwargs editor to "leave it to the style".
+
+        Only the live editor changes here - exactly like typing a new value
+        into any other row, this is not applied to the axis until Apply is
+        pressed, so a reset can still be backed out of.
+        """
+        if self._kwargs_editor is None:
+            return
+        self._kwargs_editor.reset_to_defaults()
 
     def _build_note_widget(self, text: str) -> QWidget:
         note = QLabel(text, self)

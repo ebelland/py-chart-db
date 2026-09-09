@@ -6,7 +6,7 @@ Run directly, from the repository root::
     python _make_demo_project.py
 
 writes the whole set (the "Getting started" project first, then one file per
-subject) into ``demo/``. The application's "Create demo" reads pre-built
+subject) into ``demo/``. The application's "Load demo" reads pre-built
 files from there rather than building them on the spot - see
 ``app.data.demo_project.copy_demo_project`` - so this needs to be run once
 after cloning, and again whenever the demo set itself changes.

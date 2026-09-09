@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.charts import layout_presets
+from app.charts.render_figure import OPT_DOWNSAMPLE_THRESHOLD
 from app.dialogs.edit_mpl_styles_dialog import (
     MplStyleEditorDialog,
     _sanitize_mplstyle_text,
@@ -41,6 +41,7 @@ from app.styles.style import (
     configure_combo_width,
 )
 from app.utils.config import MPLSTYLES_DIR
+from app.widgets.base_properties import BaseProperties
 from app.widgets.chart_panel import RESIZE_MODE_CHOICES
 from app.utils.figure_metrics import (
     CM_PER_INCH,
@@ -66,7 +67,7 @@ def _read_text_any_encoding(path: Path) -> str:
     return raw.decode("utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
 
 
-class FigurePropertiesWidget(QWidget):
+class FigurePropertiesWidget(BaseProperties):
     """Reusable Figure properties editor extracted from the old dialog Figure tab.
 
     Width, height, and DPI belong to the figure, not to the application: they
@@ -78,18 +79,6 @@ class FigurePropertiesWidget(QWidget):
     style_changed = Signal(str)
     grid_layout_requested = Signal(int, int)
     figure_options_requested = Signal(dict)
-    #: Emitted with one of app.charts.layout_presets.PRESETS.
-    layout_preset_requested = Signal(str)
-
-    #: (label, preset constant) for the layout preset combo, in the order
-    #: offered. Grid first, since it is what a new figure already looks
-    #: like - re-picking it is how another preset gets undone.
-    LAYOUT_PRESETS: tuple[tuple[str, str], ...] = (
-        ("Grid", layout_presets.GRID),
-        ("Shared axes (grid)", layout_presets.SHARED_GRID),
-        ("Main + secondary (grid)", layout_presets.MAIN_AND_SECONDARY),
-        ("Overlapping (twin Y)", layout_presets.OVERLAPPING),
-    )
 
     # Sentinel combo entry that opens a native file picker instead of naming a
     # style. Keeps "browse anywhere" available even though the dropdown itself
@@ -136,6 +125,38 @@ class FigurePropertiesWidget(QWidget):
         ),
     )
 
+    #: (label, row-count threshold, tooltip) for the downsample combo. 0
+    #: disables it - a very large series is drawn in full unless a threshold
+    #: is actually picked, since decimating a series changes what a plot
+    #: shows and should never happen invisibly. Above the threshold, a
+    #: series query is decimated to roughly that many rows before it ever
+    #: reaches pandas - see SqliteRepo.downsampled_series_df.
+    DOWNSAMPLE_THRESHOLDS: tuple[tuple[str, int, str], ...] = (
+        ("Off", 0, "Draw every point, however many a series has."),
+        (
+            "10,000",
+            10_000,
+            "Decimate a series past 10,000 points to roughly that many, "
+            "picked at even intervals.",
+        ),
+        (
+            "50,000",
+            50_000,
+            "Decimate a series past 50,000 points to roughly that many - "
+            "about where redraws start to feel slow.",
+        ),
+        (
+            "100,000",
+            100_000,
+            "Decimate a series past 100,000 points to roughly that many.",
+        ),
+        (
+            "500,000",
+            500_000,
+            "Decimate a series past 500,000 points to roughly that many.",
+        ),
+    )
+
     #: (option key, label, default, tooltip) for the manual spacing block.
     #: Defaults match ``_apply_subplot_margins`` in the renderer, so opening
     #: this panel on a figure that has no margins block shows what it is
@@ -151,10 +172,7 @@ class FigurePropertiesWidget(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._repo = None
-        self._figure_id: int | None = None
-        self._figure = None
-        self._redraw_callback = None
+        # _repo/_figure_id/_figure/_redraw_callback come from BaseProperties.
         self._last_valid_style_index = 0
 
         self._style_combo: QComboBox
@@ -168,6 +186,7 @@ class FigurePropertiesWidget(QWidget):
         self._resize_mode_combo: QComboBox
         self._on_resize_mode_changed: Callable[[str], None] | None = None
         self._fig_layout_mode: QComboBox
+        self._downsample_combo: QComboBox
         # Bound before _build_ui rather than declared: the layout combo's
         # currentIndexChanged handler reads them, and a stray signal during
         # construction would otherwise hit an attribute that does not exist.
@@ -282,29 +301,6 @@ class FigurePropertiesWidget(QWidget):
         grid_lay.addWidget(self._ncols_combo, 1)
         grid_section_lay.addWidget(grid_row)
 
-        # A preset writes row_span/col_span/sharex/sharey/twin_of across
-        # every axis at once - the rows/cols above only ever set a uniform
-        # grid, which is one of the four this offers rather than the whole
-        # of what an axis's own options can already express.
-        preset_row = QWidget(grid_section)
-        preset_lay = QHBoxLayout(preset_row)
-        preset_lay.setContentsMargins(0, 0, 0, 0)
-        preset_lay.setSpacing(8)
-
-        self._layout_preset_combo = QComboBox(preset_row)
-        for label, preset in self.LAYOUT_PRESETS:
-            self._layout_preset_combo.addItem(_(label), preset)
-        self._configure_combo_width(self._layout_preset_combo, minimum_contents_length=20)
-        preset_lay.addWidget(QLabel(_("Layout"), preset_row))
-        preset_lay.addWidget(self._layout_preset_combo, 1)
-        self._btn_apply_layout_preset = create_action_button(
-                                             parent=preset_row,
-                                             action_id="apply_layout_preset",
-                                             action=self._apply_layout_preset,
-                                             layout=preset_lay,
-                                         )
-        grid_section_lay.addWidget(preset_row)
-
         lay.addWidget(grid_section)
 
         # ----- Figure options -----
@@ -374,12 +370,28 @@ class FigurePropertiesWidget(QWidget):
             self._update_margin_controls_enabled
         )
 
+        # A large series drawn in full costs more the more of it there is to
+        # paint - see todo.txt P2-5. Rather than one hard-coded cutoff, this
+        # offers a few, so a figure with genuinely huge series can pick one
+        # deliberately instead of the application guessing at what "large"
+        # means for it.
+        self._downsample_combo = QComboBox(opts_section)
+        self._configure_combo_width(self._downsample_combo, minimum_contents_length=14)
+        for label, value, tooltip in self.DOWNSAMPLE_THRESHOLDS:
+            self._downsample_combo.addItem(_(label), value)
+            self._downsample_combo.setItemData(
+                self._downsample_combo.count() - 1,
+                _(tooltip),
+                Qt.ItemDataRole.ToolTipRole,
+            )
+
         form.addRow(_("DPI"), self._fig_dpi)
         form.addRow(_("Width"), self._fig_width_cm)
         form.addRow(_("Height"), self._fig_height_cm)
         form.addRow(_("Frame on"), self._fig_frameon)
         form.addRow(_("Display"), self._resize_mode_combo)
         form.addRow(_("Figure layout"), self._fig_layout_mode)
+        form.addRow(_("Downsample large series above"), self._downsample_combo)
         opts_section_lay.addLayout(form)
         lay.addWidget(opts_section)
 
@@ -403,26 +415,38 @@ class FigurePropertiesWidget(QWidget):
         apply_card_layout(section_lay)
         section_lay.addWidget(create_section_title(_("Manual spacing"), section))
 
-        form = QFormLayout()
-        stdSizeAndlayout(form)
-
+        # Two fields per row - the natural pairs an edge or a gap already
+        # comes in (Left/Right, Bottom/Top, Column gap/Row gap) - rather than
+        # one full-width QFormLayout row each. Six rows of one spin box each
+        # made this the tallest section in the panel for what is, in effect,
+        # three pairs of numbers.
         self._margin_spins = {}
-        for key, label, default, tooltip in self.MARGIN_FIELDS:
-            spin = QDoubleSpinBox(section)
-            # Fractions of the figure, so 0..1 for edges.  wspace/hspace are
-            # fractions of the average axis size and can legitimately exceed 1
-            # when axes need to be spread far apart.
-            spin.setRange(0.0, 2.0 if key in ("wspace", "hspace") else 1.0)
-            spin.setDecimals(3)
-            spin.setSingleStep(0.01)
-            spin.setValue(default)
-            spin.setToolTip(_(tooltip))
-            spin.setMinimumWidth(self.FIGURE_SPIN_MIN_WIDTH)
-            spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-            self._margin_spins[key] = spin
-            form.addRow(_(label), spin)
+        field_pairs = (
+            (self.MARGIN_FIELDS[0], self.MARGIN_FIELDS[1]),  # Left, Right
+            (self.MARGIN_FIELDS[2], self.MARGIN_FIELDS[3]),  # Bottom, Top
+            (self.MARGIN_FIELDS[4], self.MARGIN_FIELDS[5]),  # Column gap, Row gap
+        )
+        for first_field, second_field in field_pairs:
+            row = QWidget(section)
+            row_lay = QHBoxLayout(row)
+            stdSizeAndlayout(row_lay)
+            for key, label, default, tooltip in (first_field, second_field):
+                spin = QDoubleSpinBox(section)
+                # Fractions of the figure, so 0..1 for edges.  wspace/hspace
+                # are fractions of the average axis size and can legitimately
+                # exceed 1 when axes need to be spread far apart.
+                spin.setRange(0.0, 2.0 if key in ("wspace", "hspace") else 1.0)
+                spin.setDecimals(3)
+                spin.setSingleStep(0.01)
+                spin.setValue(default)
+                spin.setToolTip(_(tooltip))
+                spin.setMinimumWidth(self.FIGURE_SPIN_MIN_WIDTH)
+                spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+                self._margin_spins[key] = spin
+                row_lay.addWidget(QLabel(_(label), row))
+                row_lay.addWidget(spin, 1)
+            section_lay.addWidget(row)
 
-        section_lay.addLayout(form)
         self._margins_section = section
         return section
 
@@ -440,17 +464,13 @@ class FigurePropertiesWidget(QWidget):
                 else _("Set Figure layout to Manual to edit spacing by hand.")
             )
 
-    def set_connected_figure(
-        self,
-        repo,
-        figure_id: int,
-        figure,
-        redraw_callback=None,
-    ) -> None:
-        self._repo = repo
-        self._figure_id = int(figure_id)
-        self._figure = figure
-        self._redraw_callback = redraw_callback
+    def _before_reload(self) -> None:
+        """Push this figure's own metrics into rcParams before reloading.
+
+        Runs after set_connected_figure has set _repo/_figure_id/_figure
+        (both helpers below read _figure_id) and before
+        _reload_from_descriptor rebuilds the fields from them.
+        """
         # Disabled and unwired until set_resize_mode_control actually attaches
         # a live callback: a caller that connects a figure without also
         # calling it - a future one, or a test - must not leave a combo that
@@ -459,7 +479,6 @@ class FigurePropertiesWidget(QWidget):
         self._resize_mode_combo.setEnabled(False)
         self._apply_persisted_metrics_to_rcparams()
         self._apply_rcparams_to_connected_figure()
-        self._reload_from_descriptor()
 
     def set_resize_mode_control(self, current: str, on_change: Callable[[str], None]) -> None:
         """Show the panel's current fit mode, and wire changes back to it.
@@ -487,12 +506,8 @@ class FigurePropertiesWidget(QWidget):
             self._on_resize_mode_changed(mode)
 
     def clear_connected_figure(self) -> None:
-        self._repo = None
-        self._figure_id = None
         self._on_resize_mode_changed = None
         self._resize_mode_combo.setEnabled(False)
-        self._figure = None
-        self._redraw_callback = None
 
         self._style_combo.blockSignals(True)
         try:
@@ -510,9 +525,10 @@ class FigurePropertiesWidget(QWidget):
         self._fig_height_cm.setValue(height_cm)
         self._fig_frameon.setChecked(True)
         self._fig_layout_mode.setCurrentIndex(0)
+        self._downsample_combo.setCurrentIndex(0)
         self._load_margins_into_spins({})
         self._name_edit.clear()
-        self._set_enabled_state(False)
+        super().clear_connected_figure()
 
     def _set_enabled_state(self, enabled: bool) -> None:
         for widget in (
@@ -527,6 +543,7 @@ class FigurePropertiesWidget(QWidget):
             self._fig_height_cm,
             self._fig_frameon,
             self._fig_layout_mode,
+            self._downsample_combo,
             self._btn_apply,
         ):
             widget.setEnabled(enabled)
@@ -593,6 +610,7 @@ class FigurePropertiesWidget(QWidget):
             self._fig_height_cm.setValue(height_cm)
             self._fig_frameon.setChecked(True)
             self._fig_layout_mode.setCurrentIndex(0)
+            self._downsample_combo.setCurrentIndex(0)
             self._load_margins_into_spins({})
             self._set_enabled_state(False)
             return
@@ -638,6 +656,14 @@ class FigurePropertiesWidget(QWidget):
 
         self._fig_layout_mode.setCurrentIndex(
             max(0, self._fig_layout_mode.findData(current_layout))
+        )
+
+        try:
+            downsample_threshold = int(fig_opts.get(OPT_DOWNSAMPLE_THRESHOLD, 0) or 0)
+        except (TypeError, ValueError):
+            downsample_threshold = 0
+        self._downsample_combo.setCurrentIndex(
+            max(0, self._downsample_combo.findData(downsample_threshold))
         )
 
         self._set_enabled_state(True)
@@ -813,19 +839,6 @@ class FigurePropertiesWidget(QWidget):
         ncols = int(self._ncols_combo.currentData() or 1)
         self.grid_layout_requested.emit(nrows, ncols)
 
-    def _apply_layout_preset(self) -> None:
-        """Request the chosen preset, applied across every axis in the figure.
-
-        Unlike ``_apply_grid_layout`` (a uniform rows x cols the person
-        chose), a preset computes its own grid size from how many axes the
-        figure has - see app.charts.layout_presets - so there is nothing
-        here to read from the Rows/Cols combos.
-        """
-        preset = self._layout_preset_combo.currentData()
-        if not preset:
-            return
-        self.layout_preset_requested.emit(str(preset))
-
     def _rcparams_dpi(self) -> int:
         try:
             dpi = int(round(float(rcParams.get("figure.dpi", DEFAULT_FIGURE_DPI))))
@@ -945,6 +958,7 @@ class FigurePropertiesWidget(QWidget):
             "name": self._name_edit.text().strip(),
             "frameon": bool(self._fig_frameon.isChecked()),
             "layout_mode": str(self._fig_layout_mode.currentData() or "constrained"),
+            OPT_DOWNSAMPLE_THRESHOLD: int(self._downsample_combo.currentData() or 0),
             OPT_FIGURE_WIDTH_CM: float(self._fig_width_cm.value()),
             OPT_FIGURE_HEIGHT_CM: float(self._fig_height_cm.value()),
             OPT_FIGURE_DPI: float(self._fig_dpi.value()),

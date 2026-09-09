@@ -61,7 +61,7 @@ class ConnectDatabaseDialog(QDialog):
     """Pick an engine, connect, and choose one of its tables.
 
     ``connection`` and ``table`` hold the result once accepted - read
-    through those rather than a signal, the same way ``CreateDemoDialog.chosen``
+    through those rather than a signal, the same way ``LoadDemoDialog.chosen``
     is: the caller wants one answer before it goes on to read the table, not
     an ongoing conversation.
     """

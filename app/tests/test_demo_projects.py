@@ -277,6 +277,85 @@ def test_the_overlapping_figure_twins_its_second_axis(tmp_path: Path) -> None:
     assert twin.options["twin_of"] == primary.id
 
 
+def test_anscombe_quartet_has_the_same_summary_statistics_on_every_dataset() -> None:
+    """The whole point of the dataset: identical mean, variance and
+    correlation on all four, despite four very different shapes."""
+    frame = TABLE_SOURCES["anscombe"]()
+    stats = frame.groupby("dataset").agg(
+        mean_x=("x", "mean"), mean_y=("y", "mean"),
+        var_x=("x", "var"), var_y=("y", "var"),
+        corr=("x", lambda s: s.corr(frame.loc[s.index, "y"])),
+    )
+    assert stats["mean_x"].round(1).nunique() == 1
+    assert stats["mean_y"].round(1).nunique() == 1
+    assert stats["var_x"].round(1).nunique() == 1
+    assert stats["var_y"].round(1).nunique() == 1
+    assert (stats["corr"].round(2) == 0.82).all()
+
+
+def test_the_anscombe_figure_shares_scale_past_the_first_axis(tmp_path: Path) -> None:
+    path = build_demo_project(tmp_path / "layouts.dhub", ("anscombe_quartet",))
+    descriptor = _load_axes(path, "20 · Anscombe's quartet - the matplotlib classic")
+
+    axes_by_index = sorted(descriptor.axes, key=lambda a: a.axis_index)
+    assert len(axes_by_index) == 4
+    assert not axes_by_index[0].options.get("sharex")
+    for axis in axes_by_index[1:]:
+        assert axis.options.get("sharex")
+        assert axis.options.get("sharey")
+
+
+def test_lissajous_curves_stay_inside_their_own_box() -> None:
+    """x=sin(...), y=sin(...): every point of every curve is bounded in
+    [-1, 1] by construction - if this ever fails, the generator changed."""
+    frame = TABLE_SOURCES["lissajous"]()
+    assert frame["x"].between(-1.0, 1.0).all()
+    assert frame["y"].between(-1.0, 1.0).all()
+    assert frame["curve"].nunique() == 4
+
+
+def test_the_lissajous_figure_keeps_equal_aspect_per_axis(tmp_path: Path) -> None:
+    """Plain GRID, not SHARED_GRID: Matplotlib refuses equal aspect on axes
+    that share both x and y (see the axis_options comment in
+    _multi_axis_figure_specs), so each of these must be independent."""
+    path = build_demo_project(tmp_path / "layouts.dhub", ("lissajous_grid",))
+    descriptor = _load_axes(path, "21 · Lissajous curves - equal-aspect grid")
+
+    assert len(descriptor.axes) == 4
+    for axis in descriptor.axes:
+        assert axis.options.get("aspect") == "equal"
+        assert axis.options.get("adjustable") == "datalim"
+        assert not axis.options.get("sharex")
+        assert not axis.options.get("sharey")
+
+
+def test_the_signal_spectrum_recovers_its_three_injected_tones() -> None:
+    """The signal is built from exactly three tones at 5, 20 and 50 Hz - the
+    paired spectrum table has to actually recover them, or pairing the two
+    tables demonstrates nothing."""
+    spectrum = TABLE_SOURCES["signal_spectrum"]()
+    peaks = spectrum.nlargest(3, "magnitude").sort_values("freq_hz")
+    assert peaks["freq_hz"].round(0).tolist() == [5.0, 20.0, 50.0]
+    # Amplitudes were injected as 1.0, 0.6, 0.3; the FFT normalisation
+    # should recover each to within a few percent.
+    for magnitude, expected in zip(peaks["magnitude"], (1.0, 0.6, 0.3)):
+        assert magnitude == pytest.approx(expected, abs=0.05)
+
+
+def test_the_signal_figure_is_a_plain_two_axis_grid(tmp_path: Path) -> None:
+    path = build_demo_project(tmp_path / "layouts.dhub", ("signal_time_and_frequency",))
+    descriptor = _load_axes(path, "22 · Signal analysis - time and frequency domains")
+
+    assert len(descriptor.axes) == 2
+    for axis in descriptor.axes:
+        assert not axis.options.get("sharex")
+        assert not axis.options.get("sharey")
+        assert not axis.options.get("twin_of")
+        # A raw signal and its spectrum are each the point; a rolling mean
+        # drawn over either would hide it.
+        assert axis.options.get("show_rolling") is False
+
+
 # ----------------------------------------------------------------------
 # What the running application does with a pre-built file
 # ----------------------------------------------------------------------

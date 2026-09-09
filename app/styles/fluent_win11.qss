@@ -35,7 +35,19 @@ QGroupBox {
     background: transparent;
 }
 
-/* Standard card surface */
+/* Standard card surface.
+   create_card_widget() (app/styles/style.py) sets the Qt *property*
+   card=true and gives each card its own distinct objectName - it never
+   names one literally "Card"/"card", so the #Card/#card rules below never
+   matched a single one of them; every card-styled section in the app
+   (axis/figure/series properties, and the rest) was falling straight
+   through to the plain QFrame{background:transparent} rule above, with no
+   surface, border or radius of its own. The [card="true"] property
+   selector is what macos_native.qss already uses correctly for the same
+   widgets. Kept the #Card/#card id rules too, in case something someday
+   names a frame that literally rather than going through the helper. */
+QFrame[card="true"],
+QWidget[card="true"],
 QFrame#Card,
 QFrame#card,
 QWidget#Card,

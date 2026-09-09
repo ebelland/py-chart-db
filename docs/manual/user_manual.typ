@@ -84,7 +84,7 @@ On first launch, or whenever no file is given, Data Hub asks which database to o
 
 / New: creates an empty `.dhub` database at a path you choose.
 / Open: opens an existing `.dhub` file.
-/ Create demo: builds one of the shipped demo projects and opens it immediately — useful for exploring the application without your own data.
+/ Load demo: loads one of the shipped demo projects and opens it immediately — useful for exploring the application without your own data.
 
 The last database opened is remembered and offered again on the next launch.
 
@@ -334,7 +334,7 @@ The *Log viewer* shows the history of the application's internal operations (sta
 
 = Demo projects
 
-*Create demo* builds a pre-filled `.dhub` database with sample tables and a set of figures already configured across several chart types. It is the fastest way to explore the application's features without preparing your own data, and a good place to copy a series' or an axis' settings from into a real project.
+*Load demo* opens a pre-filled `.dhub` database with sample tables and a set of figures already configured across several chart types. It is the fastest way to explore the application's features without preparing your own data, and a good place to copy a series' or an axis' settings from into a real project. It loads straight into your home directory under the demo's own name — no save dialog to answer first — and loading the same demo again simply replaces that file with a fresh copy, so an edited demo is never mistaken for your own work.
 
 = Credits
 

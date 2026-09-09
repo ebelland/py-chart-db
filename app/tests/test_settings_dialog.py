@@ -208,6 +208,66 @@ def test_a_forced_style_is_applied_whatever_the_platform(
     assert resolved.qss_file.name == expected
 
 
+@pytest.mark.parametrize("qss_name", ["fluent_win11.qss", "macos_native.qss"])
+def test_every_stylesheet_actually_styles_create_card_widget(qss_name: str) -> None:
+    """create_card_widget() (app/styles/style.py) sets the Qt *property*
+    card=true on every card it makes, with its own distinct objectName - it
+    never names one literally "Card"/"card".
+
+    fluent_win11.qss used to select on #Card/#card (an object name) rather
+    than [card="true"] (the property), which never matched a single card in
+    the app - every card-styled section fell through to a plain transparent
+    QFrame, with no surface, border or radius of its own, on both the
+    Fluent and the Dark theme (dark reuses this same file). Regression
+    guard: both sheets must carry the property selector that actually
+    matches what the widgets are built with.
+    """
+    from app.styles.style import _load_qss
+
+    qss, _path = _load_qss(qss_name)
+    assert qss is not None
+    assert '[card="true"]' in qss
+
+
+@pytest.mark.parametrize("preference", ["fluent_win11", "macos_native", "dark"])
+def test_a_themed_stylesheet_does_not_force_an_app_wide_qt_style(
+    preference: str, qapp, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """macos_native.qss's own header explains why standard controls
+    (QPushButton, QComboBox, QMenu, QScrollBar...) are deliberately left
+    unstyled: Qt's native Aqua/Fluent style plugins already draw those
+    authentically, and forcing Fusion app-wide to fix one narrow rendering
+    gap (item-view selection/header styling - see
+    apply_fusion_for_item_view_styling) would throw that away for every
+    other widget in the application. That fix is scoped to the specific
+    views that need it instead (test_table_list.py /
+    test_table_preview.py), not applied here.
+    """
+    calls: list[str] = []
+    monkeypatch.setattr(
+        type(qapp), "setStyle", lambda self, name: calls.append(str(name))
+    )
+
+    style.apply_platform_style(qapp, preference)
+
+    assert calls == []
+
+
+def test_an_explicit_qt_style_is_still_applied(
+    qapp, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Picking a Qt style plugin by name is a real app.setStyle() case,
+    unrelated to the themed-stylesheet path above."""
+    calls: list[str] = []
+    monkeypatch.setattr(
+        type(qapp), "setStyle", lambda self, name: calls.append(str(name))
+    )
+
+    style.apply_platform_style(qapp, f"{style.QT_STYLE_PREFIX}windows")
+
+    assert calls == ["Windows"]
+
+
 def test_an_unknown_style_reads_as_automatic(qapp) -> None:
     """A typo in config.json should leave the app looking normal, not bare."""
     assert style.resolve_app_style("not-a-style") == style.APP_STYLE_AUTOMATIC

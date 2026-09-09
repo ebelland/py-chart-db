@@ -1,8 +1,10 @@
-"""Pick one of the shipped demo projects, and build it on request.
+"""Pick one of the shipped demo projects, and load it on request.
 
 The set itself - what each project shows, which figures and tables it needs -
-is app/data/demo_project.py's; this dialog only presents the choice and asks
-where to save it, the same way "New" asks where a blank database goes.
+is app/data/demo_project.py's; this dialog only presents the choice. Loading
+it, unlike "New" or "Open", asks nothing about where: see
+MainWindow._on_load_demo for why a fixed, well-known name needs no dialog of
+its own.
 
 This is the only way in. A first run used to offer the whole set before the
 window was even up; it now starts on an empty database and says nothing, so
@@ -34,28 +36,27 @@ from app.styles.style import (
 from app.utils.i18n import _
 
 
-class CreateDemoDialog(QDialog):
+class LoadDemoDialog(QDialog):
     """Let the user choose one demo project; ``chosen`` holds the result.
 
     Modal, and read through ``chosen`` rather than a signal: the caller wants
-    one answer before it goes on to ask where to save it, not an ongoing
-    conversation.
+    one answer before it goes on to load it, not an ongoing conversation.
     """
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
 
-        self.setWindowTitle(_("Create demo"))
+        self.setWindowTitle(_("Load demo"))
         self.setWindowIcon(load_icon("plot"))
         self.chosen: DemoProject | None = None
 
         root = QVBoxLayout(self)
         apply_dialog_shell(self, root, size="small")
 
-        card = create_card_widget(self, "createDemoCard")
+        card = create_card_widget(self, "loadDemoCard")
         card_layout = QVBoxLayout(card)
         stdSizeAndlayout(card_layout)
-        card_layout.addWidget(create_section_title(_("Create demo"), card))
+        card_layout.addWidget(create_section_title(_("Load demo"), card))
 
         self._list = QListWidget(card)
         mark_editor_panel(self._list)

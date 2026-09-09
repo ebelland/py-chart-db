@@ -14,7 +14,12 @@ from PySide6.QtWidgets import QWidget, QFrame, QTableView, QHeaderView, QInputDi
 from app.data.data_source import quote_identifier as _quote_table
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
-from app.styles.style import MenuItem, create_menu, create_menu_item
+from app.styles.style import (
+    MenuItem,
+    apply_fusion_for_item_view_styling,
+    create_menu,
+    create_menu_item,
+)
 from app.utils.messages import ask, show_message
 from app.utils.i18n import _
 
@@ -101,6 +106,7 @@ class TablePreviewPanel(QWidget):
         self._table: str|None = None
 
         self.view = QTableView(self)
+        apply_fusion_for_item_view_styling(self.view)
         self.view.setShowGrid(False)
         # Finder's list view: alternating rows carry the eye across a wide
         # row, and the frame is dropped so the list meets the sidebar

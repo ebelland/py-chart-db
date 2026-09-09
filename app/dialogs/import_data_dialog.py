@@ -266,6 +266,14 @@ class ImportDataDialog(QDialog):
         self._web_source_button.setToolTip(tooltip)
         self._web_source_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
 
+        # Every entry gets the same icon rather than one per category: what
+        # they have in common is that picking one downloads something, which
+        # is exactly what the "fetch_url" action already draws - reusing it
+        # needs no new catalogue entry, and a dozen bespoke subject glyphs
+        # (Astronomy, Sports, Entertainment...) would each need an SF Symbol,
+        # a Segoe Fluent glyph and a freedesktop theme name of their own to
+        # match how every other icon in this application is sourced.
+        entry_icon = load_icon("fetch_url")
         self._web_source_menu = QMenu(self._web_source_button)
         by_category: dict[str, list[WebDataSource]] = {}
         for source in WEB_DATA_SOURCES:
@@ -275,7 +283,7 @@ class ImportDataDialog(QDialog):
             # the note above on _(): they are deliberately not translated.
             self._web_source_menu.addSection(category)
             for source in sources:
-                menu_action = self._web_source_menu.addAction(source.name)
+                menu_action = self._web_source_menu.addAction(entry_icon, source.name)
                 menu_action.setToolTip(source.description)
                 menu_action.triggered.connect(
                     lambda _checked=False, s=source: self._on_web_source_picked(s)

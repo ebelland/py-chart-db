@@ -312,9 +312,6 @@ EXTRA_THEME_ICON_NAMES: frozenset[str] = frozenset(
         # Connecting to a server database: the freedesktop Status icon for
         # network activity, the closest standard name to what this does.
         "network-transmit-receive",
-        # No Qt ThemeIcon enum member covers a grid-of-cells layout icon;
-        # Breeze, Papirus and Adwaita all ship this one for a grid/icon view.
-        "view-grid",
         # No Qt ThemeIcon enum member covers "fetch this from the web" -
         # GoDown is a plain navigation arrow, not a download. Breeze,
         # Papirus and Adwaita all ship this Icon Naming Specification
@@ -1283,6 +1280,15 @@ def apply_platform_style(
 
     qss, path = _load_qss(qss_name) if qss_name else ("", None)
 
+    # No app.setStyle() override here, deliberately: macos_native.qss's own
+    # header explains why standard controls (QPushButton, QComboBox, QMenu,
+    # QScrollBar...) are left unstyled on purpose - Qt's native Aqua/Fluent
+    # style plugins already draw those authentically, and forcing Fusion
+    # app-wide to fix one narrow rendering gap (see
+    # apply_fusion_for_item_view_styling below) would throw that away for
+    # every other widget in the application. The gap gets a surgical fix
+    # instead, on just the specific views that need it.
+
     # Read the sheet first, then theme it: themed_qss hands back the palette it
     # resolved, and the palette has to be installed even when there is no sheet
     # to go with it - a desktop with no QSS of its own still gets the theme's
@@ -1299,6 +1305,30 @@ def apply_platform_style(
 
     app.setStyleSheet(themed)
     return PlatformStyle(system, path)
+
+
+def apply_fusion_for_item_view_styling(view: QWidget) -> None:
+    """Force Fusion on one view whose selection/header styling must render
+    as this application's own QSS says, not as the native platform style's
+    own approximation of it.
+
+    The narrow case this exists for: TableListPanel and TablePreviewPanel
+    both style QAbstractItemView selection (a rounded "capsule" on the
+    sidebar, a flat highlight on the file list) and header colours
+    directly, and the native macOS and Windows Qt styles paint a fair
+    amount of that themselves - a table's selected-row highlight in
+    particular - in ways a stylesheet cannot always override. Fusion draws
+    itself entirely from the palette and the stylesheet, so it is the one
+    Qt style guaranteed to render what these files actually say.
+
+    Scoped to the one view that needs it via ``QWidget.setStyle`` rather
+    than ``QApplication.setStyle`` - the rest of the application keeps
+    whatever native style (or Fusion, if that is what was actually chosen)
+    it already had. See macos_native.qss's own header for why every other
+    standard control is deliberately left native.
+    """
+    view.setStyle(QtWidgets.QStyleFactory.create("Fusion"))
+
 
 # ----------------------------------------------------------------------
 # UI helpers

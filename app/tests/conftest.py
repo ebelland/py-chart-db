@@ -15,6 +15,8 @@ from types import ModuleType
 import matplotlib
 import pytest
 
+from app.data.sqlite_repo import SqliteRepo
+
 matplotlib.use("Agg")
 
 
@@ -72,6 +74,28 @@ def plots_dir(test_results_dir: Path) -> Path:
 def tmp_db_path(test_results_dir: Path, request: pytest.FixtureRequest) -> Path:
     name = (request.node.name or "test").replace("/", "_").replace("\\", "_")
     return test_results_dir / f"{name}.dhub"
+
+
+@pytest.fixture
+def repo(tmp_db_path: Path) -> SqliteRepo:
+    """A fresh, empty SqliteRepo at this test's own tmp_db_path.
+
+    The base shape most test modules were redefining by hand: open, yield,
+    close. ``tmp_db_path`` names its file after the test rather than a new
+    temp path every run, so a database - and its WAL/SHM siblings - left
+    over from an earlier local run has to be cleared before this test
+    builds its own, or a stale table or link from that run leaks into this
+    one's assertions. A module that needs more than this - seed data, a
+    non-default constructor argument - defines its own ``repo`` fixture,
+    which shadows this one for that module only; nothing here changes for
+    every module that already does.
+    """
+    for suffix in (".dhub", ".dhub-wal", ".dhub-shm"):
+        tmp_db_path.with_suffix(suffix).unlink(missing_ok=True)
+
+    built = SqliteRepo(db_path=tmp_db_path)
+    yield built
+    built.close()
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:

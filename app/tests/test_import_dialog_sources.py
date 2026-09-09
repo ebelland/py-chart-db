@@ -199,7 +199,7 @@ def other_db(tmp_path: Path) -> Path:
 def _pick_database(
     dialog, path: Path, monkeypatch: pytest.MonkeyPatch, *, table: str = "readings"
 ) -> None:
-    """Stand in for the connect dialog, the way CreateDemoDialog.exec is
+    """Stand in for the connect dialog, the way LoadDemoDialog.exec is
     stood in for elsewhere: picking a database is its own dialog now, not a
     bare file picker, since PostgreSQL and MySQL need host/user/password
     fields a file dialog has no room for."""

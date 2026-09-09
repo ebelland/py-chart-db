@@ -21,13 +21,6 @@
       "SegoeFluent": "E73E",
       "ThemeIcon": "object-select"
     },
-    "apply_layout_preset": {
-      "text": "Apply layout",
-      "description": "Arrange every axis in this figure using the chosen layout",
-      "SFSymbol": "rectangle.grid.2x2",
-      "SegoeFluent": "E80A",
-      "ThemeIcon": "view-grid"
-    },
     "clear": {
       "text": "Clear",
       "description": "Clear the content",
@@ -57,13 +50,6 @@
       "SFSymbol": "doc.on.doc",
       "SegoeFluent": "E8C8",
       "ThemeIcon": "edit-copy"
-    },
-    "create_demo": {
-      "text": "Create demo",
-      "description": "Create one of the shipped demo projects and open it",
-      "SFSymbol": "wand.and.stars",
-      "SegoeFluent": "e8a5",
-      "ThemeIcon": "document-new"
     },
     "credits": {
       "text": "Credits",
@@ -156,6 +142,13 @@
       "SFSymbol": "plus",
       "SegoeFluent": "e710",
       "ThemeIcon": "list-add"
+    },
+    "load_demo": {
+      "text": "Load demo",
+      "description": "Load one of the shipped demo projects and open it",
+      "SFSymbol": "wand.and.stars",
+      "SegoeFluent": "e8a5",
+      "ThemeIcon": "document-new"
     },
     "log_viewer": {
       "text": "Log viewer",
@@ -302,6 +295,13 @@
       "SFSymbol": "pencil",
       "SegoeFluent": "E70F",
       "ThemeIcon": "document-edit"
+    },
+    "reset_kwargs_to_defaults": {
+      "text": "Reset to style",
+      "description": "Reset every drawing option here to what the active style sheet says",
+      "SFSymbol": "arrow.clockwise",
+      "SegoeFluent": "E72C",
+      "ThemeIcon": "edit-undo"
     },
     "run": {
       "text": "Run",
@@ -490,8 +490,8 @@
     },
     "demo.build_failed": {
       "level": "error",
-      "title": "Create demo",
-      "text": "Could not create the demo project:\n{error}"
+      "title": "Load demo",
+      "text": "Could not load the demo project:\n{error}"
     },
     "import.clipboard_empty": {
       "level": "info",

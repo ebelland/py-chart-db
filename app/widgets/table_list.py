@@ -11,7 +11,12 @@ import PySide6.QtCore
 from PySide6.QtGui import QColor, QPainter, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QStyledItemDelegate, QWidget, QStyleOptionViewItem, QVBoxLayout, QTableView, QAbstractItemView, QFrame, QHeaderView, QFileDialog, QLineEdit, QInputDialog
 
-from app.styles.style import MenuItem, create_menu, load_icon
+from app.styles.style import (
+    MenuItem,
+    apply_fusion_for_item_view_styling,
+    create_menu,
+    load_icon,
+)
 from app.utils.config import get_section, update_section
 from app.data.sqlite_repo import SqliteRepo
 from app.utils.import_runner import refresh_link
@@ -189,6 +194,7 @@ class TableListPanel(QWidget):
         does now, striped or not.
         """
         view = QTableView(self)
+        apply_fusion_for_item_view_styling(view)
         view.setShowGrid(False)
         view.setFrameShape(QFrame.Shape.NoFrame)
         view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)

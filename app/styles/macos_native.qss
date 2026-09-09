@@ -118,6 +118,15 @@ QWidget[card="true"] {
   border-radius: 10px;
 }
 
+/* The dataset/series selector sits directly on top of a QTabWidget whose
+   own pane is the same palette(base) white as every other card - an 8%
+   hairline is the only thing telling them apart, which all but disappears
+   white-on-white. A faint tint gives it a surface of its own without
+   needing a stronger border to do it. */
+#axisSelectorCard {
+  background: rgba(@SHADOW_RGB@, 0.025);
+}
+
 QWidget[editorPanel="true"],
 QAbstractItemView[editorPanel="true"] {
   background: palette(base);
@@ -201,10 +210,13 @@ QPushButton#primaryDialogButton:disabled {
 /* -------------------------------
    QToolBox
    Used for the properties inspector and the series-operation
-   dialogs. Qt draws its headers as bezeled buttons on macOS,
-   which fights the flat inspector look; these become flat,
-   taller header strips (todo.txt: "QToolBox: increase header
-   size") with a faint selected tint.
+   dialogs. Styled after Finder's sidebar section captions
+   ("Preferiti", "Tag", "Posizioni") rather than as buttons: a
+   plain semibold label, no filled pill behind it, a hairline
+   between sections instead of a box around each one, and the
+   current section marked by an accent-coloured underline and
+   text rather than a background fill - the same restraint
+   TableListPanel's own header captions already use.
 -------------------------------- */
 
 QToolBox {
@@ -214,22 +226,31 @@ QToolBox {
 
 QToolBox::tab {
   text-align: left;
-  padding: 12px 14px;
-  min-height: 26px;
+  padding: 10px 14px 8px 14px;
+  min-height: 22px;
   border: none;
-  border-radius: 6px;
-  background: rgba(@SHADOW_RGB@, 0.04);
+  border-bottom: 1px solid rgba(@SHADOW_RGB@, 0.08);
+  border-radius: 0;
+  background: transparent;
   font-weight: 600;
-  color: palette(text);
+  font-size: 11pt;
+  letter-spacing: 0;
+  color: palette(mid);
 }
 
 QToolBox::tab:hover {
-  background: rgba(@SHADOW_RGB@, 0.07);
+  background: rgba(@SHADOW_RGB@, 0.04);
+  color: palette(text);
 }
 
 QToolBox::tab:selected {
-  background: rgba(@ACCENT_RGB@, 0.12);
-  color: palette(text);
+  background: transparent;
+  color: rgba(@ACCENT_RGB@, 1.0);
+  border-bottom: 2px solid rgba(@ACCENT_RGB@, 0.85);
+}
+
+QToolBox::tab:selected:hover {
+  background: rgba(@ACCENT_RGB@, 0.06);
 }
 
 QToolBox::tab:disabled {
@@ -639,7 +660,15 @@ TablePreviewPanel QTableView::item:selected {
 }
 
 TablePreviewPanel QHeaderView::section {
-  background: palette(window);
+  /* transparent, not palette(window): palette(mid) is a muted tone meant to
+     sit on palette(base) (what the table body itself uses, right below this
+     header) or on nothing at all - not on palette(window), which on macOS
+     sits close enough to palette(mid) in luminance to read as barely-there
+     grey text on grey. TableListPanel's header already gets this right with
+     the same transparent + palette(mid) pairing; this now matches it, which
+     also fixes the two headers looking like two different colours side by
+     side in the same window. */
+  background: transparent;
   color: palette(mid);
   font-size: 11pt;
   font-weight: 500;

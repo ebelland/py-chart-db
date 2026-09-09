@@ -113,7 +113,7 @@ def test_the_menu_holds_every_item_the_popup_has(window: MainWindow) -> None:
         "save_as",
         "import",
         "query_builder",
-        "create_demo",
+        "load_demo",
         "optimize_db",
         "settings",
         "log_viewer",

@@ -9,7 +9,7 @@ demo projects and, when that was declined, fall back to an open dialog: two
 boxes in front of someone who has not seen the application yet, the second of
 which can only open a file they do not have.  Starting on an empty project is
 the answer that needs no explaining, and the demo set is still one menu item
-away once the window is up (File, Create demo).
+away once the window is up (File, Load demo).
 
 It lives here rather than in ``main.py`` because the remaining fallback shows
 a box, and every box in this application comes from the catalogue in
@@ -99,7 +99,7 @@ def _default_database(parent: QWidget | None) -> Path | None:
     Nothing is asked, which is the whole point: the alternative was offering
     to build the demo set and then, on "no", an open dialog with nothing in it
     to open.  An empty project is a legitimate way to start, and the demo is
-    still reachable from File, Create demo once the window is up.
+    still reachable from File, Load demo once the window is up.
 
     An existing file at that path is opened rather than replaced.
     ``create_empty`` only connects, and connecting to a database that already

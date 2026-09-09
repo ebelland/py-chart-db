@@ -1,4 +1,4 @@
-"""Build the shipped demo set from the real sample data in ``sample data/``.
+"""Build the shipped demo set from the sample data in ``sample data/``.
 
 The demo used to be synthetic data generated fresh on every click of "Create
 demo" - four batches of `rng.normal`, a peak placed exactly where the Fit
@@ -7,16 +7,20 @@ dataset anyone would recognise, and generating it on demand meant "Create
 demo" could only ever be as fast as the slowest table it built.
 
 The demo set is built ahead of time instead, from the CSV and Excel files
-under ``sample data/`` at the repository root - real, ordinary datasets
-(Palmer penguins, a stock's daily close, a DLVO force curve, the classic
-driver-clustering set) each shaped for a chart type or a Series Operations
-tool. Run this module directly, or the thin wrapper at the repository root::
+under ``sample data/`` at the repository root - mostly real, ordinary
+datasets (Palmer penguins, a stock's daily close, a DLVO force curve, the
+classic driver-clustering set) each shaped for a chart type or a Series
+Operations tool, plus a handful of classic teaching examples from
+mathematics and physics that are exact by construction rather than measured
+(Anscombe's quartet, Lissajous curves, a signal built from known
+frequencies) - see :func:`_multi_axis_figure_specs` for those. Run this
+module directly, or the thin wrapper at the repository root::
 
     python _make_demo_project.py
 
 which writes one ``.dhub`` file per subject into ``demo/`` - see
 :data:`DEMO_DIR`. The running application never calls :func:`build_demo_project`
-itself; ``Create demo`` copies the pre-built file instead, through
+itself; "Load demo" copies the pre-built file instead, through
 :func:`copy_demo_project`. Only this module and the tests that check its
 output need pandas' read_csv/read_excel machinery.
 """
@@ -40,7 +44,7 @@ REPO_ROOT: Path = Path(__file__).resolve().parents[2]
 #: Where the source CSV/Excel files live.
 SAMPLE_DATA_DIR: Path = REPO_ROOT / "sample data"
 
-#: Where the built demo set is written, and where "Create demo" reads it from.
+#: Where the built demo set is written, and where "Load demo" reads it from.
 #: Not version-controlled (see .gitignore's ``*.dhub``): every environment
 #: that wants the demo set runs this module once to build it.
 DEMO_DIR: Path = REPO_ROOT / "demo"
@@ -54,7 +58,12 @@ axes.linewidth: 1.0
 axes.grid: True
 axes.axisbelow: True
 axes.titlesize: 13
-axes.titleweight: 600
+# bold, not 600: DejaVu Sans (Matplotlib's bundled fallback) ships only
+# normal/bold weights, so a numeric 600 request always misses and silently
+# substitutes bold anyway - "findfont: Failed to find font weight 600, now
+# using 700" on every render. Asking for what is actually there renders
+# identically without the warning.
+axes.titleweight: bold
 axes.labelcolor: 3C4250
 axes.labelsize: 10
 grid.color: E4E7EC
@@ -222,6 +231,43 @@ def _parametric_curve() -> pd.DataFrame:
     return pd.read_excel(SAMPLE_DATA_DIR / "sample_3d_parametric.xlsx")
 
 
+def _anscombe() -> pd.DataFrame:
+    """Anscombe's quartet: four x/y datasets, one ``dataset`` column (I-IV)
+    telling them apart. Textbook values - same mean, variance and
+    correlation to three decimal places on every one of the four - not
+    measured, and not needing to be: the numbers themselves are the whole
+    demonstration, and everyone who plots them gets the same four shapes.
+    """
+    return pd.read_csv(SAMPLE_DATA_DIR / "anscombe.csv")
+
+
+def _lissajous() -> pd.DataFrame:
+    """Four Lissajous figures - x=sin(a*t+delta), y=sin(b*t) - at frequency
+    ratios 1:1, 1:2, 3:2 and 5:4, one ``curve`` column telling them apart.
+    Generated, not measured: a Lissajous figure is defined by its ratio, so
+    there is no real-world reading to substitute for computing it.
+    """
+    return pd.read_csv(SAMPLE_DATA_DIR / "lissajous.csv")
+
+
+def _signal_time_domain() -> pd.DataFrame:
+    """A synthetic signal - 5, 20 and 50 Hz tones plus noise, 2 s at 500 Hz -
+    built (not measured) so its true frequency content is known exactly,
+    which is what the paired spectrum in :func:`_signal_spectrum` is there
+    to recover. Fixed random seed: the noise looks the same on every
+    machine that builds this demo.
+    """
+    return pd.read_csv(SAMPLE_DATA_DIR / "signal_time_domain.csv")
+
+
+def _signal_spectrum() -> pd.DataFrame:
+    """The single-sided amplitude spectrum of :func:`_signal_time_domain`'s
+    signal (``numpy.fft.rfft``, normalised so each tone's peak reads off as
+    its actual amplitude) - the three injected tones are its three tallest
+    peaks, at 5, 20 and 50 Hz."""
+    return pd.read_csv(SAMPLE_DATA_DIR / "signal_spectrum.csv")
+
+
 #: Table name -> the function that loads it. A demo file writes only the
 #: tables its own figures read, which is what keeps a single-subject demo
 #: small enough to open and understand.
@@ -238,6 +284,10 @@ TABLE_SOURCES: dict[str, Callable[[], pd.DataFrame]] = {
     "surface_grid": _surface_grid,
     "scattered_surface": _scattered_surface,
     "parametric_curve": _parametric_curve,
+    "anscombe": _anscombe,
+    "lissajous": _lissajous,
+    "signal_time_domain": _signal_time_domain,
+    "signal_spectrum": _signal_spectrum,
 }
 
 #: Saved query name -> its SQL, and the table it reads.
@@ -601,9 +651,16 @@ def _figure_specs() -> list[FigureSpec]:
 
 
 def _multi_axis_figure_specs() -> list[MultiAxisFigureSpec]:
-    """Return every demo figure with more than one axis, one per layout
-    preset - each reusing a table a single-axis figure above already needs,
-    so showing the layout costs no new data."""
+    """Return every demo figure with more than one axis.
+
+    The first three are one per layout preset - main+secondary, shared
+    grid, overlapping - each reusing a table a single-axis figure above
+    already needs, so showing the layout costs no new data. The rest are
+    classic multi-panel teaching examples from mathematics, physics and
+    signal processing (Anscombe's quartet, Lissajous curves, a signal and
+    its spectrum), each with its own small table: the point there is the
+    subject, and the layout preset is whichever one actually suits it.
+    """
     return [
         MultiAxisFigureSpec(
             name="17 · Stock prices - main and secondary",
@@ -719,6 +776,118 @@ def _multi_axis_figure_specs() -> list[MultiAxisFigureSpec]:
                 ),
             ],
         ),
+        MultiAxisFigureSpec(
+            name="20 · Anscombe's quartet - the matplotlib classic",
+            key="anscombe_quartet",
+            tables=("anscombe",),
+            queries=(),
+            layout=layout_presets.SHARED_GRID,
+            axes=[
+                AxisSpec(
+                    chart_type="Scatter Plot",
+                    title=f"Dataset {dataset}",
+                    x_label="x",
+                    y_label="y",
+                    axis_options={"grid": True},
+                    series=[
+                        SeriesSpec(
+                            name=f"Dataset {dataset}",
+                            sql="SELECT x, y FROM anscombe "
+                            f"WHERE dataset = '{dataset}' ORDER BY x",
+                            roles={"x": "x", "y": "y"},
+                            style={"marker": "o", "linestyle": ""},
+                        ),
+                    ],
+                )
+                for dataset in ("I", "II", "III", "IV")
+            ],
+        ),
+        MultiAxisFigureSpec(
+            name="21 · Lissajous curves - equal-aspect grid",
+            key="lissajous_grid",
+            tables=("lissajous",),
+            queries=(),
+            # Plain GRID, not SHARED_GRID: Matplotlib refuses equal aspect on
+            # axes that share *both* x and y (see the axis_options note
+            # below) - and every curve here already lives in the same [-1,
+            # 1] box by construction, so sharing buys no extra comparability
+            # that equal aspect was not already giving it.
+            layout=layout_presets.GRID,
+            axes=[
+                AxisSpec(
+                    chart_type="Scatter Plot",
+                    title=curve,
+                    x_label="x",
+                    y_label="y",
+                    # Equal aspect, or a circle (the 1:1 ratio) would draw as
+                    # an ellipse and misrepresent the curve. adjustable=
+                    # "datalim" rather than the default "box" only matters
+                    # once an axis shares a scale with another - harmless
+                    # here, and worth setting anyway since it is the one
+                    # value of the two that is never wrong.
+                    axis_options={"grid": True, "aspect": "equal", "adjustable": "datalim"},
+                    series=[
+                        SeriesSpec(
+                            name=curve,
+                            sql="SELECT x, y FROM lissajous "
+                            f"WHERE curve = '{curve}' ORDER BY rowid",
+                            roles={"x": "x", "y": "y"},
+                            style={"marker": "", "linestyle": "-"},
+                        ),
+                    ],
+                )
+                for curve in (
+                    "1:1 - circle/ellipse (delta = pi/4)",
+                    "1:2 - a figure eight",
+                    "3:2",
+                    "5:4",
+                )
+            ],
+        ),
+        MultiAxisFigureSpec(
+            name="22 · Signal analysis - time and frequency domains",
+            key="signal_time_and_frequency",
+            tables=("signal_time_domain", "signal_spectrum"),
+            queries=(),
+            layout=layout_presets.GRID,
+            axes=[
+                AxisSpec(
+                    chart_type="Time Series",
+                    title="Signal - 5, 20, 50 Hz + noise",
+                    x_label="time (s)",
+                    y_label="amplitude",
+                    # show_rolling defaults on; a rolling mean drawn over a
+                    # signal whose own raw shape is the point would only
+                    # hide it.
+                    axis_options={"grid": True, "show_rolling": False},
+                    series=[
+                        SeriesSpec(
+                            name="signal",
+                            sql="SELECT t_s AS x, amplitude AS y "
+                            "FROM signal_time_domain ORDER BY t_s",
+                            roles={"x": "x", "y": "y"},
+                            style={"marker": "", "linestyle": "-", "linewidth": 0.8},
+                        ),
+                    ],
+                ),
+                AxisSpec(
+                    chart_type="Time Series",
+                    title="Spectrum - recovers the tones",
+                    x_label="frequency (Hz)",
+                    y_label="amplitude",
+                    axis_options={"grid": True, "show_rolling": False},
+                    series=[
+                        SeriesSpec(
+                            name="spectrum",
+                            sql="SELECT freq_hz AS x, magnitude AS y "
+                            "FROM signal_spectrum WHERE freq_hz <= 80 ORDER BY freq_hz",
+                            roles={"x": "x", "y": "y"},
+                            style={"marker": "", "linestyle": "-"},
+                        ),
+                    ],
+                ),
+            ],
+        ),
     ]
 
 
@@ -759,8 +928,8 @@ class DemoProject:
 DEMO_PROJECTS: tuple[DemoProject, ...] = (
     DemoProject(
         "Getting started - real data across every chart type",
-        "Twelve real datasets, nineteen figures across every chart type and "
-        "three multi-axis layouts, and one saved query.",
+        "Fifteen real datasets, twenty-two figures across every chart type "
+        "and six multi-axis layouts, and one saved query.",
         (),
     ),
     DemoProject(
@@ -837,6 +1006,15 @@ DEMO_PROJECTS: tuple[DemoProject, ...] = (
         "histograms panning and zooming together, and force paired with "
         "potential energy on a second y-axis.",
         ("stock_main_secondary", "penguin_shared_grid", "dlvo_overlapping"),
+    ),
+    DemoProject(
+        "Classic demos - Anscombe, Lissajous, and a signal spectrum",
+        "Three teaching examples from mathematics, physics and signal "
+        "processing: Anscombe's quartet on a shared-scale grid (the "
+        "matplotlib gallery's own multi-axis example), four Lissajous "
+        "figures at different frequency ratios, and a noisy signal beside "
+        "the frequency spectrum that recovers its three true tones.",
+        ("anscombe_quartet", "lissajous_grid", "signal_time_and_frequency"),
     ),
 )
 
@@ -937,7 +1115,7 @@ def copy_demo_project(demo: DemoProject, target: Path) -> Path:
     the source datasets (four thousand drivers, three years of daily prices)
     are large enough that rebuilding one on every click would make "Create
     demo" feel like it had hung. Run ``_make_demo_project.py`` once to
-    populate :data:`DEMO_DIR`; after that, "Create demo" is just a file copy.
+    populate :data:`DEMO_DIR`; after that, "Load demo" is just a file copy.
     """
     source = demo.source_path
     if not source.is_file():

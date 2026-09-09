@@ -306,6 +306,10 @@ class SqliteRepo:
     _series_cache_hits: int = 0
     _series_cache_misses: int = 0
 
+    # Row counts behind series_row_count(), invalidated the same way and at
+    # the same time as _series_cache - see that field's docstring.
+    _series_row_count_cache: dict[str, int] = field(default_factory=dict)
+
 
     # =====================================================================
     # Path helpers
@@ -461,6 +465,7 @@ class SqliteRepo:
     def invalidate_series_cache(self) -> None:
         """Drop every cached series DataFrame."""
         self._series_cache.clear()
+        self._series_row_count_cache.clear()
         self._series_cache_stamp = None
 
     @property
@@ -515,6 +520,70 @@ class SqliteRepo:
             self._series_cache.popitem(last=False)
 
         return frame.copy(deep=False)
+
+    @ensure_connection_wrapper
+    def series_row_count(self, sql: str) -> int:
+        """Return how many rows *sql* would produce, without building them.
+
+        Downsampling needs the total row count before it can size a stride -
+        a single ``COUNT(*)`` rather than reading the whole result into a
+        DataFrame just to call ``len()`` on it, which would defeat the point
+        of downsampling in the first place. Cached the same way and
+        invalidated by the same database-state stamp as ``series_df``.
+        """
+        sql_text = (sql or "").strip()
+        if not sql_text:
+            return 0
+
+        assert self._con is not None
+
+        stamp = self._database_stamp()
+        if stamp != self._series_cache_stamp:
+            self._series_cache.clear()
+            self._series_row_count_cache.clear()
+            self._series_cache_stamp = stamp
+
+        cached = self._series_row_count_cache.get(sql_text)
+        if cached is not None:
+            return cached
+
+        row = self._con.execute(f"SELECT COUNT(*) FROM ({sql_text})").fetchone()
+        count = int(row[0]) if row and row[0] is not None else 0
+        self._series_row_count_cache[sql_text] = count
+        return count
+
+    @ensure_connection_wrapper
+    def downsampled_series_df(self, sql: str, *, threshold: int) -> pd.DataFrame:
+        """Return *sql*'s result, decimated to roughly ``threshold`` rows.
+
+        Decided and applied entirely inside SQLite: one ``COUNT(*)``
+        (``series_row_count``, itself cached) to size a stride, and - only
+        when the query actually exceeds ``threshold`` - one row kept out of
+        every stride via ``ROW_NUMBER()``, ordered by the query's own first
+        column. Every point-series query in this application selects the x
+        role first (``SELECT x, y FROM ...``), so ordinal position 1 names
+        it without needing to know the column's actual alias. The full
+        result is never read into pandas only to be thinned out afterwards -
+        that would keep the exact cost this exists to avoid.
+
+        ``threshold <= 0`` disables downsampling and reads the plain query.
+        """
+        sql_text = (sql or "").strip()
+        if not sql_text or threshold <= 0:
+            return self.series_df(sql_text)
+
+        total = self.series_row_count(sql_text)
+        if total <= threshold:
+            return self.series_df(sql_text)
+
+        stride = max(1, -(-total // threshold))  # ceil division
+        wrapped = (
+            "SELECT * FROM ("
+            f"SELECT *, ROW_NUMBER() OVER (ORDER BY 1) AS __dhub_rn__ FROM ({sql_text})"
+            f") WHERE (__dhub_rn__ - 1) % {stride} = 0"
+        )
+        frame = self.series_df(wrapped)
+        return frame.drop(columns="__dhub_rn__", errors="ignore")
 
 
     @ensure_connection_wrapper

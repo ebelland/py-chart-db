@@ -400,8 +400,8 @@ msgid "Build a multi-peak expression"
 msgstr "Costruisci un’espressione multi-picco"
 
 
-msgid "Create one of the shipped demo projects and open it"
-msgstr "Crea uno dei progetti dimostrativi inclusi e aprilo"
+msgid "Load one of the shipped demo projects and open it"
+msgstr "Carica uno dei progetti dimostrativi inclusi e aprilo"
 
 
 msgid "Builds a 1D multi-peak expression. Edit generated parameters before fitting."
@@ -740,8 +740,8 @@ msgid "Create a new plot tab from the current data context."
 msgstr "Crea una nuova scheda grafico dal contesto dati corrente."
 
 
-msgid "Create demo"
-msgstr "Crea demo"
+msgid "Load demo"
+msgstr "Carica demo"
 
 
 msgid "Create new figure (new tab)"
@@ -1262,6 +1262,36 @@ msgstr "campi:"
 
 msgid "Figure layout"
 msgstr "Disposizione della figura"
+
+msgid "Downsample large series above"
+msgstr "Riduci le serie di grandi dimensioni oltre"
+
+msgid "10,000"
+msgstr "10.000"
+
+msgid "50,000"
+msgstr "50.000"
+
+msgid "100,000"
+msgstr "100.000"
+
+msgid "500,000"
+msgstr "500.000"
+
+msgid "Draw every point, however many a series has."
+msgstr "Disegna ogni punto, qualunque sia il numero di punti della serie."
+
+msgid "Decimate a series past 10,000 points to roughly that many, picked at even intervals."
+msgstr "Riduci una serie oltre 10.000 punti a circa quel numero, scegliendo punti a intervalli regolari."
+
+msgid "Decimate a series past 50,000 points to roughly that many - about where redraws start to feel slow."
+msgstr "Riduci una serie oltre 50.000 punti a circa quel numero - il punto in cui i ridisegni iniziano a sembrare lenti."
+
+msgid "Decimate a series past 100,000 points to roughly that many."
+msgstr "Riduci una serie oltre 100.000 punti a circa quel numero."
+
+msgid "Decimate a series past 500,000 points to roughly that many."
+msgstr "Riduci una serie oltre 500.000 punti a circa quel numero."
 
 
 msgid "Figure name"
@@ -2651,6 +2681,12 @@ msgstr "Rimossa prima di integrare. Senza questo, una linea di base sollevata co
 msgid "Rename"
 msgstr "Rinomina"
 
+msgid "Reset to style"
+msgstr "Ripristina lo stile"
+
+msgid "Reset every drawing option here to what the active style sheet says"
+msgstr "Ripristina ogni opzione di disegno a ciò che dice il foglio di stile attivo"
+
 
 msgid "Rename current table"
 msgstr "Rinomina la tabella corrente"
@@ -2855,9 +2891,6 @@ msgstr "Salva come immagine"
 msgid "Save chart as"
 msgstr "Salva il grafico come"
 
-
-msgid "Save demo project"
-msgstr "Salva progetto dimostrativo"
 
 
 msgid "Save error"
@@ -4126,8 +4159,8 @@ msgstr "Lo stesso tipo di superficie nei due formati richiesti dai renderer di s
 msgid "Getting started - real data across every chart type"
 msgstr "Per iniziare - dati reali per ogni tipo di grafico"
 
-msgid "Twelve real datasets, nineteen figures across every chart type and three multi-axis layouts, and one saved query."
-msgstr "Dodici dataset reali, diciannove figure per ogni tipo di grafico e tre layout multi-asse, e una query salvata."
+msgid "Fifteen real datasets, twenty-two figures across every chart type and six multi-axis layouts, and one saved query."
+msgstr "Quindici dataset reali, ventidue figure per ogni tipo di grafico e sei layout multi-asse, e una query salvata."
 
 msgid "Antibiotics - grouped bars from a classic dataset"
 msgstr "Antibiotici - barre raggruppate da un dataset classico"
@@ -4195,6 +4228,12 @@ msgstr "Layout delle figure - scala condivisa, principale+secondari, assi sovrap
 msgid "Three real datasets, each arranged with a different multi-axis layout preset: three price series sharing one main chart, three histograms panning and zooming together, and force paired with potential energy on a second y-axis."
 msgstr "Tre dataset reali, ciascuno disposto con un preset di layout multi-asse diverso: tre serie di prezzi che condividono un grafico principale, tre istogrammi che si spostano e ingrandiscono insieme, e la forza abbinata all'energia potenziale su un secondo asse y."
 
+msgid "Classic demos - Anscombe, Lissajous, and a signal spectrum"
+msgstr "Demo classiche - Anscombe, Lissajous e uno spettro di segnale"
+
+msgid "Three teaching examples from mathematics, physics and signal processing: Anscombe's quartet on a shared-scale grid (the matplotlib gallery's own multi-axis example), four Lissajous figures at different frequency ratios, and a noisy signal beside the frequency spectrum that recovers its three true tones."
+msgstr "Tre esempi didattici da matematica, fisica ed elaborazione dei segnali: il quartetto di Anscombe su una griglia a scala condivisa (l'esempio multi-asse della stessa galleria di matplotlib), quattro figure di Lissajous con rapporti di frequenza diversi, e un segnale rumoroso accanto allo spettro di frequenza che ne recupera i tre toni reali."
+
 msgid "Contour maps - the same fields drawn flat"
 msgstr "Mappe di contorno - gli stessi campi disegnati in piano"
 
@@ -4204,8 +4243,8 @@ msgstr "Il wafer e il rilievo di nuovo come mappe di contorno 2D, a griglia e tr
 msgid "Could not create a database in your home folder:\n{error}\n\nPick one to open instead."
 msgstr "Impossibile creare un database nella cartella home:\n{error}\n\nScegline uno da aprire."
 
-msgid "Could not create the demo project:\n{error}"
-msgstr "Impossibile creare il progetto dimostrativo:\n{error}"
+msgid "Could not load the demo project:\n{error}"
+msgstr "Impossibile caricare il progetto dimostrativo:\n{error}"
 
 msgid "...and {count} more, under Show Details."
 msgstr "...e altri {count}, sotto Mostra dettagli."
@@ -4285,20 +4324,3 @@ msgstr "Impossibile scaricare {url}:\n{error}"
 msgid "{url} does not look like a web address. It should start with http:// or https://."
 msgstr "{url} non sembra un indirizzo web. Deve iniziare con http:// o https://."
 
-msgid "Layout"
-msgstr "Layout"
-
-msgid "Shared axes (grid)"
-msgstr "Assi condivisi (griglia)"
-
-msgid "Main + secondary (grid)"
-msgstr "Principale + secondari (griglia)"
-
-msgid "Overlapping (twin Y)"
-msgstr "Sovrapposti (Y gemello)"
-
-msgid "Apply layout"
-msgstr "Applica layout"
-
-msgid "Arrange every axis in this figure using the chosen layout"
-msgstr "Disponi tutti gli assi di questa figura secondo il layout scelto"

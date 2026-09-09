@@ -4,6 +4,12 @@ First run offers the whole set automatically and opens the complete one (see
 app/utils/startup.py). This is the way back to that choice afterwards -
 rebuilding one demo that got edited, or looking at a subject that was skipped
 the first time - without starting the application over.
+
+Loading a demo used to ask where to save it first, exactly like "New" does.
+It no longer does: a demo is a fixed, disposable file by name, loaded
+straight into the home directory - the one place every desktop agrees the
+user can write to without asking, and the same reasoning that lets a first
+run open with no dialog at all (see app.utils.startup.DEFAULT_DATABASE_NAME).
 """
 from __future__ import annotations
 
@@ -13,47 +19,47 @@ import pytest
 
 from app.data import demo_project
 from app.data.demo_project import DEMO_PROJECTS, build_demo_project
-from app.dialogs.create_demo_dialog import CreateDemoDialog
+from app.dialogs.load_demo_dialog import LoadDemoDialog
 
 
 @pytest.fixture
-def dialog(qapp) -> CreateDemoDialog:
-    return CreateDemoDialog()
+def dialog(qapp) -> LoadDemoDialog:
+    return LoadDemoDialog()
 
 
 # ----------------------------------------------------------------------
 # The picker itself
 # ----------------------------------------------------------------------
-def test_every_demo_project_is_offered(dialog: CreateDemoDialog) -> None:
+def test_every_demo_project_is_offered(dialog: LoadDemoDialog) -> None:
     assert dialog._list.count() == len(DEMO_PROJECTS)
 
 
-def test_the_complete_project_is_selected_by_default(dialog: CreateDemoDialog) -> None:
+def test_the_complete_project_is_selected_by_default(dialog: LoadDemoDialog) -> None:
     """DEMO_PROJECTS[0] is "Getting started" - the one a first run opens, and
     the reasonable thing to land on here too."""
     assert dialog._list.currentRow() == 0
     assert dialog._list.currentItem().data(_user_role()) is DEMO_PROJECTS[0]
 
 
-def test_the_summary_follows_the_selection(dialog: CreateDemoDialog) -> None:
+def test_the_summary_follows_the_selection(dialog: LoadDemoDialog) -> None:
     dialog._list.setCurrentRow(2)
 
     assert dialog._summary.text() == DEMO_PROJECTS[2].summary
 
 
-def test_closing_without_choosing_leaves_nothing_chosen(dialog: CreateDemoDialog) -> None:
+def test_closing_without_choosing_leaves_nothing_chosen(dialog: LoadDemoDialog) -> None:
     dialog.reject()
 
     assert dialog.chosen is None
 
 
-def test_confirming_records_the_selected_project(dialog: CreateDemoDialog) -> None:
+def test_confirming_records_the_selected_project(dialog: LoadDemoDialog) -> None:
     dialog._list.setCurrentRow(3)
 
     dialog._confirm()
 
     assert dialog.chosen is DEMO_PROJECTS[3]
-    assert dialog.result() == CreateDemoDialog.DialogCode.Accepted
+    assert dialog.result() == LoadDemoDialog.DialogCode.Accepted
 
 
 def _user_role():
@@ -92,79 +98,71 @@ def window(qapp, repo, tmp_db_path: Path):
     applogger.set_status_bar(None)
 
 
-def test_choosing_a_demo_builds_it_and_opens_it(
+def test_choosing_a_demo_loads_it_with_no_save_dialog(
     window, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The whole path: pick one, say where, and it becomes the open database.
+    """The whole path: pick one, and it becomes the open database - nothing
+    else asked.
 
-    "Create demo" copies a pre-built file rather than building on the spot -
+    "Load demo" copies a pre-built file rather than building on the spot -
     see app.data.demo_project.copy_demo_project - so the test pre-builds the
     chosen project into a temp DEMO_DIR instead of relying on the real one,
     which is not version-controlled and may not exist in a fresh checkout.
     """
-    from PySide6.QtWidgets import QFileDialog
-
     chosen = DEMO_PROJECTS[9]
     build_demo_project(tmp_path / "source" / chosen.path_name, chosen.figures)
     monkeypatch.setattr(demo_project, "DEMO_DIR", tmp_path / "source")
-
-    target = tmp_path / "pairwise demo.dhub"
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
 
     monkeypatch.setattr(
-        CreateDemoDialog, "exec", lambda self: (setattr(self, "chosen", chosen) or True)
-    )
-    monkeypatch.setattr(
-        QFileDialog,
-        "getSaveFileName",
-        staticmethod(lambda *_a, **_k: (str(target), "")),
+        LoadDemoDialog, "exec", lambda self: (setattr(self, "chosen", chosen) or True)
     )
 
-    window._on_create_demo()
+    window._on_load_demo()
 
+    target = tmp_path / chosen.path_name
     assert target.exists()
     assert window._db_path == target
 
 
-def test_declining_the_save_dialog_builds_nothing(
+def test_loading_the_same_demo_again_overwrites_its_previous_copy(
+    window, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Loading it again is how you get back the pristine version, not a
+    second file to clean up."""
+    chosen = DEMO_PROJECTS[0]
+    build_demo_project(tmp_path / "source" / chosen.path_name, chosen.figures)
+    monkeypatch.setattr(demo_project, "DEMO_DIR", tmp_path / "source")
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+    monkeypatch.setattr(
+        LoadDemoDialog, "exec", lambda self: (setattr(self, "chosen", chosen) or True)
+    )
+
+    window._on_load_demo()
+    target = tmp_path / chosen.path_name
+    edited_marker = b"not a real database, just proving the file got replaced"
+    target.write_bytes(edited_marker)
+
+    window._on_load_demo()
+
+    assert target.read_bytes() != edited_marker
+
+
+def test_cancelling_the_picker_loads_nothing(
     window, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from PySide6.QtWidgets import QFileDialog
-
-    monkeypatch.setattr(
-        CreateDemoDialog, "exec", lambda self: (setattr(self, "chosen", DEMO_PROJECTS[0]) or True)
-    )
-    monkeypatch.setattr(
-        QFileDialog, "getSaveFileName", staticmethod(lambda *_a, **_k: ("", ""))
-    )
+    monkeypatch.setattr(LoadDemoDialog, "exec", lambda self: False)
 
     original_db_path = window._db_path
-    window._on_create_demo()
+    window._on_load_demo()
 
     assert window._db_path == original_db_path
 
 
-def test_cancelling_the_picker_never_opens_a_save_dialog(
-    window, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from PySide6.QtWidgets import QFileDialog
-
-    monkeypatch.setattr(CreateDemoDialog, "exec", lambda self: False)
-    asked = []
-    monkeypatch.setattr(
-        QFileDialog,
-        "getSaveFileName",
-        staticmethod(lambda *_a, **_k: asked.append(1) or ("", "")),
-    )
-
-    window._on_create_demo()
-
-    assert asked == []
-
-
-def test_the_menu_offers_create_demo(window) -> None:
+def test_the_menu_offers_load_demo(window) -> None:
     ids = [
         action.data()
         for action in window._app_menu.actions()
         if not action.isSeparator()
     ]
-    assert "create_demo" in ids
+    assert "load_demo" in ids
