@@ -67,3 +67,38 @@ def test_table_preview_panel_applies_the_helper_to_its_view(
     panel = TablePreviewPanel(None, repo)
 
     assert styled == [panel.view]
+
+
+def test_the_scroll_bars_are_put_back_on_the_application_style(qapp) -> None:
+    """A widget's style is inherited by its children, so Fusion on the view
+    reached the two scroll bars as well - and Fusion with no stylesheet to
+    follow draws a square black handle between two stepper arrows, beside
+    the rounded native ones on every other scrolling widget in the window.
+
+    Read back by identity rather than by class name: what matters is that
+    the bars are on the *same* style object as the rest of the application,
+    whatever that object happens to be wrapped in.
+    """
+    from PySide6.QtWidgets import QApplication, QTableView
+
+    view = QTableView()
+    apply_fusion_for_item_view_styling(view)
+
+    assert view.verticalScrollBar().style() is QApplication.style()
+    assert view.horizontalScrollBar().style() is QApplication.style()
+    assert view.style() is not QApplication.style(), "the view itself is Fusion"
+
+
+def test_both_panels_leave_their_scroll_bars_alone(
+    qapp, repo: SqliteRepo
+) -> None:
+    """Through the panels themselves, since that is where it was seen."""
+    from PySide6.QtWidgets import QApplication
+
+    host = QWidget()
+    for view in (
+        TableListPanel(repo, host)._view,
+        TablePreviewPanel(host, repo).view,
+    ):
+        assert view.verticalScrollBar().style() is QApplication.style()
+        assert view.horizontalScrollBar().style() is QApplication.style()

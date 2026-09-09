@@ -26,6 +26,7 @@ import array
 import gettext
 import os
 import struct
+import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -269,6 +270,12 @@ def _platform_language_candidates() -> list[str]:
             raise_error=False,
         )
 
+    # Before the environment, and only on the platform it belongs to: on
+    # macOS the system preference is authoritative and LANG usually is not
+    # even set - and when it *is* set, to C, it is what broke this.
+    if sys.platform == "darwin":
+        candidates.extend(_apple_preferred_languages())
+
     # Only useful where Qt came back with nothing usable, which in practice
     # means a Linux session that sets LANG and no desktop locale.
     for variable in ("LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"):
@@ -278,6 +285,36 @@ def _platform_language_candidates() -> list[str]:
         candidates.extend(part for part in value.split(":") if part)
 
     return candidates
+
+
+def _apple_preferred_languages() -> list[str]:
+    """Return macOS's own Preferred Languages list, in the user's order.
+
+    Qt consults the POSIX environment before the system preference on
+    macOS, so a session that exports ``LANG=C`` - which is what an app
+    launched from a terminal with a locale-less profile inherits - makes
+    ``QLocale.system()`` report the C locale on a Mac that is set to
+    Italian, and "Auto" then reads English. The preference itself is
+    untouched by any of that, and this is it: the same
+    ``AppleLanguages`` array ``defaults read -g AppleLanguages`` prints,
+    read through Qt rather than through a subprocess.
+    """
+    try:
+        from PySide6.QtCore import QSettings
+
+        value = QSettings(
+            QSettings.Format.NativeFormat,
+            QSettings.Scope.UserScope,
+            "Apple Global Domain",
+        ).value("AppleLanguages")
+    except Exception:  # pragma: no cover - depends on the Qt build
+        return []
+
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, (list, tuple)):
+        return [str(entry) for entry in value]
+    return []
 
 
 def _language_subtag(name: str) -> str:

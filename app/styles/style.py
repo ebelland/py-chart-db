@@ -1386,8 +1386,26 @@ def apply_fusion_for_item_view_styling(view: QWidget) -> None:
     whatever native style (or Fusion, if that is what was actually chosen)
     it already had. See macos_native.qss's own header for why every other
     standard control is deliberately left native.
+
+    The scroll bars are put back on the application's style afterwards,
+    and that is not a detail: a widget's style *is* inherited by its
+    children, so Fusion on the view reached the two scroll bars as well
+    and drew them as Fusion draws them with no stylesheet to follow - a
+    square black handle between two stepper arrows, beside the rounded
+    native ones on every other scrolling widget in the window. Nothing
+    about a scroll bar was the reason for Fusion here; the selection and
+    the header were.
     """
     view.setStyle(QtWidgets.QStyleFactory.create("Fusion"))
+
+    application_style = QtWidgets.QApplication.style()
+    for reader in ("verticalScrollBar", "horizontalScrollBar"):
+        # getattr: the helper's argument is a QWidget, and only a scroll
+        # area has these. Nothing else needs putting back.
+        scrollbar = getattr(view, reader, None)
+        bar = scrollbar() if callable(scrollbar) else None
+        if bar is not None:
+            bar.setStyle(application_style)
 
 
 # ----------------------------------------------------------------------

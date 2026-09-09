@@ -384,6 +384,10 @@ def test_a_platform_locale_nothing_translates_falls_back_to_english(
     monkeypatch.setattr(
         QLocale, "system", staticmethod(lambda: QLocale("fi_FI"))
     )
+    # The macOS preference list is the other place an answer comes from,
+    # and on a developer's own Mac it is a real one - so a test about a
+    # machine set only to Finnish has to say that about all of it.
+    monkeypatch.setattr(module, "_apple_preferred_languages", lambda: [])
 
     assert module.platform_language() == module.DEFAULT_LANGUAGE
 
@@ -489,3 +493,68 @@ def test_a_sheet_that_has_gone_missing_falls_back(qapp, custom_qss: Path) -> Non
     custom_qss.unlink()
 
     assert style.resolve_app_style(key) == style.APP_STYLE_AUTOMATIC
+
+
+def test_the_macos_preference_answers_when_qt_reports_the_c_locale(
+    monkeypatch,
+) -> None:
+    """The bug: an Italian Mac showing an English interface on Auto.
+
+    Qt consults the POSIX environment before the system preference on
+    macOS, so a session that exports LANG=C - which is what an app
+    launched from a terminal with a locale-less profile inherits - makes
+    QLocale.system() report the C locale on a Mac that is set to Italian.
+    """
+    from PySide6.QtCore import QLocale
+
+    from app.utils import i18n as module
+
+    monkeypatch.setattr(QLocale, "system", staticmethod(lambda: QLocale("C")))
+    monkeypatch.setattr(module.sys, "platform", "darwin")
+    monkeypatch.setattr(module, "_apple_preferred_languages", lambda: ["it-US"])
+    monkeypatch.setattr(module.os, "environ", {"LANG": "C.UTF-8"})
+
+    assert module.platform_language() == "it"
+
+
+def test_the_macos_preference_is_not_read_on_other_platforms(
+    monkeypatch,
+) -> None:
+    """It is a macOS preference; asking for it elsewhere is a Qt call that
+    can only ever answer nothing."""
+    from app.utils import i18n as module
+
+    asked: list[int] = []
+    monkeypatch.setattr(module.sys, "platform", "win32")
+    monkeypatch.setattr(
+        module, "_apple_preferred_languages", lambda: asked.append(1) or []
+    )
+
+    module._platform_language_candidates()
+
+    assert asked == []
+
+
+@pytest.mark.parametrize(
+    "stored, expected",
+    [
+        (["it-US", "en-GB"], ["it-US", "en-GB"]),
+        ("it-US", ["it-US"]),
+        (None, []),
+        (17, []),
+    ],
+)
+def test_the_preference_list_is_read_whatever_shape_it_comes_back_in(
+    monkeypatch, stored, expected
+) -> None:
+    """QSettings hands back a list for a multi-language preference, a bare
+    string for one, and None where the key is absent."""
+    from PySide6.QtCore import QSettings
+
+    from app.utils import i18n as module
+
+    monkeypatch.setattr(
+        QSettings, "value", lambda self, key, *args, **kwargs: stored
+    )
+
+    assert module._apple_preferred_languages() == expected
