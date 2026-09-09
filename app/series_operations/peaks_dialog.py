@@ -32,7 +32,7 @@ from scipy.signal import find_peaks, peak_prominences, peak_widths
 from app.data.data_source import row_value
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
-from app.series_operations.parameter_spec import BoolParam, ChoiceParam, FloatParam, IntParam
+from app.series_operations.parameter_spec import ChoiceParam, FloatParam, IntParam
 from app.series_operations.dialog_base import (
     ResultSeriesSpec,
     SeriesOperationDialogBase,
@@ -175,16 +175,15 @@ class SeriesPeaksDialog(SeriesOperationDialogBase):
             minimum=1,
             maximum=10_000,
         ),
-        BoolParam(
-            "mark_only",
-            "Mark peaks only:",
-            tooltip=(
-                "Draw the located peaks as markers rather than writing a "
-                "table of measurements."
-            ),
-            default_value=True,
-        ),
     )
+
+    # "Mark peaks only" was declared here and read nowhere - a checkbox that
+    # did nothing at all, for either of its states (todo.txt P3-x). It is
+    # gone rather than implemented because neither reading of it survives
+    # contact with what this dialog already does: the result table carries
+    # every measurement because the report is built from it, and the chart
+    # series draws markers because joining peaks would draw a curve through
+    # nothing. There was no third behaviour left for the box to choose.
 
     Icon = """
     <path d="M3 18l4-8 3 5 4-11 3 8 4-4"/>
