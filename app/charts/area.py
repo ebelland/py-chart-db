@@ -1,5 +1,5 @@
-"""Four renderers from Matplotlib's basic plot types: stackplot, stairs,
-fill_between and barbs.
+"""Five renderers from Matplotlib's basic plot types: stackplot, stairs,
+stem, fill_between and barbs.
 
 https://matplotlib.org/stable/plot_types/basic/index.html
 
@@ -9,7 +9,8 @@ read an x and a y per series and draw one mark per row; every renderer here
 breaks one half of that.  ``stackplot`` needs *every* series at once, because a
 stacked band's position depends on the ones below it.  ``fill_between`` reads
 two y columns and draws a region rather than marks.  ``stairs`` reads bin edges
-and one value fewer than it has edges.  ``barbs`` reads four columns.  Nothing
+and one value fewer than it has edges.  ``stem`` draws to a baseline rather
+than marking a point.  ``barbs`` reads four columns.  Nothing
 of the scatter's drawing survives contact with any of them, so inheriting it
 would mean overriding ``render_axis`` entirely - which is inheritance for the
 sake of a shared ancestor and buys nothing.
@@ -232,6 +233,110 @@ class StairsAxisRenderer(BaseAxisRenderer):
         self.apply_annotations(ax, options or {})
 
 
+class StemAxisRenderer(BaseAxisRenderer):
+    """One stem per point, from a baseline up to the value.
+
+    A scatter says where the points are; a stem says how far each is from a
+    reference, which is what a spectrum, an impulse response or a set of
+    residuals is read for. The x is discrete in all of those cases, and a
+    line joining the tops would claim values between the samples that do not
+    exist.
+
+    Not a Timeline, which is the same drawing with the y invented: there the
+    stems only separate labels, and the renderer is a Scatter underneath (see
+    app/charts/timeline.py). Here the height is the data.
+    """
+
+    Name: str = "Stem Plot"
+    Category: str = "Pairwise data"
+    Description: str = (
+        "A stem from a baseline to each value, for impulses, spectra and "
+        "anything else sampled at discrete x."
+    )
+    Link: str = "https://matplotlib.org/stable/plot_types/basic/stem.html"
+
+    RequiredRoles: list[str] = ["x", "y"]
+    OptionalRoles: list[str] = []
+
+    #: Only ``label`` of the shared appearance set: ``ax.stem`` takes a fixed
+    #: signature and raises on any other keyword - it is a helper that builds
+    #: three artists, not a single artist accepting the usual properties.
+    Kwargs: dict[str, object] = {
+        "label": _SHARED_KWARGS["label"],
+        "linefmt": {
+            "default": None,
+            "type": str,
+            "group": "Appearance",
+            "description": (
+                "Matplotlib format string for the stems, e.g. \"C0-\" or "
+                "\"grey:\". Empty follows the style."
+            ),
+        },
+        "markerfmt": {
+            "default": None,
+            "type": str,
+            "group": "Appearance",
+            "description": (
+                "Format string for the marker at the top of each stem, e.g. "
+                "\"C0o\". Empty follows the style; \" \" draws none."
+            ),
+        },
+        "basefmt": {
+            "default": None,
+            "type": str,
+            "group": "Appearance",
+            "description": (
+                "Format string for the baseline, e.g. \"C7-\". Empty follows "
+                "the style."
+            ),
+        },
+        "bottom": {
+            "default": 0.0,
+            "type": float,
+            "group": "Appearance",
+            "description": "Where the stems start. The reference the values are read against.",
+        },
+        "orientation": {
+            "default": "vertical",
+            "type": ["vertical", "horizontal"],
+            "group": "Layout",
+            "description": "Which axis the stems grow along.",
+        },
+    }
+
+    def render_axis(self, ax: Any, series: list[SeriesData], options: dict) -> None:
+        axis_options = options or {}
+
+        for sd in series:
+            style = dict(sd.style or {})
+            if not style.get("visible", True) or not self.ensure_required_roles(sd.df):
+                continue
+
+            x = _numeric(sd.df, "x")
+            y = _numeric(sd.df, "y")
+            mask = np.isfinite(x) & np.isfinite(y)
+            if not mask.any():
+                applogger.info("Series '%s' skipped: no finite x/y pairs.", sd.name)
+                continue
+
+            # Empty format strings are dropped rather than forwarded: ax.stem
+            # reads "" as a format meaning "no colour, no style, no marker"
+            # and draws nothing, where absent means "use the defaults".
+            kwargs = {
+                key: value
+                for key, value in self.get_kwargs({**axis_options, **style}).items()
+                if not (isinstance(value, str) and value == "")
+            }
+            kwargs.setdefault("label", style.get("label") or sd.name)
+
+            try:
+                ax.stem(x[mask], y[mask], **kwargs)
+            except Exception:
+                applogger.exception("Stem Plot failed to draw series '%s'.", sd.name)
+
+        self.apply_annotations(ax, axis_options)
+
+
 class FillBetweenAxisRenderer(BaseAxisRenderer):
     """A filled region between two curves, or between one curve and a level.
 
@@ -338,12 +443,17 @@ class BarbsAxisRenderer(BaseAxisRenderer):
     """
 
     Name: str = "Wind Barbs"
-    Category: str = "Pairwise data"
+    #: Where Matplotlib itself files it, alongside quiver and streamplot -
+    #: see app/charts/vector_field.py, which holds the other two. It read
+    #: "Pairwise data" until they existed, which put the three members of one
+    #: family in two different sections of the chart picker.
+    Category: str = "Gridded data"
     Description: str = (
         "A barb per point showing the direction and strength of a vector "
-        "field, read from u and v components."
+        "field, read from u and v components. Barbs encode speed in flags, "
+        "so they stay readable where a field of arrows does not."
     )
-    Link: str = "https://matplotlib.org/stable/plot_types/basic/barbs.html"
+    Link: str = "https://matplotlib.org/stable/plot_types/arrays/barbs.html"
 
     RequiredRoles: list[str] = ["x", "y", "u", "v"]
     OptionalRoles: list[str] = []

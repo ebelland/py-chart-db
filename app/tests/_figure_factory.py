@@ -44,6 +44,12 @@ SHOWCASE_CHART_TYPES: tuple[str, ...] = (
     "Surface Plot (Scattered)",
     "Contour Plot",
     "Contour Plot (Scattered)",
+    "Stem Plot",
+    "Quiver",
+    "Stream Plot",
+    "Triangular Mesh",
+    "Triangular Color Mesh",
+    "Scatter Plot (3D)",
 )
 
 
@@ -492,6 +498,74 @@ def _showcase_definitions() -> list[dict[str, Any]]:
             },
             "series": [
                 ("ripple", "SELECT x, y, z FROM src_grid", {}),
+            ],
+        },
+        {
+            "chart_type": "Stem Plot",
+            "name": "Stem showcase",
+            "labels": ("t", "value"),
+            "axis_options": {"title": "Stem Plot"},
+            "series": [
+                ("impulses", "SELECT t AS x, v AS y FROM src_series LIMIT 40", {}),
+            ],
+        },
+        {
+            # The same field the barbs showcase draws, as arrows coloured by
+            # their own magnitude - the two renderers side by side is the
+            # clearest statement of what each is for.
+            "chart_type": "Quiver",
+            "name": "Quiver showcase",
+            "labels": ("x", "y"),
+            "axis_options": {"title": "Quiver", "pivot": "mid"},
+            "series": [
+                (
+                    "field",
+                    "SELECT x, y, u, v, (u * u + v * v) AS color FROM src_field",
+                    {},
+                ),
+            ],
+        },
+        {
+            "chart_type": "Stream Plot",
+            "name": "Stream showcase",
+            "labels": ("x", "y"),
+            "axis_options": {"title": "Stream Plot", "density": 1.2},
+            "series": [
+                ("field", "SELECT x, y, u, v FROM src_field", {}),
+            ],
+        },
+        {
+            "chart_type": "Triangular Mesh",
+            "name": "Triangulation showcase",
+            "labels": ("x", "y"),
+            "axis_options": {"title": "Triangular Mesh", "marker": "."},
+            "series": [
+                ("sites", "SELECT x, y FROM src_scatter3d LIMIT 120", {}),
+            ],
+        },
+        {
+            # No colorbar: it is a second Axes, and the showcase test asserts
+            # one plot area per figure - the same reason the contour showcase
+            # leaves its own off.
+            "chart_type": "Triangular Color Mesh",
+            "name": "Tripcolor showcase",
+            "labels": ("x", "y"),
+            "axis_options": {"title": "Triangular Color Mesh", "shading": "gouraud"},
+            "series": [
+                ("ripple", "SELECT x, y, z FROM src_scatter3d", {}),
+            ],
+        },
+        {
+            "chart_type": "Scatter Plot (3D)",
+            "name": "3D scatter showcase",
+            "labels": ("", ""),
+            "axis_options": {"title": "Scatter Plot (3D)", "projection": "3d"},
+            "series": [
+                (
+                    "ripple",
+                    "SELECT x, y, z, z AS color FROM src_scatter3d",
+                    {},
+                ),
             ],
         },
         {

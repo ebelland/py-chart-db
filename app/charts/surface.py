@@ -1,4 +1,4 @@
-"""3D surface renderers, for data on a regular grid and for scattered points.
+"""3D renderers: two surfaces and a point cloud.
 
 Two shapes of input, two Matplotlib functions - the same split the contour
 renderers (app/charts/contour.py) are built around, and for the same
@@ -15,7 +15,12 @@ non-gridded x/y/z needs - see
 https://matplotlib.org/stable/gallery/mplot3d/surface3d.html and
 https://matplotlib.org/stable/gallery/mplot3d/trisurf3d.html.
 
-Both request a 3D axes through ``options["projection"] = "3d"``, returned by
+``Scatter3DAxisRenderer`` draws the points themselves rather than a skin
+over them, for a cloud whose shape - clusters, a plane, an outlier - is the
+reading, and for data too sparse or too noisy for a surface to be honest
+about.
+
+All three request a 3D axes through ``options["projection"] = "3d"``, returned by
 create_chart_dialog.py's per-chart-type axis defaults;
 render_figure.py's _subplot_kwargs_for_axis already reads a generic
 "projection" option for every renderer, so nothing about axis creation had to
@@ -26,6 +31,7 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
+import pandas as pd
 from matplotlib import rcParams
 
 from app.charts.base import (
@@ -330,3 +336,182 @@ class TriSurfaceAxisRenderer(BaseAxisRenderer):
             ax.view_init(**view)
 
         self.apply_annotations(ax, axis_options)
+
+
+class Scatter3DAxisRenderer(BaseAxisRenderer):
+    """Points in three dimensions, one mark per row.
+
+    Role columns:
+        x, y, z          required, one point per row.
+        color, size      optional, read exactly as the 2D scatter reads them
+                         - a numeric column mapped through the colormap, and
+                         a numeric column as marker areas.
+
+    Deliberately not a subclass of ``ScatterAxisRenderer``, even though the
+    two draw the same thing. That renderer's ``render_axis`` reads two role
+    columns, resolves a line style, sorts by x, fits trend lines and draws
+    confidence ellipses - all of it two-dimensional, and none of it
+    meaningful on a 3D axes, where "sorted by x" is not a property of
+    anything and an ellipse has no plane to lie in. What is shared is the
+    option vocabulary, which comes from ``kwarg_spec`` rather than from the
+    other renderer.
+
+    Like both surfaces, this asks for a 3D axes through
+    ``options["projection"] = "3d"``, which create_chart_dialog sets when the
+    chart type is created (CHART_TYPES_NEEDING_3D_AXES) and
+    render_figure._subplot_kwargs_for_axis reads for every renderer.
+    """
+
+    Name: str = "Scatter Plot (3D)"
+    Category: str = "3D and volumetric data"
+    Description: str = (
+        "Points in three dimensions, optionally coloured and sized by further "
+        "columns - a cloud read for its shape rather than a surface."
+    )
+    Link: str = "https://matplotlib.org/stable/gallery/mplot3d/scatter3d.html"
+
+    RequiredRoles: list[str] = ["x", "y", "z"]
+    OptionalRoles: list[str] = ["color", "size"]
+
+    Kwargs: dict[str, object] = merge(
+        pick(ARTIST_KWARGS, "alpha", "label", "zorder", "visible", "rasterized"),
+        pick(CMAP_KWARGS, "cmap", "norm", "vmin", "vmax"),
+        {
+            "marker": {
+                "default": "o",
+                "type": str,
+                "group": "Appearance",
+                "description": "Marker shape, as a Matplotlib marker code.",
+            },
+            "s": {
+                "default": None,
+                "type": float,
+                "min": 0.0,
+                "max": 1000.0,
+                "step": 5.0,
+                "group": "Appearance",
+                "description": (
+                    "Marker area in points squared, for every point. Ignored "
+                    "when a size role column is mapped."
+                ),
+            },
+            "color": {
+                "default": None,
+                "type": str,
+                "kind": "color",
+                "group": "Appearance",
+                "description": (
+                    "One colour for every point. Ignored when a color role "
+                    "column is mapped, which colours them individually."
+                ),
+            },
+            "depthshade": {
+                "default": True,
+                "type": bool,
+                "group": "Appearance",
+                "description": (
+                    "Fade the points that are further away. It is the main "
+                    "depth cue a still 3D image has."
+                ),
+            },
+            "edgecolor": {
+                "default": None,
+                "type": str,
+                "kind": "color",
+                "group": "Appearance",
+                "description": "Marker outline colour.",
+            },
+        },
+    )
+
+    #: The camera, read here and applied to the axes rather than forwarded.
+    Options: dict[str, object] = dict(VIEW_OPTIONS)
+
+    def render_axis(
+        self,
+        ax: Any,
+        series: list[SeriesData],
+        options: dict[str, Any] | None = None,
+    ) -> None:
+        axis_options = options or {}
+
+        for index, sd in enumerate(series):
+            style = dict(sd.style or {})
+            if not style.get("visible", True) or not self.ensure_required_roles(sd.df):
+                continue
+
+            x, y, z = finite_xyz(sd.df)
+            if x.size == 0:
+                applogger.info("Series '%s' skipped: no finite x/y/z rows.", sd.name)
+                continue
+
+            merged = self.merge_style(axis_options, style)
+            kwargs = {
+                key: value
+                for key, value in self.get_kwargs(merged).items()
+                if value is not None and value != ""
+            }
+            kwargs.setdefault("label", style.get("label") or sd.name)
+
+            colors = self._aligned_column(sd, "color", x.size)
+            if colors is not None:
+                # c, not color: one is an array mapped through the colormap,
+                # the other is a single colour, and passing both is refused.
+                kwargs.pop("color", None)
+                kwargs["c"] = colors
+                kwargs.setdefault("cmap", rcParams["image.cmap"])
+            else:
+                for key in ("cmap", "norm", "vmin", "vmax"):
+                    kwargs.pop(key, None)
+                kwargs.setdefault("color", self.series_color(style, index))
+
+            sizes = self._aligned_column(sd, "size", x.size)
+            if sizes is not None:
+                kwargs.pop("s", None)
+                kwargs["s"] = sizes
+
+            try:
+                ax.scatter(x, y, z, **kwargs)
+            except Exception:
+                applogger.exception(
+                    "Scatter Plot (3D) failed to draw series '%s'.", sd.name
+                )
+
+        view = _view_kwargs(axis_options, self)
+        if view:
+            ax.view_init(**view)
+
+        self.apply_annotations(ax, axis_options)
+
+    def _aligned_column(
+        self, sd: SeriesData, role: str, expected: int
+    ) -> np.ndarray | None:
+        """Return one optional numeric role, aligned to the finite x/y/z rows.
+
+        None when the column is absent, or when dropping the non-finite rows
+        has left it a different length than the points: colouring or sizing
+        the wrong points is worse than doing neither.
+        """
+        if role not in sd.df.columns:
+            return None
+
+        frame = sd.df
+        finite = np.isfinite(
+            np.column_stack(
+                [
+                    pd.to_numeric(frame[name], errors="coerce").to_numpy(dtype=float)
+                    for name in ("x", "y", "z")
+                ]
+            )
+        ).all(axis=1)
+        values = pd.to_numeric(frame[role], errors="coerce").to_numpy(dtype=float)
+        values = values[finite]
+        if values.size != expected or not np.isfinite(values).all():
+            applogger.info(
+                "Series '%s': the %s column does not line up with the points, "
+                "so it is ignored.",
+                sd.name,
+                role,
+            )
+            return None
+        return values

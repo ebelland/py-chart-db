@@ -202,6 +202,9 @@ P2-14 renderer: il boilerplate duplicato appartiene a BaseAxisRenderer
       renderer su 23. Sono ~55 righe che vanno sulla base come
       merge_options() e valid_series(), lasciando a ogni renderer solo cio'
       che disegna davvero. Due ore, e ogni renderer nuovo parte piu' corto.
+      Aggiornato 2026-09-09: ora sono 29 renderer, e i sei nuovi (stem,
+      quiver, stream, triplot, tripcolor, scatter 3D) hanno riscritto lo
+      stesso filtro un'altra volta ciascuno.
 
 P2-3  series operation: baseline correction (ALS or rubber-band)
       Pure numpy/scipy. Prerequisite for meaningful peak areas.

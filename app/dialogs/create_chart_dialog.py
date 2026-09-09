@@ -1306,7 +1306,7 @@ class NewPlotTabDialog(QDialog):
     #: for every axis, so this is the only place that had to name which
     #: renderers want it.
     CHART_TYPES_NEEDING_3D_AXES: frozenset[str] = frozenset(
-        {"Surface Plot", "Surface Plot (Scattered)"}
+        {"Surface Plot", "Surface Plot (Scattered)", "Scatter Plot (3D)"}
     )
 
     def _default_axis_options(self, chart_type: str) -> dict[str, Any] | None:
