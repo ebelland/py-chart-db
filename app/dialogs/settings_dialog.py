@@ -26,9 +26,12 @@ whatever is constructed next and leaves the rest in the old language.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
+    QFileDialog,
     QFormLayout,
     QHBoxLayout,
     QLabel,
@@ -47,6 +50,8 @@ from app.styles.style import (
     create_card_widget,
     create_section_title,
     load_icon,
+    qss_file_style_key,
+    qss_file_style_label,
     resolve_app_style,
     stdSizeAndlayout,
 )
@@ -123,6 +128,12 @@ class SettingsDialog(QDialog):
     docstring.
     """
 
+    #: Sentinel combo entry that opens a file picker instead of naming a
+    #: style, the same way FigurePropertiesWidget's Style combo browses for
+    #: a .mplstyle. Never stored: picking it either adds a real ``file:``
+    #: entry or puts the combo back where it was.
+    _BROWSE_SENTINEL = "__browse_qss__"
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
 
@@ -156,9 +167,19 @@ class SettingsDialog(QDialog):
         # that does not, rather than being listed and doing nothing.
         self._style_combo = self._combo(
             card,
-            [(key, tr(label)) for key, label in available_app_styles()],
+            [
+                *[(key, tr(label)) for key, label in available_app_styles()],
+                # Last, and a sentinel rather than a style: the dropdown can
+                # only ever list what this installation ships or has
+                # installed, and a sheet kept anywhere else has no other way
+                # in. Same idea as the Style combo in Figure properties,
+                # which browses for a .mplstyle the same way.
+                (self._BROWSE_SENTINEL, tr("Browse…")),
+            ],
             self._entry_style,
         )
+        self._last_valid_style_index = self._style_combo.currentIndex()
+        self._style_combo.currentIndexChanged.connect(self._on_style_selected)
         form.addRow(tr("App style"), self._style_combo)
 
         self._language_combo = self._combo(
@@ -228,6 +249,50 @@ class SettingsDialog(QDialog):
         return str(combo.currentData() or "")
 
     # ------------------------------------------------------------------
+    # A stylesheet of the user's own
+    # ------------------------------------------------------------------
+    def _on_style_selected(self, _index: int) -> None:
+        if self._value(self._style_combo) != self._BROWSE_SENTINEL:
+            self._last_valid_style_index = self._style_combo.currentIndex()
+            return
+        self._browse_for_stylesheet()
+
+    def _browse_for_stylesheet(self) -> None:
+        """Pick a ``.qss`` file and select it as the app style.
+
+        Nothing is applied or written here - this dialog saves on Save and
+        the style takes effect on the next start, which the note at the
+        bottom of it says. Cancelling puts the combo back where it was
+        rather than leaving "Browse…" selected.
+        """
+        path_str, _unused = QFileDialog.getOpenFileName(
+            self,
+            tr("Select a stylesheet"),
+            "",
+            tr("Qt Stylesheet (*.qss);;All Files (*)"),
+        )
+        if not path_str:
+            self._select_style_index(self._last_valid_style_index)
+            return
+
+        key = qss_file_style_key(Path(path_str))
+        index = self._style_combo.findData(key)
+        if index < 0:
+            # Before the Browse… row, which stays last.
+            index = self._style_combo.count() - 1
+            self._style_combo.insertItem(index, qss_file_style_label(key), key)
+        self._select_style_index(index)
+
+    def _select_style_index(self, index: int) -> None:
+        """Move the combo without re-entering the browse handler."""
+        self._style_combo.blockSignals(True)
+        try:
+            self._style_combo.setCurrentIndex(index)
+        finally:
+            self._style_combo.blockSignals(False)
+        self._last_valid_style_index = self._style_combo.currentIndex()
+
+    # ------------------------------------------------------------------
     # Behaviour
     # ------------------------------------------------------------------
     def _save(self) -> None:
@@ -239,13 +304,19 @@ class SettingsDialog(QDialog):
         of config.json - dialog geometry is saved on close - and a single
         blind write would drop whatever else changed while it was open.
         """
-        set_value(CONFIG_APP_STYLE, self._value(self._style_combo))
+        # Never the sentinel: browsing either selects a real entry or puts
+        # the combo back, so this is belt and braces rather than a case
+        # that is reachable today.
+        style_key = self._value(self._style_combo)
+        if style_key == self._BROWSE_SENTINEL:
+            style_key = self._entry_style
+        set_value(CONFIG_APP_STYLE, style_key)
         set_value("language", self._value(self._language_combo))
         set_value(CONFIG_SAVE_FORMAT, self._value(self._format_combo))
 
         applogger.info(
             "Settings saved: style=%s language=%s format=%s",
-            self._value(self._style_combo),
+            style_key,
             self._value(self._language_combo),
             self._value(self._format_combo),
         )

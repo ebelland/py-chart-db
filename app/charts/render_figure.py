@@ -469,7 +469,13 @@ def _create_axes_grid(
     # numbers agreeing. Matches Matplotlib's own convention for this (see the
     # sharex/sharey examples in the subplots_axes_and_figures gallery, which
     # pair sharex/sharey with gridspec_kw={"hspace": 0, "wspace": 0}).
-    _close_gaps_between_shared_neighbours(gridspec, axes_flat)
+    vertical_space, horizontal_space = _shared_axis_spacing(descriptor)
+    _close_gaps_between_shared_neighbours(
+        gridspec,
+        axes_flat,
+        vertical_space=vertical_space,
+        horizontal_space=horizontal_space,
+    )
 
     for ax in shared_axes:
         ax.label_outer()
@@ -477,8 +483,41 @@ def _create_axes_grid(
     return axes_flat, shared_axes
 
 
-def _close_gaps_between_shared_neighbours(gridspec: Any, axes_flat: list[Any]) -> None:
-    """Zero a GridSpec's row/column gap only where every neighbour agrees.
+#: Figure option keys for the gap left between shared, adjacent axes.
+#: "Vertical" is the gap between stacked rows (Matplotlib's hspace) and
+#: "horizontal" the gap between side-by-side columns (wspace), named for
+#: the direction the gap runs rather than for the axis it separates.
+#: 0.0 - flush, the Matplotlib gallery's own shared-axis convention - is
+#: the default, which is what this did unconditionally before the two were
+#: settable.
+OPT_SHARED_VERTICAL_SPACE = "shared_vertical_space"
+OPT_SHARED_HORIZONTAL_SPACE = "shared_horizontal_space"
+
+
+def _shared_axis_spacing(descriptor: FigureDescriptor) -> tuple[float, float]:
+    """Return this figure's (vertical, horizontal) shared-axis spacing."""
+    options = descriptor.options if isinstance(descriptor.options, dict) else {}
+
+    def _read(key: str) -> float:
+        try:
+            value = float(options.get(key, 0.0) or 0.0)
+        except (TypeError, ValueError):
+            return 0.0
+        # Matplotlib reads these as a fraction of the average axis size; a
+        # negative one would overlap the panels rather than space them.
+        return max(0.0, value)
+
+    return _read(OPT_SHARED_VERTICAL_SPACE), _read(OPT_SHARED_HORIZONTAL_SPACE)
+
+
+def _close_gaps_between_shared_neighbours(
+    gridspec: Any,
+    axes_flat: list[Any],
+    *,
+    vertical_space: float = 0.0,
+    horizontal_space: float = 0.0,
+) -> None:
+    """Set a GridSpec's row/column gap only where every neighbour agrees.
 
     A GridSpec has one wspace and one hspace for the whole grid, not a gap
     per row or column, so this cannot be "close the gap here but not there" -
@@ -532,11 +571,11 @@ def _close_gaps_between_shared_neighbours(gridspec: Any, axes_flat: list[Any]) -
     if vertical_pairs and all(
         a.get_shared_x_axes().joined(a, b) for a, b in vertical_pairs
     ):
-        gridspec.update(hspace=0.0)
+        gridspec.update(hspace=vertical_space)
     if horizontal_pairs and all(
         a.get_shared_y_axes().joined(a, b) for a, b in horizontal_pairs
     ):
-        gridspec.update(wspace=0.0)
+        gridspec.update(wspace=horizontal_space)
 
 
 def _clear_redundant_shared_axis_labels(shared_axes: set[Any]) -> None:

@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -27,7 +28,11 @@ from PySide6.QtWidgets import (
 )
 
 from app.charts import layout_presets
-from app.charts.render_figure import OPT_DOWNSAMPLE_THRESHOLD
+from app.charts.render_figure import (
+    OPT_DOWNSAMPLE_THRESHOLD,
+    OPT_SHARED_HORIZONTAL_SPACE,
+    OPT_SHARED_VERTICAL_SPACE,
+)
 from app.dialogs.edit_mpl_styles_dialog import (
     MplStyleEditorDialog,
     _sanitize_mplstyle_text,
@@ -210,6 +215,23 @@ class FigurePropertiesWidget(BaseProperties):
         self._build_ui()
         self.clear_connected_figure()
 
+    def _shared_space_spin(self, parent: QWidget) -> QDoubleSpinBox:
+        """A spin box for one shared-axis gap, in Matplotlib's own units.
+
+        Same range and step as the Manual spacing gaps below, which these
+        are the shared-axis counterpart of: a fraction of the average axis
+        size, which can legitimately exceed 1 when panels need spreading
+        far apart.
+        """
+        spin = QDoubleSpinBox(parent)
+        spin.setRange(0.0, 2.0)
+        spin.setDecimals(3)
+        spin.setSingleStep(0.01)
+        spin.setValue(0.0)
+        spin.setMinimumWidth(self.FIGURE_SPIN_MIN_WIDTH)
+        spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        return spin
+
     def _configure_combo_width(
         self,
         combo: QComboBox,
@@ -355,6 +377,36 @@ class FigurePropertiesWidget(BaseProperties):
         preset_lay.addWidget(self._layout_preset_combo, 1)
         grid_section_lay.addWidget(preset_row)
 
+        # Axes that share a scale are drawn flush by default, the way
+        # Matplotlib's own shared-axis gallery example does it - these two
+        # are how to ask for a gap anyway. They apply only between axes
+        # that actually share the scale that gap runs across (see
+        # render_figure._close_gaps_between_shared_neighbours), which is
+        # what makes them a different setting from Manual spacing below:
+        # that one is the whole figure's margins under one layout mode,
+        # this one is what "attached" means when axes are attached.
+        shared_row = QWidget(grid_section)
+        shared_lay = QHBoxLayout(shared_row)
+        shared_lay.setContentsMargins(0, 0, 0, 0)
+        shared_lay.setSpacing(8)
+
+        self._shared_vspace = self._shared_space_spin(shared_row)
+        self._shared_vspace.setToolTip(
+            _("Gap between shared axes stacked one above the other. 0 draws them flush.")
+        )
+        self._shared_hspace = self._shared_space_spin(shared_row)
+        self._shared_hspace.setToolTip(
+            _("Gap between shared axes side by side. 0 draws them flush.")
+        )
+
+        shared_lay.addWidget(QLabel(_("Shared gap"), shared_row))
+        shared_lay.addWidget(QLabel(_("V"), shared_row))
+        shared_lay.addWidget(self._shared_vspace, 1)
+        shared_lay.addSpacing(8)
+        shared_lay.addWidget(QLabel(_("H"), shared_row))
+        shared_lay.addWidget(self._shared_hspace, 1)
+        grid_section_lay.addWidget(shared_row)
+
         lay.addWidget(grid_section)
 
         # ----- Figure options -----
@@ -431,6 +483,13 @@ class FigurePropertiesWidget(BaseProperties):
         # means for it.
         self._downsample_combo = QComboBox(opts_section)
         self._configure_combo_width(self._downsample_combo, minimum_contents_length=14)
+        # The label is one word: a long one ("Downsample large series above")
+        # sets the width of the label column for the whole form, and every
+        # other row - Width and Height in particular - loses that width to a
+        # phrase only this row needs. The tooltip says the rest.
+        self._downsample_combo.setToolTip(
+            _("Draw at most this many points per series, sampling the rest away.")
+        )
         for label, value, tooltip in self.DOWNSAMPLE_THRESHOLDS:
             self._downsample_combo.addItem(_(label), value)
             self._downsample_combo.setItemData(
@@ -439,13 +498,23 @@ class FigurePropertiesWidget(BaseProperties):
                 Qt.ItemDataRole.ToolTipRole,
             )
 
+        # Width and height share a row: they are one measurement asked for
+        # in two halves, and stacking them cost a whole row of the panel's
+        # height to say so twice.
+        size_row = QWidget(opts_section)
+        size_lay = QHBoxLayout(size_row)
+        size_lay.setContentsMargins(0, 0, 0, 0)
+        size_lay.setSpacing(8)
+        size_lay.addWidget(self._fig_width_cm, 1)
+        size_lay.addWidget(QLabel(_("Height"), size_row))
+        size_lay.addWidget(self._fig_height_cm, 1)
+
         form.addRow(_("DPI"), self._fig_dpi)
-        form.addRow(_("Width"), self._fig_width_cm)
-        form.addRow(_("Height"), self._fig_height_cm)
+        form.addRow(_("Width"), size_row)
         form.addRow(_("Frame on"), self._fig_frameon)
         form.addRow(_("Display"), self._resize_mode_combo)
         form.addRow(_("Figure layout"), self._fig_layout_mode)
-        form.addRow(_("Downsample large series above"), self._downsample_combo)
+        form.addRow(_("Downsample"), self._downsample_combo)
         opts_section_lay.addLayout(form)
         lay.addWidget(opts_section)
 
@@ -474,17 +543,29 @@ class FigurePropertiesWidget(BaseProperties):
         # one full-width QFormLayout row each. Six rows of one spin box each
         # made this the tallest section in the panel for what is, in effect,
         # three pairs of numbers.
+        #
+        # One QGridLayout rather than three QHBoxLayouts: a row of its own
+        # sized its own label column, so "Left", "Bottom" and "Column gap"
+        # each pushed their spin box to a different x and nothing in the
+        # block lined up with anything else. A grid gives all three rows the
+        # same four columns - label, field, label, field - with only the
+        # field columns stretching, so the two columns of numbers are
+        # actually columns.
         self._margin_spins = {}
+        grid = QGridLayout()
+        stdSizeAndlayout(grid)
+        for column in (0, 2):
+            grid.setColumnStretch(column, 0)
+        for column in (1, 3):
+            grid.setColumnStretch(column, 1)
+
         field_pairs = (
             (self.MARGIN_FIELDS[0], self.MARGIN_FIELDS[1]),  # Left, Right
             (self.MARGIN_FIELDS[2], self.MARGIN_FIELDS[3]),  # Bottom, Top
             (self.MARGIN_FIELDS[4], self.MARGIN_FIELDS[5]),  # Column gap, Row gap
         )
-        for first_field, second_field in field_pairs:
-            row = QWidget(section)
-            row_lay = QHBoxLayout(row)
-            stdSizeAndlayout(row_lay)
-            for key, label, default, tooltip in (first_field, second_field):
+        for row, pair in enumerate(field_pairs):
+            for half, (key, label, default, tooltip) in enumerate(pair):
                 spin = QDoubleSpinBox(section)
                 # Fractions of the figure, so 0..1 for edges.  wspace/hspace
                 # are fractions of the average axis size and can legitimately
@@ -497,10 +578,13 @@ class FigurePropertiesWidget(BaseProperties):
                 spin.setMinimumWidth(self.FIGURE_SPIN_MIN_WIDTH)
                 spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
                 self._margin_spins[key] = spin
-                row_lay.addWidget(QLabel(_(label), row))
-                row_lay.addWidget(spin, 1)
-            section_lay.addWidget(row)
 
+                text = QLabel(_(label), section)
+                text.setToolTip(_(tooltip))
+                grid.addWidget(text, row, half * 2)
+                grid.addWidget(spin, row, half * 2 + 1)
+
+        section_lay.addLayout(grid)
         self._margins_section = section
         return section
 
@@ -581,6 +665,7 @@ class FigurePropertiesWidget(BaseProperties):
         self._fig_layout_mode.setCurrentIndex(0)
         self._downsample_combo.setCurrentIndex(0)
         self._reset_layout_preset_combo()
+        self._load_shared_spacing_into_spins({})
         self._load_margins_into_spins({})
         self._name_edit.clear()
         super().clear_connected_figure()
@@ -594,6 +679,8 @@ class FigurePropertiesWidget(BaseProperties):
             self._nrows_combo,
             self._ncols_combo,
             self._layout_preset_combo,
+            self._shared_vspace,
+            self._shared_hspace,
             self._fig_dpi,
             self._fig_width_cm,
             self._fig_height_cm,
@@ -668,6 +755,7 @@ class FigurePropertiesWidget(BaseProperties):
             self._fig_layout_mode.setCurrentIndex(0)
             self._downsample_combo.setCurrentIndex(0)
             self._reset_layout_preset_combo()
+            self._load_shared_spacing_into_spins({})
             self._load_margins_into_spins({})
             self._set_enabled_state(False)
             return
@@ -703,6 +791,7 @@ class FigurePropertiesWidget(BaseProperties):
         )
 
         self._load_metrics_into_spins(fig_opts)
+        self._load_shared_spacing_into_spins(fig_opts)
         self._load_margins_into_spins(fig_opts)
         self._fig_frameon.setChecked(bool(fig_opts.get("frameon", True)))
 
@@ -960,6 +1049,23 @@ class FigurePropertiesWidget(BaseProperties):
             spin = self._margin_spins[key]
             spin.setValue(min(max(value, spin.minimum()), spin.maximum()))
 
+    def _load_shared_spacing_into_spins(self, fig_opts: dict[str, Any]) -> None:
+        """Show this figure's shared-axis gaps, or the flush default.
+
+        0.0 for a figure that has never set them, which is what the
+        renderer draws shared axes with - see
+        render_figure._shared_axis_spacing.
+        """
+        for key, spin in (
+            (OPT_SHARED_VERTICAL_SPACE, self._shared_vspace),
+            (OPT_SHARED_HORIZONTAL_SPACE, self._shared_hspace),
+        ):
+            try:
+                value = float(fig_opts.get(key, 0.0) or 0.0)
+            except (TypeError, ValueError):
+                value = 0.0
+            spin.setValue(min(max(value, spin.minimum()), spin.maximum()))
+
     def _load_metrics_into_spins(self, fig_opts: dict[str, Any]) -> None:
         """Show this figure's own metrics, falling back to the rcParams ones.
 
@@ -1054,6 +1160,8 @@ class FigurePropertiesWidget(BaseProperties):
             "frameon": bool(self._fig_frameon.isChecked()),
             "layout_mode": str(self._fig_layout_mode.currentData() or "constrained"),
             OPT_DOWNSAMPLE_THRESHOLD: int(self._downsample_combo.currentData() or 0),
+            OPT_SHARED_VERTICAL_SPACE: float(self._shared_vspace.value()),
+            OPT_SHARED_HORIZONTAL_SPACE: float(self._shared_hspace.value()),
             OPT_FIGURE_WIDTH_CM: float(self._fig_width_cm.value()),
             OPT_FIGURE_HEIGHT_CM: float(self._fig_height_cm.value()),
             OPT_FIGURE_DPI: float(self._fig_dpi.value()),

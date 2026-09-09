@@ -400,3 +400,92 @@ def test_a_regional_variant_still_finds_its_language(monkeypatch) -> None:
 
     assert module.platform_language() == "it"
 
+
+
+# ----------------------------------------------------------------------
+# A stylesheet of the user's own
+# ----------------------------------------------------------------------
+@pytest.fixture
+def custom_qss(tmp_path: Path) -> Path:
+    sheet = tmp_path / "mine.qss"
+    sheet.write_text("QPushButton { background: #ff0000; }", encoding="utf-8")
+    return sheet
+
+
+def test_the_style_combo_offers_browse_last(qapp) -> None:
+    """The dropdown can only list what this installation ships or has
+    installed; a sheet kept anywhere else has no other way in."""
+    dialog = SettingsDialog()
+    combo = dialog._style_combo
+
+    assert combo.itemData(combo.count() - 1) == dialog._BROWSE_SENTINEL
+
+
+def test_browsing_selects_the_chosen_sheet(
+    qapp, custom_qss: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "app.dialogs.settings_dialog.QFileDialog.getOpenFileName",
+        lambda *a, **k: (str(custom_qss), ""),
+    )
+    dialog = SettingsDialog()
+    combo = dialog._style_combo
+
+    combo.setCurrentIndex(combo.findData(dialog._BROWSE_SENTINEL))
+
+    assert combo.currentData() == style.qss_file_style_key(custom_qss)
+    assert combo.currentText() == "File: mine.qss"
+    # Browse… stays the last row, so it is always reachable again.
+    assert combo.itemData(combo.count() - 1) == dialog._BROWSE_SENTINEL
+
+
+def test_cancelling_the_picker_puts_the_combo_back(
+    qapp, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "app.dialogs.settings_dialog.QFileDialog.getOpenFileName",
+        lambda *a, **k: ("", ""),
+    )
+    dialog = SettingsDialog()
+    combo = dialog._style_combo
+    before = combo.currentIndex()
+
+    combo.setCurrentIndex(combo.findData(dialog._BROWSE_SENTINEL))
+
+    assert combo.currentIndex() == before
+    assert combo.currentData() != dialog._BROWSE_SENTINEL
+
+
+def test_the_sentinel_is_never_what_gets_saved(
+    qapp, temp_config: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Belt and braces: browsing always leaves a real entry selected, but
+    "__browse_qss__" must never reach config.json even so."""
+    dialog = SettingsDialog()
+    combo = dialog._style_combo
+    combo.blockSignals(True)
+    combo.setCurrentIndex(combo.findData(dialog._BROWSE_SENTINEL))
+    combo.blockSignals(False)
+
+    dialog._save()
+
+    assert _written(temp_config)["app_style"] != dialog._BROWSE_SENTINEL
+
+
+def test_a_chosen_sheet_resolves_and_applies(qapp, custom_qss: Path) -> None:
+    key = style.qss_file_style_key(custom_qss)
+
+    assert style.resolve_app_style(key) == key
+
+    resolved = style.apply_platform_style(qapp, key)
+    assert resolved.qss_file == custom_qss
+    assert "ff0000" in qapp.styleSheet()
+
+
+def test_a_sheet_that_has_gone_missing_falls_back(qapp, custom_qss: Path) -> None:
+    """Same answer as an uninstalled Qt plugin: the app looks normal, not
+    unstyled, and says why in the log."""
+    key = style.qss_file_style_key(custom_qss)
+    custom_qss.unlink()
+
+    assert style.resolve_app_style(key) == style.APP_STYLE_AUTOMATIC

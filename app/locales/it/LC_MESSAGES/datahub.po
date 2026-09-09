@@ -219,6 +219,12 @@ msgstr "Le annotazioni sono salvate nelle opzioni dell'asse. I kwargs devono ess
 msgid "App style"
 msgstr "Stile dell'applicazione"
 
+msgid "Select a stylesheet"
+msgstr "Seleziona un foglio di stile"
+
+msgid "Qt Stylesheet (*.qss);;All Files (*)"
+msgstr "Foglio di stile Qt (*.qss);;Tutti i file (*)"
+
 
 msgid "Appearance"
 msgstr "Aspetto"
@@ -1263,8 +1269,11 @@ msgstr "campi:"
 msgid "Figure layout"
 msgstr "Disposizione della figura"
 
-msgid "Downsample large series above"
-msgstr "Riduci le serie di grandi dimensioni oltre"
+msgid "Downsample"
+msgstr "Riduzione punti"
+
+msgid "Draw at most this many points per series, sampling the rest away."
+msgstr "Disegna al massimo questo numero di punti per serie, scartando il resto."
 
 msgid "10,000"
 msgstr "10.000"
@@ -1515,6 +1524,21 @@ msgstr "Griglia"
 
 msgid "Layout"
 msgstr "Layout"
+
+msgid "Shared gap"
+msgstr "Spazio tra assi condivisi"
+
+msgid "V"
+msgstr "V"
+
+msgid "H"
+msgstr "O"
+
+msgid "Gap between shared axes stacked one above the other. 0 draws them flush."
+msgstr "Spazio tra assi condivisi impilati uno sopra l'altro. 0 li disegna attaccati."
+
+msgid "Gap between shared axes side by side. 0 draws them flush."
+msgstr "Spazio tra assi condivisi affiancati. 0 li disegna attaccati."
 
 msgid "Apply a preset…"
 msgstr "Applica un preset…"

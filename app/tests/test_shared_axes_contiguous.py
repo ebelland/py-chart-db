@@ -216,3 +216,48 @@ def test_manual_layout_margins_still_override_the_automatic_zero(
 
     assert fig.subplotpars.wspace == pytest.approx(0.3)
     assert fig.subplotpars.hspace == pytest.approx(0.25)
+
+
+def test_shared_gap_options_open_the_grid_by_the_amount_asked_for(
+    repo: SqliteRepo,
+) -> None:
+    """Flush is the default, not a rule: the two Shared gap fields in Figure
+    properties ask for a gap between panels that share a scale, without
+    touching the figure's own margins."""
+    figure_id = _shared_2x2_figure(
+        repo,
+        figure_options={
+            "layout_mode": "constrained",
+            "shared_vertical_space": 0.25,
+            "shared_horizontal_space": 0.10,
+        },
+    )
+    fig = Figure()
+    render_figure_from_descriptor(
+        figure=fig, descriptor=repo.load_figure_descriptor(figure_id), repo=repo
+    )
+
+    gridspec = fig.axes[0].get_gridspec()
+    assert gridspec.hspace == pytest.approx(0.25)
+    assert gridspec.wspace == pytest.approx(0.10)
+
+
+def test_a_negative_shared_gap_is_read_as_flush(repo: SqliteRepo) -> None:
+    """Gridspec accepts a negative gap and overlaps the panels with it. The
+    fields cannot produce one, but a hand-edited .dhub can."""
+    figure_id = _shared_2x2_figure(
+        repo,
+        figure_options={
+            "layout_mode": "constrained",
+            "shared_vertical_space": -1.0,
+            "shared_horizontal_space": -0.5,
+        },
+    )
+    fig = Figure()
+    render_figure_from_descriptor(
+        figure=fig, descriptor=repo.load_figure_descriptor(figure_id), repo=repo
+    )
+
+    gridspec = fig.axes[0].get_gridspec()
+    assert gridspec.hspace == 0.0
+    assert gridspec.wspace == 0.0
