@@ -28,6 +28,9 @@ from app.data.data_source import parse_roles, row_value
 from app.data.sqlite_repo import SqliteRepo
 from app.widgets.axis_series_selector import AxisSeriesSelector
 from app.styles.style import (
+    MARGIN_PANEL,
+    SPACING_DEFAULT,
+    apply_card_layout,
     apply_dialog_shell,
     icon_from_svg_source,
     set_doc_link,
@@ -365,6 +368,51 @@ class SeriesOperationDialogBase(QDialog):
     # ------------------------------------------------------------------
     # Common layout
     # ------------------------------------------------------------------
+    def _standard_toolbox_page(self, inner: QWidget, *, name: str) -> QWidget:
+        """Put one QToolBox page's content on the standard properties ground.
+
+        The Figure/Axis/Series inspector's toolbox pages are ``BaseProperties``
+        widgets: a ``#basePropertiesPanel`` ground - grey on macOS, white on
+        Windows - with white cards floating on it. The operation dialogs'
+        pages were whatever their builder happened to return: a bare card for
+        Model, a plain form widget for Parameters, the selector for Axis /
+        Series. ``apply_toolbox_page_metrics`` then painted each one the page
+        ground, so a card page kept its border drawn around the whole page
+        while a plain page had none - a different colour and outline on every
+        section.
+
+        This gives them all the inspector's arrangement: the panel ground,
+        one card, the content inside it. A builder that already returned a
+        card keeps it rather than being wrapped in a second one.
+        """
+        panel = QWidget(self)
+        panel.setObjectName("basePropertiesPanel")
+        panel.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        panel.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding,
+        )
+
+        panel_layout = QVBoxLayout(panel)
+        panel_layout.setContentsMargins(*MARGIN_PANEL)
+        panel_layout.setSpacing(SPACING_DEFAULT)
+
+        if inner.property("card"):
+            card = inner
+            card.setParent(panel)
+        else:
+            card = create_card_widget(panel, name)
+            card_layout = QVBoxLayout(card)
+            apply_card_layout(card_layout)
+            card_layout.addWidget(inner)
+
+        card.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding,
+        )
+        panel_layout.addWidget(card, 1)
+        return panel
+
     def _build_common_ui(self) -> None:
         """Build the common shell with a QToolBox left panel."""
         left_toolbox = QToolBox(self)
@@ -375,9 +423,18 @@ class SeriesOperationDialogBase(QDialog):
             QSizePolicy.Policy.Expanding,
         )
 
-        self.axis_series_panel = self.series_selector
-        self.model_panel = self._model_selector_widget
-        self.parameters_panel = self._parameter_selector_widget
+        # Each page gets the same #basePropertiesPanel ground + card the main
+        # window's properties inspector uses, so the sections read alike
+        # instead of one-card-here, one-plain-widget-there.
+        self.axis_series_panel = self._standard_toolbox_page(
+            self.series_selector, name="operationAxisSeriesCard"
+        )
+        self.model_panel = self._standard_toolbox_page(
+            self._model_selector_widget, name="operationModelCard"
+        )
+        self.parameters_panel = self._standard_toolbox_page(
+            self._parameter_selector_widget, name="operationParametersCard"
+        )
 
         # QToolBox gives the current page the available page area, but the page
         # itself still follows its own size policy. Keep all three pages capable
