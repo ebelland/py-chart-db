@@ -434,6 +434,43 @@ def test_deleting_a_table_enables_the_undo_entry_without_a_show_signal(window) -
     assert all(a.isEnabled() for a in built._undo_actions())
 
 
+def _menu_bar_undo_action(built):
+    """The Undo QAction in the real menu bar (macOS), or None if there is none."""
+    for top in built.menuBar().actions():
+        submenu = top.menu()
+        if submenu is None:
+            continue
+        for action in submenu.actions():
+            if str(action.data() or "") == "undo":
+                return action
+    return None
+
+
+def test_a_stack_change_rebuilds_the_macos_menu_bar(window, monkeypatch) -> None:
+    """On macOS setText/setEnabled on the QAction never reaches the native menu
+    bar (it caches item state and never re-validates), so _refresh_undo_item
+    has to rebuild it - the plain property poke is not enough."""
+    from app.dialogs import main_window as main_window_module
+
+    built, _axis_id, _series_id = window
+    if not main_window_module.IS_MACOS:
+        pytest.skip("the rebuild is a macOS-only workaround")
+
+    calls: list[int] = []
+    original = built._build_app_menu
+    monkeypatch.setattr(
+        built, "_build_app_menu", lambda: (calls.append(1), original())[1]
+    )
+
+    built._repo.delete_table("w")
+    built.refresh2()
+
+    assert calls, "the menu bar was not rebuilt after the stack changed"
+    action = _menu_bar_undo_action(built)
+    assert action is not None and action.isEnabled()
+    assert action.text() == "Undo: Delete table 'w'"
+
+
 def test_an_axis_edit_comes_back(window) -> None:
     built, axis_id, _series_id = window
     built._on_axis_options_requested({"axis_id": axis_id, "x_scale": "log"})

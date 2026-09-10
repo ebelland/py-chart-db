@@ -13,6 +13,7 @@ from __future__ import annotations
 import gc
 from functools import partial
 from pathlib import Path
+from time import monotonic
 from typing import Any, cast
 
 from PySide6.QtCore import QSize, Qt, QTimer, QUrl
@@ -68,11 +69,18 @@ from app.utils.dialog_state import restore_window_geometry, save_window_geometry
 from app.utils.messages import show_message
 from app.logs.logger import applogger
 from app.utils.i18n import _
-from PySide6.QtWidgets import QApplication, QButtonGroup, QFileDialog, QFrame, QHBoxLayout, QMainWindow, QScrollArea, QSizePolicy, QSplitter, QStackedWidget, QTabWidget, QToolBox, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QButtonGroup, QFileDialog, QFrame, QHBoxLayout, QMainWindow, QMenu, QScrollArea, QSizePolicy, QSplitter, QStackedWidget, QTabWidget, QToolBox, QToolButton, QVBoxLayout, QWidget
 
 # Coalescing window for property-driven chart reloads, in milliseconds.
 # Long enough to swallow a spinbox drag, short enough to feel immediate.
 PROPERTIES_REDRAW_DEBOUNCE_MS: int = 120
+
+# A run of same-label descriptor snapshots inside this many seconds is
+# treated as one edit and recorded once. The auto-applying property panels
+# fire _snapshot_descriptors on every debounced change; without this a
+# single slider drag would leave a stack of identical "Figure properties"
+# undo entries in front of the state worth going back to.
+SNAPSHOT_COALESCE_SECONDS: float = 2.0
 
 # config.json keys for the remembered window layout.
 STATE_KEY: str = "main_window"
@@ -130,6 +138,11 @@ class MainWindow(QMainWindow):
         self._properties_redraw_timer = QTimer(self)
         self._properties_redraw_timer.setSingleShot(True)
         self._properties_redraw_timer.timeout.connect(self._flush_properties_chart_redraw)
+
+        # Last descriptor snapshot, for coalescing a run of auto-applied
+        # edits into one undo entry (see _snapshot_descriptors).
+        self._last_snapshot_label: str = ""
+        self._last_snapshot_at: float = 0.0
 
         self.statusBar().showMessage("Ready")
 
@@ -488,12 +501,12 @@ class MainWindow(QMainWindow):
 
     def _undo_actions(self) -> list[QAction]:
         """Every Undo entry on screen: the rail's popup, and the macOS bar."""
-        menus = [self._app_menu]
+        menus: list[QMenu | None] = [self._app_menu]
         if IS_MACOS:
             menus.extend(
-                action.menu()
+                menu
                 for action in self.menuBar().actions()
-                if action.menu() is not None
+                if isinstance(menu := action.menu(), QMenu)
             )
 
         found: list[QAction] = []
@@ -512,28 +525,48 @@ class MainWindow(QMainWindow):
             )
         return found
 
-    def _refresh_undo_item(self) -> None:
-        """Bring the Undo entry's text and enabled state up to date.
-
-        Wired to ``aboutToShow`` so the popup menu asks the moment it opens,
-        and also called straight after anything that records an undo entry -
-        because the native macOS menu bar does *not* emit ``aboutToShow`` for
-        its items, so on a Mac the show-time refresh never runs and the entry
-        would sit at whatever it was built as (disabled, at startup). The
-        callers are the few UI refresh points every change already funnels
-        through - _snapshot_descriptors, refresh, refresh2, _reload_tabs -
-        not every handler individually.
-        """
+    def _undo_item_state(self) -> tuple[str, bool]:
+        """The Undo entry's text and whether it should be enabled, read fresh."""
         entries = self._repo.undo_entries() if self._repo is not None else []
         latest = entries[0] if entries else None
         _icon, label, _tooltip = action_presentation("undo")
+        text = (
+            _("Undo: {what}").format(what=latest.label)
+            if latest is not None
+            else label
+        )
+        return text, latest is not None
+
+    def _sync_undo_item(self) -> None:
+        """Push the current Undo state onto the QAction objects on screen.
+
+        Enough on its own for the rail's popup, which is a live QMenu and is
+        wired to call this from ``aboutToShow``. Not enough for the native
+        macOS menu bar - see :meth:`_refresh_undo_item`.
+        """
+        text, enabled = self._undo_item_state()
         for action in self._undo_actions():
-            action.setText(
-                _("Undo: {what}").format(what=latest.label)
-                if latest is not None
-                else label
-            )
-            action.setEnabled(latest is not None)
+            action.setText(text)
+            action.setEnabled(enabled)
+
+    def _refresh_undo_item(self) -> None:
+        """Bring the Undo entry up to date after the stack changed.
+
+        Called straight after anything that records or consumes an undo entry
+        - the few UI refresh points every change funnels through
+        (_snapshot_descriptors, refresh, refresh2, _on_chart_panel_deleted,
+        ChartPanel.figure_edited) and _on_undo - not every handler.
+
+        The native macOS menu bar makes this more than a property poke: it
+        caches each item's text and enabled state from the last time the menu
+        was built, never emits ``aboutToShow`` for its items, and so never
+        re-reads the QAction - _sync_undo_item's changes simply do not land
+        there. A full rebuild does land, and is the same hammer the
+        Open-recent list already swings on every change (_build_app_menu).
+        """
+        self._sync_undo_item()
+        if IS_MACOS:
+            self._build_app_menu()
 
     def _snapshot_descriptors(self, label: str) -> None:
         """Record the chart settings before an edit changes them.
@@ -542,9 +575,24 @@ class MainWindow(QMainWindow):
         a few rows each, so working out which is more expensive than
         copying all four - and getting that wrong is an undo that restores
         half of a change (todo.txt P2-11).
+
+        A run of identical labels inside SNAPSHOT_COALESCE_SECONDS is one
+        edit: the auto-applying property panels call this on every debounced
+        change, and only the first call - the one taken before the edit
+        began - has a pre-edit state worth keeping.
         """
         if self._repo is None:
             return
+
+        now = monotonic()
+        if (
+            label == self._last_snapshot_label
+            and now - self._last_snapshot_at < SNAPSHOT_COALESCE_SECONDS
+        ):
+            self._last_snapshot_at = now
+            return
+        self._last_snapshot_label = label
+        self._last_snapshot_at = now
         self._repo.snapshot_for_undo(self._repo.DESCRIPTOR_TABLES, label=label)
         self._refresh_undo_item()
 
@@ -561,8 +609,9 @@ class MainWindow(QMainWindow):
         self._preview.clear()
         self._reload_tabs()
         self._update_properties_for_current_chart()
-        # The entry just consumed: refresh the label rather than rebuild the
-        # menu, which would delete the menu this was invoked from.
+        # The entry just consumed - update the menu to name the next one (or
+        # disable it). On macOS this rebuilds the bar; safe here because Cocoa
+        # has already closed the menu before dispatching this.
         self._refresh_undo_item()
 
     def _recent_databases_item(self) -> MenuItem:
@@ -636,13 +685,23 @@ class MainWindow(QMainWindow):
         bundle) and a default Quit.
 
         Rebuilt wholesale on every call - after Settings, since language and
-        theme are what changes underneath these - rather than patched in
-        place, which is simpler and is exactly what already happened when
-        this was only ever the popup.
+        theme are what changes underneath these, and after every undo-stack
+        change on macOS, whose native menu bar only reads the item list at
+        build time - rather than patched in place, which is simpler and is
+        exactly what already happened when this was only ever the popup.
         """
+        previous = getattr(self, "_app_menu", None)
         items = self._app_menu_items()
         self._app_menu = create_menu(self, items)
-        self._app_menu.aboutToShow.connect(self._refresh_undo_item)
+        if previous is not None and IS_MACOS:
+            # It is parented to this window, so replacing the attribute is not
+            # enough to free it - and on macOS this runs on every undo-stack
+            # change, often enough for the leak to matter. Only macOS: off it,
+            # the activity-rail button still holds this exact object.
+            previous.deleteLater()
+        # The live popup can just re-read on open; _sync, not _refresh, so it
+        # never triggers the macOS menu-bar rebuild from a show handler.
+        self._app_menu.aboutToShow.connect(self._sync_undo_item)
 
         if IS_MACOS:
             self._build_macos_menu_bar(items)
@@ -670,7 +729,10 @@ class MainWindow(QMainWindow):
         menu_bar.clear()
 
         menu = menu_bar.addMenu(_("File"))
-        menu.aboutToShow.connect(self._refresh_undo_item)
+        # Cocoa rarely delivers this for a menu-bar menu, and rebuilding the
+        # bar from inside a show handler would clear the menu mid-display -
+        # so _sync (a plain property poke), never _refresh.
+        menu.aboutToShow.connect(self._sync_undo_item)
         for item in items:
             if item is None:
                 menu.addSeparator()
@@ -753,7 +815,12 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            app_menu = AppKit.NSApp.mainMenu().itemAtIndex_(0).submenu()
+            app = getattr(AppKit, "NSApp", None)
+            if app is None:
+                ns_application = getattr(AppKit, "NSApplication")
+                app = ns_application.sharedApplication()
+
+            app_menu = app.mainMenu().itemAtIndex_(0).submenu()
             if app_menu is None or app_menu.numberOfItems() == 0:
                 return
 
@@ -974,6 +1041,11 @@ class MainWindow(QMainWindow):
                 )
                 panel.delete_requested.connect(self._on_chart_panel_deleted)
                 panel.figure_edited.connect(self._refresh_undo_item)
+                # A reference line or annotation dropped from the chart's own
+                # context menu is written straight to the axis descriptor -
+                # reload the property pages so the Overlay panel's Lines and
+                # Annotations tables show it without a chart reselection.
+                panel.figure_edited.connect(self._update_properties_for_current_chart)
                 # Clicking a point reports it in the status bar, which is the
                 # only surface in the window that can carry a transient line
                 # without moving anything else. It times out rather than
