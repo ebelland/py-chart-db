@@ -28,6 +28,7 @@ from app.data.data_source import parse_roles, row_value
 from app.data.sqlite_repo import SqliteRepo
 from app.widgets.axis_series_selector import AxisSeriesSelector
 from app.styles.style import (
+    apply_card_layout,
     apply_dialog_shell,
     icon_from_svg_source,
     set_doc_link,
@@ -365,6 +366,39 @@ class SeriesOperationDialogBase(QDialog):
     # ------------------------------------------------------------------
     # Common layout
     # ------------------------------------------------------------------
+    def _toolbox_page(self, content: QWidget) -> QWidget:
+        """Wrap one left-panel widget as a QToolBox page.
+
+        The properties inspector's arrangement: the page is the grey ground
+        (``apply_toolbox_page_metrics`` marks it and insets it), and the
+        content floats on it inside one white card - the System Settings
+        grouped-box look. Most operation panels are already
+        ``create_card_widget`` cards; the ones that are not (the Axis / Series
+        selector) get wrapped in one here so every page reads the same.
+        """
+        page = QWidget(self)
+        page.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        page_layout = QVBoxLayout(page)
+        # Left null so apply_toolbox_page_metrics fills it with the page inset.
+        page_layout.setContentsMargins(0, 0, 0, 0)
+        page_layout.setSpacing(0)
+
+        if content.property("card"):
+            card: QWidget = content
+        else:
+            card = create_card_widget(page, "operationToolboxCard")
+            card.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            )
+            card_layout = QVBoxLayout(card)
+            apply_card_layout(card_layout)
+            # Stretch: the Axis / Series selector carries an expanding series
+            # list that has to take the height the card is given.
+            card_layout.addWidget(content, 1)
+
+        page_layout.addWidget(card, 1)
+        return page
+
     def _build_common_ui(self) -> None:
         """Build the common shell with a QToolBox left panel."""
         left_toolbox = QToolBox(self)
@@ -399,9 +433,13 @@ class SeriesOperationDialogBase(QDialog):
         # keeps the header button for a hidden page, leaving a section that
         # opens onto nothing.
         if self.SHOWS_AXIS_SERIES_PAGE:
-            left_toolbox.addItem(self.axis_series_panel, _("Axis / Series"))
-        left_toolbox.addItem(self.model_panel, _("Model"))
-        left_toolbox.addItem(self.parameters_panel, _("Parameters"))
+            left_toolbox.addItem(
+                self._toolbox_page(self.axis_series_panel), _("Axis / Series")
+            )
+        left_toolbox.addItem(self._toolbox_page(self.model_panel), _("Model"))
+        left_toolbox.addItem(
+            self._toolbox_page(self.parameters_panel), _("Parameters")
+        )
         left_toolbox.setCurrentIndex(0)
         apply_toolbox_header_metrics(left_toolbox)
         apply_toolbox_page_metrics(left_toolbox)

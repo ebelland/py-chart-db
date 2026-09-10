@@ -432,13 +432,15 @@ QTabBar::tab:hover:!selected {
 }
 
 QTabBar::tab:selected {
-  /* The floating glass lozenge: base fill, hairline edge, a lit top
-     border stepping the light down its face. */
+  /* The floating glass lozenge: base fill, a bright top edge catching
+     the light, a slightly darker bottom edge reading as the shadow it
+     casts on the track - the closest QSS gets to a real drop shadow. */
   background: palette(base);
   color: palette(text);
-  border: 1px solid rgba(@SHADOW_RGB@, 0.08);
-  border-top-color: rgba(255, 255, 255, 0.7);
-  font-weight: 500;
+  border: 1px solid rgba(@SHADOW_RGB@, 0.14);
+  border-top-color: rgba(255, 255, 255, 0.9);
+  border-bottom-color: rgba(@SHADOW_RGB@, 0.22);
+  font-weight: 600;
 }
 
 QTabBar::tab:selected:hover {
