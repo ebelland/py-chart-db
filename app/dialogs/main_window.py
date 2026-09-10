@@ -28,7 +28,7 @@ from app.data.sqlite_repo import SqliteRepo
 from app.widgets.chart_panel import ChartPanel
 from app.dialogs.create_chart_dialog import NewPlotTabDialog
 from app.dialogs.import_data_dialog import ImportDataDialog, is_importable
-from app.data.demo_project import copy_demo_project
+from app.data.demo_project import PROJECTS_DIR, copy_demo_project
 from app.dialogs.load_demo_dialog import LoadDemoDialog
 from app.dialogs.credits_dialog import CreditsDialog
 from app.dialogs.query_builder_dialog import QueryBuilderDialog
@@ -513,12 +513,16 @@ class MainWindow(QMainWindow):
         return found
 
     def _refresh_undo_item(self) -> None:
-        """Re-read the undo stack just before the menu is shown.
+        """Bring the Undo entry's text and enabled state up to date.
 
-        Rather than rebuilding the menu after every change: an operation
-        dialog applying its results, or a table deleted from the source
-        list, would each have to remember to. A menu that asks when it
-        opens cannot be out of date.
+        Wired to ``aboutToShow`` so the popup menu asks the moment it opens,
+        and also called straight after anything that records an undo entry -
+        because the native macOS menu bar does *not* emit ``aboutToShow`` for
+        its items, so on a Mac the show-time refresh never runs and the entry
+        would sit at whatever it was built as (disabled, at startup). The
+        callers are the few UI refresh points every change already funnels
+        through - _snapshot_descriptors, refresh, refresh2, _reload_tabs -
+        not every handler individually.
         """
         entries = self._repo.undo_entries() if self._repo is not None else []
         latest = entries[0] if entries else None
@@ -542,6 +546,7 @@ class MainWindow(QMainWindow):
         if self._repo is None:
             return
         self._repo.snapshot_for_undo(self._repo.DESCRIPTOR_TABLES, label=label)
+        self._refresh_undo_item()
 
     def _on_undo(self) -> None:
         """Take back the last recorded change, and show the result."""
@@ -968,6 +973,7 @@ class MainWindow(QMainWindow):
                     QSizePolicy.Policy.Expanding,
                 )
                 panel.delete_requested.connect(self._on_chart_panel_deleted)
+                panel.figure_edited.connect(self._refresh_undo_item)
                 # Clicking a point reports it in the status bar, which is the
                 # only surface in the window that can carry a transient line
                 # without moving anything else. It times out rather than
@@ -998,6 +1004,10 @@ class MainWindow(QMainWindow):
         """Refresh chart tabs after a chart is deleted from a local panel menu."""
         applogger.info("Chart deleted from panel menu (figure_id=%s)", figure_id)
         self._reload_tabs()
+        # Deleting the panel recorded an undo entry (ChartPanel.close); make
+        # the menu say so now rather than at a show-time signal the native
+        # macOS menu bar never sends.
+        self._refresh_undo_item()
 
     def _on_chart_tab_changed(self, index: int) -> None:
         """Rebind the properties control when the selected chart tab changes."""
@@ -1520,18 +1530,21 @@ class MainWindow(QMainWindow):
         demo and seeing it, for a file whose name already says what it is and
         that nobody is expected to keep - the same reasoning that lets a first
         run open straight into a fixed, well-known path with no dialog of its
-        own (see app.utils.startup.DEFAULT_DATABASE_NAME). Loading the same
-        demo again overwrites its previous copy in place, which is the point:
-        it puts back the pristine version rather than asking what to call a
-        second one. Someone who wants to keep a demo under its own name has
-        Save As for that once it is open, same as any other project.
+        own (see app.utils.startup.DEFAULT_DATABASE_NAME). The copy lands in
+        ``projects/`` beside the application (demo_project.PROJECTS_DIR), not
+        loose in the home directory: the copies are throwaway and one folder
+        holds all of them. Loading the same demo again overwrites its previous
+        copy in place, which is the point: it puts back the pristine version
+        rather than asking what to call a second one. Someone who wants to
+        keep a demo under its own name has Save As for that once it is open,
+        same as any other project.
         """
         picker = LoadDemoDialog(self)
         if not picker.exec() or picker.chosen is None:
             return
         demo = picker.chosen
 
-        target = Path.home() / demo.path_name
+        target = PROJECTS_DIR / demo.path_name
         applogger.info("Loading demo project %r into %s", demo.file_name, target)
         try:
             copy_demo_project(demo, target)
@@ -1654,6 +1667,7 @@ class MainWindow(QMainWindow):
         if id is not None and panel is not None:
             panel.reload()
             self._table_panel.reload()
+        self._refresh_undo_item()
 
     def refresh2(self):
         """Refresh active chart and data panes after series-operation Preview/Apply.
@@ -1678,6 +1692,7 @@ class MainWindow(QMainWindow):
             applogger.exception("Failed to refresh data panes after chart operation.")
 
         self._update_properties_for_current_chart()
+        self._refresh_undo_item()
 
     def _open_series_operation(
         self,

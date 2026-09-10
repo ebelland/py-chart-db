@@ -37,7 +37,12 @@ from app.styles.style import (
     create_toolbar_button,
 )
 from app.utils.config import get_section, get_value, update_section
-from app.utils.figure_metrics import CM_PER_INCH, figure_metrics_from_options
+from app.utils.figure_metrics import (
+    CM_PER_INCH,
+    DEFAULT_FIGURE_DPI,
+    DEFAULT_FIGURE_SIZE_IN,
+    figure_metrics_from_options,
+)
 from app.utils.hidpi import (
     apply_configured_dpi,
     canvas_pixel_ratio,
@@ -125,6 +130,12 @@ class ChartPanel(QFrame):
     """
 
     delete_requested = Signal(int)
+
+    #: Emitted after the panel itself writes an undo-recordable change to the
+    #: repository (a reference line dropped from the right-click menu). The
+    #: window listens so it can bring the Undo entry up to date - the native
+    #: macOS menu bar never asks on its own.
+    figure_edited = Signal()
 
     #: Emitted with a one-line description of whatever the user just clicked on
     #: in the chart. The panel has no status bar of its own, and deliberately
@@ -1177,6 +1188,7 @@ class ChartPanel(QFrame):
             "Added a %s reference line at %g on axis %s", orientation, value, axis_id
         )
         self.reload()
+        self.figure_edited.emit()
 
     # ------------------------------------------------------------------
     # Resize / zoom / background helpers
@@ -1889,8 +1901,11 @@ class ChartPanel(QFrame):
         renders instead of inheriting whatever the previously-opened figure
         left in this process-wide rcParams.
 
-        A figure with no metrics of its own leaves rcParams untouched, which
-        keeps figures saved before this change rendering exactly as they did.
+        A figure with no metrics of its own falls back to Matplotlib's own
+        defaults, *not* to whatever the last figure left in rcParams. Leaving
+        rcParams untouched meant a plain figure inherited the width, height
+        and dpi of the last figure that did carry metrics - so it rendered
+        oversized, and FIXED-mode "fit to width" then fitted that wrong size.
         """
         try:
             descriptor = self._repo.load_figure_descriptor(self._figure_id)
@@ -1899,11 +1914,13 @@ class ChartPanel(QFrame):
                 options if isinstance(options, dict) else None
             )
             if metrics is None:
-                return
+                width_in, height_in = DEFAULT_FIGURE_SIZE_IN
+                dpi = DEFAULT_FIGURE_DPI
+            else:
+                width_cm, height_cm, dpi = metrics
+                width_in = width_cm / CM_PER_INCH
+                height_in = height_cm / CM_PER_INCH
 
-            width_cm, height_cm, dpi = metrics
-            width_in = width_cm / CM_PER_INCH
-            height_in = height_cm / CM_PER_INCH
             rcParams["figure.figsize"] = [width_in, height_in]
             rcParams["figure.dpi"] = dpi
 
@@ -2188,6 +2205,20 @@ class ChartPanel(QFrame):
         self._canvas_late_sync_timer.stop()
 
         try:
+            # Before the delete opens its transaction: the undo store
+            # attaches its own database, which SQLite forbids mid-transaction.
+            # Every descriptor table, since the cascade takes the figure, its
+            # axes and their series together and undo has to bring back all
+            # three (todo.txt P2-11). Done here rather than in delete_figure
+            # so the operation dialogs' cleanup of an unapplied result figure
+            # does not leave a spurious entry behind. The label is a plain
+            # string, not translated - the same as delete_table's, so the two
+            # undo entries read the same way until both are localised.
+            title = self._repo.get_figure_title(self._figure_id)
+            self._repo.snapshot_for_undo(
+                self._repo.DESCRIPTOR_TABLES,
+                label=f"Delete figure '{title}'" if title else "Delete figure",
+            )
             self._repo.delete_figure(figure_id=self._figure_id)
             self._deleted = True
             self.delete_requested.emit(self._figure_id)

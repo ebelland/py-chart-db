@@ -49,6 +49,14 @@ SAMPLE_DATA_DIR: Path = REPO_ROOT / "sample data"
 #: that wants the demo set runs this module once to build it.
 DEMO_DIR: Path = REPO_ROOT / "demo"
 
+#: Where "Load demo" drops its working copy of a demo before opening it. A
+#: folder of its own beside the application rather than the home directory:
+#: the copies are throwaway (Load demo overwrites its own last copy in
+#: place), and one predictable place to find - or delete - all of them at
+#: once beats them scattered loose in ``~``. Not version-controlled, same as
+#: ``demo/``.
+PROJECTS_DIR: Path = REPO_ROOT / "projects"
+
 # A calm, print-friendly style applied to every figure in the demo.
 DEMO_STYLE = """
 figure.facecolor: FBFBFD

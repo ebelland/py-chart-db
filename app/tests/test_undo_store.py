@@ -400,6 +400,40 @@ def test_a_deleted_series_comes_back(window) -> None:
     assert len(built._repo.get_series(axis_id)) == 1
 
 
+def test_a_deleted_figure_comes_back(window) -> None:
+    built, axis_id, _series_id = window
+    panel = built._current_chart_panel()
+    figure_id = int(panel.figure_id)
+
+    panel.close()
+    assert built._repo.load_figure_descriptor(figure_id) is None
+
+    built._on_undo()
+
+    assert built._repo.load_figure_descriptor(figure_id) is not None
+    assert len(built._repo.get_series(axis_id)) == 1
+
+
+def test_deleting_a_figure_enables_the_undo_entry_without_a_show_signal(window) -> None:
+    """The native macOS menu bar never emits aboutToShow, so the entry has to
+    be brought up to date the moment the change lands, not when the menu opens."""
+    built, _axis_id, _series_id = window
+
+    built._current_chart_panel().close()
+
+    assert [a.text() for a in built._undo_actions()] == ["Undo: Delete figure 'F'"]
+    assert all(a.isEnabled() for a in built._undo_actions())
+
+
+def test_deleting_a_table_enables_the_undo_entry_without_a_show_signal(window) -> None:
+    built, _axis_id, _series_id = window
+
+    built._repo.delete_table("w")
+    built.refresh2()  # what TableListPanel.update_parent calls after a delete
+
+    assert all(a.isEnabled() for a in built._undo_actions())
+
+
 def test_an_axis_edit_comes_back(window) -> None:
     built, axis_id, _series_id = window
     built._on_axis_options_requested({"axis_id": axis_id, "x_scale": "log"})

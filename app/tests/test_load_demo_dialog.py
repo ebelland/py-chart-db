@@ -6,10 +6,10 @@ rebuilding one demo that got edited, or looking at a subject that was skipped
 the first time - without starting the application over.
 
 Loading a demo used to ask where to save it first, exactly like "New" does.
-It no longer does: a demo is a fixed, disposable file by name, loaded
-straight into the home directory - the one place every desktop agrees the
-user can write to without asking, and the same reasoning that lets a first
-run open with no dialog at all (see app.utils.startup.DEFAULT_DATABASE_NAME).
+It no longer does: a demo is a fixed, disposable file by name, copied into
+``projects/`` beside the application (demo_project.PROJECTS_DIR) and opened -
+the same reasoning that lets a first run open with no dialog at all (see
+app.utils.startup.DEFAULT_DATABASE_NAME).
 """
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ import pytest
 
 from app.data import demo_project
 from app.data.demo_project import DEMO_PROJECTS, build_demo_project
+from app.dialogs import main_window as main_window_module
 from app.dialogs.load_demo_dialog import LoadDemoDialog
 
 
@@ -112,7 +113,7 @@ def test_choosing_a_demo_loads_it_with_no_save_dialog(
     chosen = DEMO_PROJECTS[9]
     build_demo_project(tmp_path / "source" / chosen.path_name, chosen.figures)
     monkeypatch.setattr(demo_project, "DEMO_DIR", tmp_path / "source")
-    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+    monkeypatch.setattr(main_window_module, "PROJECTS_DIR", tmp_path / "projects")
 
     monkeypatch.setattr(
         LoadDemoDialog, "exec", lambda self: (setattr(self, "chosen", chosen) or True)
@@ -120,7 +121,7 @@ def test_choosing_a_demo_loads_it_with_no_save_dialog(
 
     window._on_load_demo()
 
-    target = tmp_path / chosen.path_name
+    target = tmp_path / "projects" / chosen.path_name
     assert target.exists()
     assert window._db_path == target
 
@@ -133,13 +134,13 @@ def test_loading_the_same_demo_again_overwrites_its_previous_copy(
     chosen = DEMO_PROJECTS[0]
     build_demo_project(tmp_path / "source" / chosen.path_name, chosen.figures)
     monkeypatch.setattr(demo_project, "DEMO_DIR", tmp_path / "source")
-    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+    monkeypatch.setattr(main_window_module, "PROJECTS_DIR", tmp_path / "projects")
     monkeypatch.setattr(
         LoadDemoDialog, "exec", lambda self: (setattr(self, "chosen", chosen) or True)
     )
 
     window._on_load_demo()
-    target = tmp_path / chosen.path_name
+    target = tmp_path / "projects" / chosen.path_name
     edited_marker = b"not a real database, just proving the file got replaced"
     target.write_bytes(edited_marker)
 
