@@ -67,7 +67,31 @@ class SeriesPropertiesWidget(BaseProperties):
         self._series_map: dict[int, SeriesDescriptorLike] = {}
 
         self._build_ui()
+        self._install_auto_apply(self._emit_series_options_requested)
+        self._connect_auto_apply()
         self.clear_connected_figure()
+
+    def _connect_auto_apply(self) -> None:
+        """Apply a style edit a short moment after the last control change.
+
+        ``_series_combo`` is left out: it picks which series is shown, not
+        an edit to one, and its handler repopulates the form under the
+        reload guard anyway.
+        """
+        self._legend_label_edit.textEdited.connect(self._queue_auto_apply)
+        self._sql_query_edit.textChanged.connect(self._queue_auto_apply)
+        for check in (
+            self._visible_check,
+            self._show_in_legend_check,
+            self._sort_x_check,
+        ):
+            check.toggled.connect(self._queue_auto_apply)
+        for combo in (
+            self._linestyle_combo,
+            self._marker_combo,
+            self._color_combo,
+        ):
+            combo.currentIndexChanged.connect(self._queue_auto_apply)
 
     def _build_ui(self) -> None:
         """Build all UI sections inside a resizable scrollable container.
@@ -159,12 +183,9 @@ class SeriesPropertiesWidget(BaseProperties):
             action=self._on_delete_clicked,
             layout=row_layout,
         )
-        self._btn_apply = create_action_button(
-            parent=row,
-            action_id="apply",
-            action=self._emit_series_options_requested,
-            layout=row_layout,
-        )
+        # No Apply button: every style control applies itself a short moment
+        # after it changes (see _connect_auto_apply). Up / Down / Delete stay
+        # - they reorder and remove series, not commit the form.
 
         row_layout.addStretch(1)
         layout.addWidget(row)
@@ -290,7 +311,7 @@ class SeriesPropertiesWidget(BaseProperties):
         """Limit the series selector to one axis."""
         self._current_axis_id = int(axis_id) if axis_id is not None else None
         if self._repo is not None and self._figure_id is not None:
-            self._reload_from_descriptor()
+            self.reload_controls()
 
     def current_axis_id(self) -> int | None:
         """Return the current axis id filter."""
@@ -433,40 +454,42 @@ class SeriesPropertiesWidget(BaseProperties):
             self._clear_series_fields()
             return
 
-        self._current_series_id = int(series_desc.id)
-        style = self._series_style(series_desc)
+        with self._reloading_controls():
+            self._current_series_id = int(series_desc.id)
+            style = self._series_style(series_desc)
 
-        self._legend_label_edit.setText(str(style.get("label", "") or ""))
-        self._sql_query_edit.setPlainText(
-            str(getattr(series_desc, "sql_query", "") or "")
-        )
-        self._visible_check.setChecked(bool(style.get("visible", True)))
-        self._show_in_legend_check.setChecked(
-            bool(style.get("show_in_legend", True))
-        )
-        self._sort_x_check.setChecked(bool(style.get("sort_x", False)))
+            self._legend_label_edit.setText(str(style.get("label", "") or ""))
+            self._sql_query_edit.setPlainText(
+                str(getattr(series_desc, "sql_query", "") or "")
+            )
+            self._visible_check.setChecked(bool(style.get("visible", True)))
+            self._show_in_legend_check.setChecked(
+                bool(style.get("show_in_legend", True))
+            )
+            self._sort_x_check.setChecked(bool(style.get("sort_x", False)))
 
-        self._set_combo_value(
-            self._linestyle_combo,
-            str(style.get("linestyle", DEFAULT) or DEFAULT),
-        )
-        self._set_combo_value(
-            self._marker_combo,
-            str(style.get("marker", DEFAULT) or DEFAULT),
-        )
-        self._set_color_value(str(style.get("color", "") or ""))
+            self._set_combo_value(
+                self._linestyle_combo,
+                str(style.get("linestyle", DEFAULT) or DEFAULT),
+            )
+            self._set_combo_value(
+                self._marker_combo,
+                str(style.get("marker", DEFAULT) or DEFAULT),
+            )
+            self._set_color_value(str(style.get("color", "") or ""))
 
     def _clear_series_fields(self) -> None:
         """Clear form fields for the no-selection state."""
-        self._current_series_id = None
-        self._legend_label_edit.clear()
-        self._sql_query_edit.clear()
-        self._visible_check.setChecked(True)
-        self._show_in_legend_check.setChecked(True)
-        self._sort_x_check.setChecked(False)
-        self._linestyle_combo.setCurrentIndex(0)
-        self._marker_combo.setCurrentIndex(0)
-        self._color_combo.setCurrentIndex(0)
+        with self._reloading_controls():
+            self._current_series_id = None
+            self._legend_label_edit.clear()
+            self._sql_query_edit.clear()
+            self._visible_check.setChecked(True)
+            self._show_in_legend_check.setChecked(True)
+            self._sort_x_check.setChecked(False)
+            self._linestyle_combo.setCurrentIndex(0)
+            self._marker_combo.setCurrentIndex(0)
+            self._color_combo.setCurrentIndex(0)
 
     def _set_color_value(self, value: str) -> None:
         """Select a color by hex value or Matplotlib color name."""
@@ -502,7 +525,6 @@ class SeriesPropertiesWidget(BaseProperties):
             self._btn_move_up,
             self._btn_move_down,
             self._btn_delete,
-            self._btn_apply,
             self._legend_label_edit,
             self._sql_query_edit,
             self._visible_check,

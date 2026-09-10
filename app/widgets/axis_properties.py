@@ -111,7 +111,40 @@ class AxisPropertiesWidget(BaseProperties):
         # Expanding/Expanding already set by BaseProperties.
         self.setMinimumHeight(0)
         self._build_ui()
+        self._install_auto_apply(self._emit_axis_options_requested)
+        self._connect_auto_apply()
         self.clear_connected_figure()
+
+    def _connect_auto_apply(self) -> None:
+        """Apply an axis edit a short moment after the last control change.
+
+        ``_axis_combo`` is left out - it selects which axis is shown, not an
+        edit to one. Every form control is populated inside
+        ``_form_signal_blocker`` on a reload, so the change signals only ever
+        reach the timer when the user is the one turning the control.
+        """
+        widgets = (
+            self._axis_label_edit,
+            self._x_label_edit,
+            self._y_label_edit,
+            self._z_label_edit,
+            self._projection_combo,
+            self._sharex_check,
+            self._sharey_check,
+            self._hide_axis_check,
+        ) + self._extended_option_widgets()
+
+        for widget in widgets:
+            if isinstance(widget, QLineEdit):
+                widget.textEdited.connect(self._queue_auto_apply)
+            elif isinstance(widget, QCheckBox):
+                widget.toggled.connect(self._queue_auto_apply)
+            elif isinstance(widget, QComboBox):
+                widget.currentIndexChanged.connect(self._queue_auto_apply)
+            elif isinstance(widget, QSpinBox):
+                widget.valueChanged.connect(self._queue_auto_apply)
+            elif isinstance(widget, QDoubleSpinBox):
+                widget.valueChanged.connect(self._queue_auto_apply)
 
     # ------------------------------------------------------------------
     # Setup helpers
@@ -195,12 +228,9 @@ class AxisPropertiesWidget(BaseProperties):
                                action=self._on_delete_clicked,
                                layout=action_layout,
                            )
-        self._btn_apply = create_action_button(
-                              parent=action_row,
-                              action_id="apply",
-                              action=self._emit_axis_options_requested,
-                              layout=action_layout,
-                          )
+        # No Apply button: every field applies itself a short moment after
+        # it changes (see _connect_auto_apply). Up / Down / Delete stay -
+        # they reorder and remove axes, not commit the form.
         action_layout.addStretch(1)
         layout.addWidget(action_row)
 
@@ -1052,7 +1082,6 @@ class AxisPropertiesWidget(BaseProperties):
             self._sharex_check,
             self._sharey_check,
             self._hide_axis_check,
-            self._btn_apply,
             self._renderer_value,
             self._tabs,
         )

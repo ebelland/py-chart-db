@@ -86,6 +86,9 @@ class OverlayPropertiesWidget(BaseProperties):
         super().__init__(parent)
         self._current_axis_id: int | None = None
         self._build_ui()
+        self._install_auto_apply(self._emit_overlay_options_requested)
+        self._annotations_table.itemChanged.connect(self._queue_auto_apply)
+        self._lines_table.itemChanged.connect(self._queue_auto_apply)
         self.clear_connected_figure()
 
     # ------------------------------------------------------------------
@@ -270,7 +273,7 @@ class OverlayPropertiesWidget(BaseProperties):
     def set_axis(self, axis_id: int | None) -> None:
         """Follow the axis the Axis properties panel has selected."""
         self._current_axis_id = None if axis_id is None else int(axis_id)
-        self._reload_from_descriptor()
+        self.reload_controls()
 
     def current_axis_id(self) -> int | None:
         return self._current_axis_id
@@ -367,40 +370,47 @@ class OverlayPropertiesWidget(BaseProperties):
     # ------------------------------------------------------------------
     def _add_annotation_row(self, annotation: dict[str, Any] | None = None) -> None:
         annotation = dict(annotation or {})
-        row = self._annotations_table.rowCount()
-        self._annotations_table.insertRow(row)
+        # Inserting the row and filling its default cells fires itemChanged;
+        # the guard keeps that from queuing an apply for a row the user has
+        # not touched yet. Their first cell edit is what commits it.
+        with self._reloading_controls():
+            row = self._annotations_table.rowCount()
+            self._annotations_table.insertRow(row)
 
-        combo = QComboBox(self._annotations_table)
-        for annotation_type in ANNOTATION_TYPES:
-            combo.addItem(annotation_type, annotation_type)
-        index = combo.findData(str(annotation.get("type", "text")))
-        combo.setCurrentIndex(index if index >= 0 else 0)
+            combo = QComboBox(self._annotations_table)
+            for annotation_type in ANNOTATION_TYPES:
+                combo.addItem(annotation_type, annotation_type)
+            index = combo.findData(str(annotation.get("type", "text")))
+            combo.setCurrentIndex(index if index >= 0 else 0)
+            combo.currentIndexChanged.connect(self._queue_auto_apply)
 
-        self._annotations_table.setItem(row, 0, self._item(annotation.get("x", 0.0)))
-        self._annotations_table.setItem(row, 1, self._item(annotation.get("y", 0.0)))
-        self._annotations_table.setCellWidget(row, 2, combo)
-        self._annotations_table.setItem(row, 3, self._item(annotation.get("text", "")))
-        self._annotations_table.setItem(
-            row, 4, self._item(self._kwargs_text(annotation.get("kwargs")))
-        )
+            self._annotations_table.setItem(row, 0, self._item(annotation.get("x", 0.0)))
+            self._annotations_table.setItem(row, 1, self._item(annotation.get("y", 0.0)))
+            self._annotations_table.setCellWidget(row, 2, combo)
+            self._annotations_table.setItem(row, 3, self._item(annotation.get("text", "")))
+            self._annotations_table.setItem(
+                row, 4, self._item(self._kwargs_text(annotation.get("kwargs")))
+            )
 
     def _add_line_row(self, line: dict[str, Any] | None = None) -> None:
         line = dict(line or {})
-        row = self._lines_table.rowCount()
-        self._lines_table.insertRow(row)
+        with self._reloading_controls():
+            row = self._lines_table.rowCount()
+            self._lines_table.insertRow(row)
 
-        combo = QComboBox(self._lines_table)
-        for label, value in LINE_ORIENTATIONS:
-            combo.addItem(_(label), value)
-        stored = str(line.get("orientation", "vertical") or "vertical").lower()
-        index = combo.findData("horizontal" if stored.startswith("h") else "vertical")
-        combo.setCurrentIndex(index if index >= 0 else 0)
+            combo = QComboBox(self._lines_table)
+            for label, value in LINE_ORIENTATIONS:
+                combo.addItem(_(label), value)
+            stored = str(line.get("orientation", "vertical") or "vertical").lower()
+            index = combo.findData("horizontal" if stored.startswith("h") else "vertical")
+            combo.setCurrentIndex(index if index >= 0 else 0)
+            combo.currentIndexChanged.connect(self._queue_auto_apply)
 
-        self._lines_table.setCellWidget(row, 0, combo)
-        self._lines_table.setItem(row, 1, self._item(line.get("value", 0.0)))
-        self._lines_table.setItem(
-            row, 2, self._item(self._kwargs_text(line.get("kwargs")))
-        )
+            self._lines_table.setCellWidget(row, 0, combo)
+            self._lines_table.setItem(row, 1, self._item(line.get("value", 0.0)))
+            self._lines_table.setItem(
+                row, 2, self._item(self._kwargs_text(line.get("kwargs")))
+            )
 
     def _kwargs_text(self, kwargs: Any) -> str:
         """Render a stored kwargs mapping back into the JSON column."""
@@ -420,8 +430,11 @@ class OverlayPropertiesWidget(BaseProperties):
         rows = {index.row() for index in table.selectedIndexes()}
         if not rows and table.currentRow() >= 0:
             rows = {table.currentRow()}
+        if not rows:
+            return
         for row in sorted(rows, reverse=True):
             table.removeRow(row)
+        self._queue_auto_apply()
 
     def _cell_text(self, table: QTableWidget, row: int, column: int) -> str:
         item = table.item(row, column)

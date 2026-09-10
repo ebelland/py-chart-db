@@ -205,7 +205,7 @@ def _twin_targets(axes: list[AxisDescriptor]) -> dict[int, int]:
     for axis_desc in axes:
         options = axis_desc.options if isinstance(axis_desc.options, dict) else {}
         raw_target = options.get("twin_of")
-        if isinstance(raw_target, bool):
+        if raw_target is None or isinstance(raw_target, bool):
             continue
         try:
             target_id = int(raw_target)

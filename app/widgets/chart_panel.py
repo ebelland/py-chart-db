@@ -16,7 +16,7 @@ from typing import Any, Final
 
 from PySide6.QtCore import QEvent, QObject, QPoint, QSize, Qt, QTimer, Signal
 import PySide6.QtGui
-from PySide6.QtWidgets import QApplication, QAbstractScrollArea, QFileDialog, QFrame, QHBoxLayout, QLabel, QMenu, QScrollArea, QSizePolicy, QSlider, QSplitter, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QAbstractScrollArea, QFileDialog, QFrame, QHBoxLayout, QInputDialog, QLabel, QMenu, QScrollArea, QSizePolicy, QSlider, QSplitter, QToolButton, QVBoxLayout, QWidget
 
 import numpy as np
 from matplotlib import rcParams
@@ -835,7 +835,7 @@ class ChartPanel(QFrame):
             # background no longer matches what is on screen.
             self._hover_background = None
 
-        self._hover_annotation = axes.annotate(
+        annotation = axes.annotate(
             "",
             xy=(0.0, 0.0),
             xytext=(12, 12),
@@ -848,9 +848,10 @@ class ChartPanel(QFrame):
             arrowprops={"arrowstyle": "-", "color": "#808080", "linewidth": 0.8},
             annotation_clip=False,
         )
-        self._hover_annotation.set_visible(False)
+        annotation.set_visible(False)
+        self._hover_annotation = annotation
         self._hover_axes = axes
-        return self._hover_annotation
+        return annotation
 
     def _blit_hover(self, axes: Any, annotation: Any) -> None:
         """Repaint only the annotation, over a cached copy of the chart.
@@ -1122,6 +1123,19 @@ class ChartPanel(QFrame):
             key=None,
             action=lambda: self._add_reference_line(axis_id, "horizontal", y_value),
         )
+        create_menu_item(
+            parent=self,
+            menu=menu,
+            icon="add",
+            checkable=False,
+            text=_("Add annotation here…"),
+            tooltip=_("A text note pinned to this point: x = {x}, y = {y}.").format(
+                x=axis_text(axes.xaxis, x_value),
+                y=axis_text(axes.yaxis, y_value),
+            ),
+            key=None,
+            action=lambda: self._add_annotation(axis_id, x_value, y_value),
+        )
         return menu
 
     def _axis_at(self, pos: QPoint) -> tuple[int, Any, float, float] | None:
@@ -1186,6 +1200,48 @@ class ChartPanel(QFrame):
 
         applogger.info(
             "Added a %s reference line at %g on axis %s", orientation, value, axis_id
+        )
+        self.reload()
+        self.figure_edited.emit()
+
+    def _add_annotation(self, axis_id: int, x_value: float, y_value: float) -> None:
+        """Prompt for text and pin a note to the clicked point, then redraw.
+
+        Writes the same "annotations" key the Overlay properties panel edits,
+        so a note dropped here can be restyled, moved or deleted there - see
+        BaseAxisRenderer.apply_annotations. Only the position and the text are
+        decided here; the type is a plain text note.
+        """
+        text, accepted = QInputDialog.getText(
+            self, _("Add annotation"), _("Annotation text:")
+        )
+        if not accepted or not text.strip():
+            return
+
+        try:
+            self._repo.snapshot_for_undo(
+                self._repo.DESCRIPTOR_TABLES,
+                label=_("Add annotation"),
+            )
+            options = dict(self._repo.get_axis_options(int(axis_id)) or {})
+            annotations = list(options.get("annotations") or [])
+            annotations.append(
+                {
+                    "x": float(x_value),
+                    "y": float(y_value),
+                    "type": "text",
+                    "text": text.strip(),
+                    "kwargs": {},
+                }
+            )
+            options["annotations"] = annotations
+            self._repo.set_axis_options(int(axis_id), options)
+        except Exception:  # noqa: BLE001
+            applogger.exception("Could not add an annotation.")
+            return
+
+        applogger.info(
+            "Added an annotation at (%g, %g) on axis %s", x_value, y_value, axis_id
         )
         self.reload()
         self.figure_edited.emit()

@@ -18,10 +18,17 @@ briefly rendered at its empty-widget size (22x22) instead of its content's.
 """
 from __future__ import annotations
 
-from typing import Any, Callable
+from contextlib import contextmanager
+from typing import Any, Callable, Iterator
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QSizePolicy, QWidget
+
+#: How long the editor waits after the last control change before it applies
+#: the edit on its own. Long enough that a slider drag or a burst of
+#: keystrokes lands as one apply (and one undo entry); short enough that the
+#: chart still feels like it is following the control.
+AUTO_APPLY_DELAY_MS: int = 400
 
 
 class BaseProperties(QWidget):
@@ -61,6 +68,69 @@ class BaseProperties(QWidget):
         self._figure: Any | None = None
         self._redraw_callback: Callable[[], None] | None = None
 
+        # Auto-apply: a subclass calls _install_auto_apply() with the method
+        # that commits its edit, then routes every editable control's change
+        # signal through _queue_auto_apply. The edit then applies itself a
+        # short moment after the last change, so the Apply button is a
+        # shortcut rather than a requirement.
+        self._auto_apply_timer = QTimer(self)
+        self._auto_apply_timer.setSingleShot(True)
+        self._auto_apply_timer.setInterval(AUTO_APPLY_DELAY_MS)
+        self._auto_apply_callback: Callable[[], None] | None = None
+        #: >0 while the controls are being populated from a descriptor, so the
+        #: setValue/setChecked/setCurrentIndex calls that reload does are not
+        #: mistaken for the user editing.
+        self._reloading_depth = 0
+
+    def _install_auto_apply(self, callback: Callable[[], None]) -> None:
+        """Register the method that commits this editor's pending edit."""
+        self._auto_apply_callback = callback
+        self._auto_apply_timer.timeout.connect(self._run_auto_apply)
+
+    @contextmanager
+    def _reloading_controls(self) -> Iterator[None]:
+        """Suppress auto-apply while the block repopulates the controls."""
+        self._reloading_depth += 1
+        try:
+            yield
+        finally:
+            self._reloading_depth -= 1
+        self._cancel_auto_apply()
+
+    def reload_controls(self) -> None:
+        """Repopulate the editor from its descriptor without auto-applying.
+
+        The entry point every external caller uses instead of
+        ``_reload_from_descriptor`` directly - it brackets the reload so the
+        programmatic control updates inside it do not queue an apply.
+        """
+        with self._reloading_controls():
+            self._reload_from_descriptor()
+
+    def _queue_auto_apply(self, *_ignored: Any) -> None:
+        """(Re)start the countdown to an automatic apply.
+
+        Ignores its arguments so it can be connected straight to Qt signals
+        that pass a value (valueChanged, currentIndexChanged, toggled). Does
+        nothing until a figure is connected or while the controls are being
+        reloaded.
+        """
+        if (
+            self._auto_apply_callback is None
+            or self._figure_id is None
+            or self._reloading_depth
+        ):
+            return
+        self._auto_apply_timer.start()
+
+    def _cancel_auto_apply(self) -> None:
+        """Drop a pending auto-apply - the edit target is changing."""
+        self._auto_apply_timer.stop()
+
+    def _run_auto_apply(self) -> None:
+        if self._auto_apply_callback is not None and self._figure_id is not None:
+            self._auto_apply_callback()
+
     def set_connected_figure(
         self,
         repo: Any,
@@ -83,7 +153,7 @@ class BaseProperties(QWidget):
         self._figure = figure
         self._redraw_callback = redraw_callback
         self._before_reload()
-        self._reload_from_descriptor()
+        self.reload_controls()
 
     def _before_reload(self) -> None:
         """Run right after connecting, right before the first reload.
@@ -106,6 +176,7 @@ class BaseProperties(QWidget):
         the rest itself - exactly what each already did before this existed,
         just without repeating these four lines to get there.
         """
+        self._cancel_auto_apply()
         self._repo = None
         self._figure_id = None
         self._figure = None

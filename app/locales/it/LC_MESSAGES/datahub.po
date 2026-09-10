@@ -4564,3 +4564,15 @@ msgstr "Una linea lungo tutta l'area del grafico, a questa y."
 
 msgid "Add {orientation} line"
 msgstr "Aggiungi linea {orientation}"
+
+
+msgid "Add annotation here…"
+msgstr "Aggiungi annotazione qui…"
+
+
+msgid "A text note pinned to this point: x = {x}, y = {y}."
+msgstr "Una nota di testo fissata a questo punto: x = {x}, y = {y}."
+
+
+msgid "Annotation text:"
+msgstr "Testo dell'annotazione:"

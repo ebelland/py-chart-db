@@ -224,7 +224,36 @@ class FigurePropertiesWidget(BaseProperties):
 
         self._apply_persisted_metrics_to_rcparams()
         self._build_ui()
+        self._install_auto_apply(self._apply_all)
+        self._connect_auto_apply()
         self.clear_connected_figure()
+
+    def _connect_auto_apply(self) -> None:
+        """Apply an edit a short moment after the last control change.
+
+        The style, layout-preset and display combos are left out: each
+        already applies itself through its own handler, and the layout
+        preset in particular is a one-shot rearrangement that deliberately
+        does not ride on the panel's apply.
+        """
+        self._name_edit.textEdited.connect(self._queue_auto_apply)
+        for combo in (
+            self._nrows_combo,
+            self._ncols_combo,
+            self._fig_layout_mode,
+            self._downsample_combo,
+        ):
+            combo.currentIndexChanged.connect(self._queue_auto_apply)
+        for spin in (
+            self._fig_dpi,
+            self._fig_width_cm,
+            self._fig_height_cm,
+            self._shared_vspace,
+            self._shared_hspace,
+            *self._margin_spins.values(),
+        ):
+            spin.valueChanged.connect(self._queue_auto_apply)
+        self._fig_frameon.toggled.connect(self._queue_auto_apply)
 
     def _shared_space_spin(self, parent: QWidget) -> QDoubleSpinBox:
         """A spin box for one shared-axis gap, in Matplotlib's own units.
@@ -307,12 +336,9 @@ class FigurePropertiesWidget(BaseProperties):
                              action=self._edit_current_style,
                              layout=style_buttons_lay,
                          )
-        self._btn_apply = create_action_button(
-                              parent=style_buttons_row,
-                              action_id="apply",
-                              action=self._apply_all,
-                              layout=style_buttons_lay,
-                          )
+        # No Apply button: every control on this panel applies itself a
+        # short moment after it changes (see _connect_auto_apply). Reload
+        # and Edit stay - they are style actions, not "commit the form".
 
         style_buttons_lay.addStretch(1)
         style_section_lay.addWidget(style_buttons_row)
@@ -703,7 +729,6 @@ class FigurePropertiesWidget(BaseProperties):
             self._fig_frameon,
             self._fig_layout_mode,
             self._downsample_combo,
-            self._btn_apply,
         ):
             widget.setEnabled(enabled)
 
@@ -1169,14 +1194,21 @@ class FigurePropertiesWidget(BaseProperties):
         Called before a render rather than once at startup: rcParams is global
         and every figure wants a different answer, so the value has to be set
         from the descriptor each time a figure becomes the current one.
+
+        A figure with no metrics of its own resets rcParams to Matplotlib's
+        defaults rather than leaving the previous figure's size in place -
+        selecting a plain figure after one with an explicit large size used
+        to push that large size onto the plain figure's canvas.
         """
         metrics = figure_metrics_from_options(self._figure_options())
         if metrics is None:
-            return
+            width_in, height_in = DEFAULT_FIGURE_SIZE_IN
+            dpi = DEFAULT_FIGURE_DPI
+        else:
+            width_cm, height_cm, dpi = metrics
+            width_in = float(width_cm) / CM_PER_INCH
+            height_in = float(height_cm) / CM_PER_INCH
 
-        width_cm, height_cm, dpi = metrics
-        width_in = float(width_cm) / CM_PER_INCH
-        height_in = float(height_cm) / CM_PER_INCH
         if width_in > 0.0 and height_in > 0.0:
             rcParams["figure.figsize"] = [width_in, height_in]
         if dpi > 0.0:
