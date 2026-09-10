@@ -386,54 +386,44 @@ QToolButton#zoom_fitButton:hover {
 }
 
 /* -------------------------------
-   Tabs — Finder document tabs.
+   Tabs — Liquid Glass segmented style.
 
-   Qt's macOS style draws segmented-control tabs, which is the
-   right look for a *settings* tab bar but not for a document tab
-   bar like Finder's or Safari's.  Finder tabs are: a full-width
-   strip the height of a toolbar row, tabs separated by single
-   hairlines with no gap and no rounded pills, the selected tab
-   reading as the window surface continuing upwards while the rest
-   sit on a slightly recessed bar, and a hairline closing the strip
-   underneath.
+   macOS 26 draws tab strips and segmented controls as a soft rounded
+   track with the active segment lifted onto a floating "glass" lozenge:
+   generous rounding, no hairline dividers between segments, a bright top
+   edge catching the light and a faint shadow beneath. QSS cannot blur
+   what is behind the strip, so the track stays transparent and the glass
+   is carried by the lozenge's rounding, its hairline edge and a lit top
+   border.
 
-   These rules are intentionally NOT scoped to #chartTabs: applying
-   one tab look to every QTabWidget is what makes the chart tabs
-   and the axis-properties tabs agree, which is the point.
+   Not scoped to #chartTabs: one look for the chart document tabs and the
+   small property-panel tabs both, which is the point.
 -------------------------------- */
 
 QTabWidget::pane {
   border: none;
-  border-top: 1px solid rgba(@SHADOW_RGB@, 0.12);
+  border-top: 1px solid rgba(@SHADOW_RGB@, 0.08);
   top: -1px;
 }
 
 QTabBar {
-  background: rgba(@SHADOW_RGB@, 0.05);
+  background: transparent;
   qproperty-drawBase: 0;
 }
 
 QTabBar::tab {
-  background: rgba(@SHADOW_RGB@, 0.05);
+  background: rgba(@SHADOW_RGB@, 0.04);
   color: palette(mid);
-  border: none;
-  /* Finder separates tabs with a single hairline rather than
-     spacing them apart, so the divider is a right border and the
-     tabs sit flush against each other. */
-  border-right: 1px solid rgba(@SHADOW_RGB@, 0.12);
-  /* 13pt text in a 28px strip is the Finder tab height.  Padding
-     is horizontal-only so the strip height stays constant however
-     long the title is. */
-  padding: 6px 16px;
-  margin: 0;
-  /* Deliberately small.  A large min-width would put a floor under
-     the whole chart pane, which is exactly the negotiation the tab
-     bar was taken out of (see _configure_tabs). */
-  min-width: 60px;
-}
-
-QTabBar::tab:first {
-  border-left: 1px solid rgba(@SHADOW_RGB@, 0.12);
+  border: 1px solid transparent;
+  border-radius: 9px;
+  /* Horizontal-only padding keeps the strip height constant however
+     long a title is; the vertical gap comes from the margin so the
+     lozenge floats clear of the strip edges. */
+  padding: 4px 16px;
+  margin: 4px 2px;
+  /* Deliberately small: a large min-width would put a floor under the
+     whole chart pane (see _configure_tabs). */
+  min-width: 52px;
 }
 
 QTabBar::tab:hover:!selected {
@@ -442,15 +432,21 @@ QTabBar::tab:hover:!selected {
 }
 
 QTabBar::tab:selected {
-  /* The selected tab is the window surface continuing upwards. */
+  /* The floating glass lozenge: base fill, hairline edge, a lit top
+     border stepping the light down its face. */
   background: palette(base);
   color: palette(text);
+  border: 1px solid rgba(@SHADOW_RGB@, 0.08);
+  border-top-color: rgba(255, 255, 255, 0.7);
   font-weight: 500;
 }
 
-QTabBar::tab:only-one {
-  border-left: none;
-  border-right: none;
+QTabBar::tab:selected:hover {
+  background: palette(base);
+}
+
+QTabBar::tab:disabled {
+  color: palette(mid);
 }
 
 QTabBar::close-button {
@@ -458,17 +454,17 @@ QTabBar::close-button {
   margin: 0 2px;
 }
 
-/* The scroll arrows that appear when the titles do not fit: Finder
-   shows them as bare chevrons on the strip, not as bezelled
-   buttons. */
+/* Scroll chevrons that appear when the titles do not fit: bare and
+   rounded, no bezel, matching the lozenge rounding. */
 QTabBar QToolButton {
-  background: rgba(@SHADOW_RGB@, 0.05);
+  background: transparent;
   border: none;
-  border-left: 1px solid rgba(@SHADOW_RGB@, 0.12);
+  border-radius: 6px;
+  margin: 3px 1px;
 }
 
 QTabBar QToolButton:hover {
-  background: rgba(@SHADOW_RGB@, 0.09);
+  background: rgba(@SHADOW_RGB@, 0.06);
 }
 /* -------------------------------
    Activity rail (#activityRail)
