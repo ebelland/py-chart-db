@@ -34,11 +34,19 @@ FATTO 2026-09-10 (N-8) linee verticali/orizzontali dal menu contestuale
       chiave "lines" del pannello Overlay, ed e' annullabile come ogni
       altra modifica ai descrittori.
 
-N-3   attribute control charts (p, np, c, u)
-      The half of SPC N-1 does not cover. These plot a proportion or a count
-      rather than a measurement, so the limits are binomial/Poisson rather
-      than normal, and the limits vary per point when the sample size does.
-      Needs a "sample size" role alongside x and y, which is the real work.
+FATTO 2026-09-10 (N-3) carte di controllo per attributi (p, np, c, u)
+      Nuovo attribute_chart_dialog.py, gemello di control_chart_dialog. La
+      colonna dei conteggi e' il ruolo y; la dimensione del campione si
+      sceglie nel pannello Parametri (combo popolata dalle colonne della
+      serie selezionata) o dal ruolo "n"/"sample_size" se c'e' - la carta c
+      non ne ha bisogno. p ed u hanno limiti che cambiano punto per punto:
+      to_frame() scrive ucl/lcl come colonne per-punto e le linee sono
+      polilinee sui valori. LCL sempre troncato a 0. Solo la regola 1 di
+      Nelson (fuori dai limiti) e' attiva; una spunta "sequenze lunghe"
+      aggiunge la regola degli 8 punti dallo stesso lato, l'unica che tiene
+      senza zone A/B/C uguali. Numerica in funzioni pure (attribute_limits,
+      attribute_violations), verificata sugli esempi di Montgomery in
+      test_attribute_chart.py. Rilevata dallo scanner AST come le altre.
 
 ================================================================
 UI - reported while testing (2026-09)
