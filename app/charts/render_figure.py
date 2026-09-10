@@ -618,18 +618,24 @@ def _clear_redundant_shared_axis_labels(shared_axes: set[Any]) -> None:
 # ----------------------------------------------------------------------
 #: Figure option key for the row-count above which a series query is
 #: decimated before it ever reaches pandas - see _figure_downsample_threshold
-#: and SqliteRepo.downsampled_series_df. 0 (the default) disables it: an
-#: opt-in per figure, not a behaviour every render pays for.
+#: and SqliteRepo.downsampled_series_df. A figure that has never set it is
+#: decimated past DEFAULT_DOWNSAMPLE_THRESHOLD; an explicit 0 turns it off.
 OPT_DOWNSAMPLE_THRESHOLD = "downsample_threshold"
+
+#: Applied when a figure descriptor carries no downsample_threshold of its
+#: own. Keeps a redraw quick on a large series while leaving the shape of
+#: any ordinary curve untouched (it only decimates *past* this many points).
+DEFAULT_DOWNSAMPLE_THRESHOLD = 1_000
 
 
 def _figure_downsample_threshold(descriptor: FigureDescriptor) -> int:
     """Return this figure's configured downsample threshold, 0 if disabled."""
     options = descriptor.options if isinstance(descriptor.options, dict) else {}
+    raw = options.get(OPT_DOWNSAMPLE_THRESHOLD, DEFAULT_DOWNSAMPLE_THRESHOLD)
     try:
-        threshold = int(options.get(OPT_DOWNSAMPLE_THRESHOLD, 0) or 0)
+        threshold = int(raw)
     except (TypeError, ValueError):
-        return 0
+        return DEFAULT_DOWNSAMPLE_THRESHOLD
     return max(0, threshold)
 
 
@@ -1165,7 +1171,9 @@ def _apply_layout(figure: Figure, fig_desc: FigureDescriptor) -> None:
         }
     """
     options = fig_desc.options if isinstance(fig_desc.options, dict) else {}
-    raw_mode = str(options.get("layout_mode", "none") or "none").strip().lower()
+    # A figure that names no engine gets "tight": forgiving on the simple
+    # figures most charts are, and needs no per-figure margins block.
+    raw_mode = str(options.get("layout_mode", "tight") or "tight").strip().lower()
 
     if raw_mode == "constrained":
         _set_layout_engine_safely(figure, "constrained")

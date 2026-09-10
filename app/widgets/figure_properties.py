@@ -116,24 +116,29 @@ class FigurePropertiesWidget(BaseProperties):
     #: for every figure (see ``_create_axes_from_gridspec``), and it is what
     #: gives an axis its row_span/col_span.  The engine only decides how the
     #: resulting axes are spaced.
+    #: The engine a figure gets when its descriptor names none. Tight is
+    #: forgiving on the simple single- and few-axis figures most charts are,
+    #: and needs no per-figure margins block to look right.
+    DEFAULT_LAYOUT_MODE = "tight"
+
     LAYOUT_ENGINES: tuple[tuple[str, str, str], ...] = (
+        (
+            "Tight",
+            "tight",
+            "Automatic spacing that keeps axes, labels and titles from "
+            "overlapping. The default; best for simple grids.",
+        ),
         (
             "Constrained",
             "constrained",
-            "Fit axes, labels and titles without overlap. Best default for a "
-            "grid of plots.",
+            "A more thorough solver than Tight. Better for a dense grid of "
+            "plots or figure-level legends and colorbars.",
         ),
         (
             "Compressed",
             "compressed",
             "Like Constrained, but pulls fixed-aspect axes together and "
             "removes the gaps between them.",
-        ),
-        (
-            "Tight",
-            "tight",
-            "Older automatic spacing. Handles simple grids; can misplace "
-            "colorbars and figure-level legends.",
         ),
         (
             "Manual",
@@ -149,29 +154,35 @@ class FigurePropertiesWidget(BaseProperties):
     #: shows and should never happen invisibly. Above the threshold, a
     #: series query is decimated to roughly that many rows before it ever
     #: reaches pandas - see SqliteRepo.downsampled_series_df.
+    #: The threshold a figure gets when its descriptor names none. Enough
+    #: points to keep the shape of almost any curve, few enough that a
+    #: redraw stays quick even on a huge series.
+    DEFAULT_DOWNSAMPLE_THRESHOLD = 1_000
+
     DOWNSAMPLE_THRESHOLDS: tuple[tuple[str, int, str], ...] = (
         ("Off", 0, "Draw every point, however many a series has."),
         (
-            "10,000",
-            10_000,
-            "Decimate a series past 10,000 points to roughly that many, "
+            "100",
+            100,
+            "Decimate a series past 100 points to roughly that many, "
             "picked at even intervals.",
         ),
         (
-            "50,000",
-            50_000,
-            "Decimate a series past 50,000 points to roughly that many - "
+            "1,000",
+            1_000,
+            "Decimate a series past 1,000 points to roughly that many. "
+            "The default.",
+        ),
+        (
+            "10,000",
+            10_000,
+            "Decimate a series past 10,000 points to roughly that many - "
             "about where redraws start to feel slow.",
         ),
         (
             "100,000",
             100_000,
             "Decimate a series past 100,000 points to roughly that many.",
-        ),
-        (
-            "500,000",
-            500_000,
-            "Decimate a series past 500,000 points to roughly that many.",
         ),
     )
 
@@ -667,8 +678,8 @@ class FigurePropertiesWidget(BaseProperties):
         self._fig_width_cm.setValue(width_cm)
         self._fig_height_cm.setValue(height_cm)
         self._fig_frameon.setChecked(True)
-        self._fig_layout_mode.setCurrentIndex(0)
-        self._downsample_combo.setCurrentIndex(0)
+        self._select_layout_mode(self.DEFAULT_LAYOUT_MODE)
+        self._select_downsample_threshold(self.DEFAULT_DOWNSAMPLE_THRESHOLD)
         self._reset_layout_preset_combo()
         self._load_shared_spacing_into_spins({})
         self._load_margins_into_spins({})
@@ -757,8 +768,8 @@ class FigurePropertiesWidget(BaseProperties):
             self._fig_width_cm.setValue(width_cm)
             self._fig_height_cm.setValue(height_cm)
             self._fig_frameon.setChecked(True)
-            self._fig_layout_mode.setCurrentIndex(0)
-            self._downsample_combo.setCurrentIndex(0)
+            self._select_layout_mode(self.DEFAULT_LAYOUT_MODE)
+            self._select_downsample_threshold(self.DEFAULT_DOWNSAMPLE_THRESHOLD)
             self._reset_layout_preset_combo()
             self._load_shared_spacing_into_spins({})
             self._load_margins_into_spins({})
@@ -801,21 +812,19 @@ class FigurePropertiesWidget(BaseProperties):
         self._fig_frameon.setChecked(bool(fig_opts.get("frameon", True)))
 
         current_layout = str(
-            fig_opts.get("layout_mode", fig_opts.get("layout", "constrained"))
-            or "constrained"
+            fig_opts.get("layout_mode", fig_opts.get("layout", self.DEFAULT_LAYOUT_MODE))
+            or self.DEFAULT_LAYOUT_MODE
         )
 
-        self._fig_layout_mode.setCurrentIndex(
-            max(0, self._fig_layout_mode.findData(current_layout))
-        )
+        self._select_layout_mode(current_layout)
 
         try:
-            downsample_threshold = int(fig_opts.get(OPT_DOWNSAMPLE_THRESHOLD, 0) or 0)
+            downsample_threshold = int(
+                fig_opts.get(OPT_DOWNSAMPLE_THRESHOLD, self.DEFAULT_DOWNSAMPLE_THRESHOLD)
+            )
         except (TypeError, ValueError):
-            downsample_threshold = 0
-        self._downsample_combo.setCurrentIndex(
-            max(0, self._downsample_combo.findData(downsample_threshold))
-        )
+            downsample_threshold = self.DEFAULT_DOWNSAMPLE_THRESHOLD
+        self._select_downsample_threshold(downsample_threshold)
         # Nothing to restore: a preset is an action this panel performed
         # once, not a property the figure carries, so there is no "current
         # preset" a descriptor could tell us about.
@@ -1028,6 +1037,22 @@ class FigurePropertiesWidget(BaseProperties):
         finally:
             self._layout_preset_combo.blockSignals(False)
 
+    def _select_layout_mode(self, mode: str) -> None:
+        """Show *mode* in the layout combo, falling back to the default."""
+        index = self._fig_layout_mode.findData(str(mode or ""))
+        if index < 0:
+            index = max(0, self._fig_layout_mode.findData(self.DEFAULT_LAYOUT_MODE))
+        self._fig_layout_mode.setCurrentIndex(index)
+
+    def _select_downsample_threshold(self, threshold: int) -> None:
+        """Show *threshold* in the downsample combo, or the default."""
+        index = self._downsample_combo.findData(int(threshold))
+        if index < 0:
+            index = max(
+                0, self._downsample_combo.findData(self.DEFAULT_DOWNSAMPLE_THRESHOLD)
+            )
+        self._downsample_combo.setCurrentIndex(index)
+
     def _rcparams_dpi(self) -> int:
         try:
             dpi = int(round(float(rcParams.get("figure.dpi", DEFAULT_FIGURE_DPI))))
@@ -1163,7 +1188,9 @@ class FigurePropertiesWidget(BaseProperties):
         payload = {
             "name": self._name_edit.text().strip(),
             "frameon": bool(self._fig_frameon.isChecked()),
-            "layout_mode": str(self._fig_layout_mode.currentData() or "constrained"),
+            "layout_mode": str(
+                self._fig_layout_mode.currentData() or self.DEFAULT_LAYOUT_MODE
+            ),
             OPT_DOWNSAMPLE_THRESHOLD: int(self._downsample_combo.currentData() or 0),
             OPT_SHARED_VERTICAL_SPACE: float(self._shared_vspace.value()),
             OPT_SHARED_HORIZONTAL_SPACE: float(self._shared_hspace.value()),

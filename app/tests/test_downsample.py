@@ -8,8 +8,9 @@ SQLite: one COUNT(*), and, only past the configured threshold, one row kept
 out of every stride via ROW_NUMBER(), ordered by the query's own first
 column (the x role, by this application's own SELECT x, y FROM ... convention).
 
-Off by default (threshold 0): decimating a series changes what a plot shows,
-and that should never happen invisibly to a figure nobody configured for it.
+A figure that names no threshold gets DEFAULT_DOWNSAMPLE_THRESHOLD (1,000):
+enough to keep the shape of any ordinary curve, few enough that a redraw
+stays quick on a huge series. An explicit 0 turns decimation off entirely.
 """
 from __future__ import annotations
 
@@ -18,7 +19,11 @@ import pandas as pd
 import pytest
 from matplotlib.figure import Figure
 
-from app.charts.render_figure import OPT_DOWNSAMPLE_THRESHOLD, render_figure_from_descriptor
+from app.charts.render_figure import (
+    DEFAULT_DOWNSAMPLE_THRESHOLD,
+    OPT_DOWNSAMPLE_THRESHOLD,
+    render_figure_from_descriptor,
+)
 from app.data.sqlite_repo import SqliteRepo
 
 # `repo` (a fresh SqliteRepo at this test's tmp_db_path) comes from conftest.py.
@@ -79,14 +84,20 @@ def test_row_count_cache_follows_data_changes(repo: SqliteRepo) -> None:
 # reaches the drawn artist.
 # ----------------------------------------------------------------------
 def _figure_with_big_series(
-    repo: SqliteRepo, *, n: int, downsample_threshold: int = 0
+    repo: SqliteRepo, *, n: int, downsample_threshold: int | None = None
 ) -> int:
+    """*downsample_threshold* None leaves the option unset; an int (0 included)
+    writes it, so a test can exercise the unset default and an explicit 0."""
     _import_points(repo, n)
     figure_id = repo.create_figure_descriptor(
         name="F",
         nrows=1,
         ncols=1,
-        options={OPT_DOWNSAMPLE_THRESHOLD: downsample_threshold} if downsample_threshold else {},
+        options=(
+            {OPT_DOWNSAMPLE_THRESHOLD: downsample_threshold}
+            if downsample_threshold is not None
+            else {}
+        ),
     )
     axis_id = repo.create_axis_descriptor(
         figure_id=figure_id, axis_index=0, chart_type="Time Series",
@@ -100,7 +111,16 @@ def _figure_with_big_series(
     return int(figure_id)
 
 
-def test_a_figure_with_no_threshold_draws_every_point(repo: SqliteRepo) -> None:
+def test_a_figure_with_no_threshold_uses_the_default(repo: SqliteRepo) -> None:
+    figure_id = _figure_with_big_series(repo, n=5_000, downsample_threshold=None)
+    fig = Figure()
+    render_figure_from_descriptor(
+        figure=fig, descriptor=repo.load_figure_descriptor(figure_id), repo=repo
+    )
+    assert len(fig.axes[0].lines[0].get_xdata()) == DEFAULT_DOWNSAMPLE_THRESHOLD
+
+
+def test_an_explicit_zero_threshold_draws_every_point(repo: SqliteRepo) -> None:
     figure_id = _figure_with_big_series(repo, n=5_000, downsample_threshold=0)
     fig = Figure()
     render_figure_from_descriptor(
@@ -130,11 +150,11 @@ def test_a_series_already_under_the_threshold_is_unaffected(repo: SqliteRepo) ->
 # ----------------------------------------------------------------------
 # FigurePropertiesWidget: the threshold combo saves and reloads
 # ----------------------------------------------------------------------
-def test_downsample_combo_defaults_to_off(qapp) -> None:
+def test_downsample_combo_defaults_to_the_default_threshold(qapp) -> None:
     from app.widgets.figure_properties import FigurePropertiesWidget
 
     widget = FigurePropertiesWidget()
-    assert widget._downsample_combo.currentData() == 0
+    assert widget._downsample_combo.currentData() == DEFAULT_DOWNSAMPLE_THRESHOLD
 
 
 def test_downsample_combo_round_trips_through_save_and_reload(
@@ -147,7 +167,7 @@ def test_downsample_combo_round_trips_through_save_and_reload(
     widget = FigurePropertiesWidget()
     widget.set_connected_figure(repo, figure_id, Figure())
 
-    index = widget._downsample_combo.findData(50_000)
+    index = widget._downsample_combo.findData(100_000)
     assert index >= 0
     widget._downsample_combo.setCurrentIndex(index)
 
@@ -155,11 +175,11 @@ def test_downsample_combo_round_trips_through_save_and_reload(
     widget.figure_options_requested.connect(payload.update)
     widget._save_figure_options()
 
-    assert payload[OPT_DOWNSAMPLE_THRESHOLD] == 50_000
+    assert payload[OPT_DOWNSAMPLE_THRESHOLD] == 100_000
 
     # Simulate persistence the way MainWindow's handler does, then reload.
     repo.set_figure_options(figure_id, payload)
     widget.clear_connected_figure()
     widget.set_connected_figure(repo, figure_id, Figure())
 
-    assert widget._downsample_combo.currentData() == 50_000
+    assert widget._downsample_combo.currentData() == 100_000

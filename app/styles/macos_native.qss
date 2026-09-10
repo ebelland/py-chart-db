@@ -194,10 +194,41 @@ QAbstractButton[iconOnly="true"]:checked {
 }
 
 /* -------------------------------
+   Push buttons
+   AppKit's own push button cannot be given an accent fill without Qt
+   dropping the native bezel for the whole control - so the emphasis
+   buttons below are QSS-drawn.  A plain button next to one has to be
+   drawn the same way or it renders at a different height: a "Reload /
+   Edit / OK" row then has its OK button taller than its neighbours.
+   Same box model as the emphasis rule; only the fill and weight differ.
+-------------------------------- */
+
+QPushButton {
+  background: palette(button);
+  color: palette(button-text);
+  border: 1px solid rgba(@SHADOW_RGB@, 0.22);
+  border-radius: 6px;
+  padding: 4px 14px;
+  min-height: 15px;
+}
+
+QPushButton:hover {
+  background: rgba(@SHADOW_RGB@, 0.04);
+}
+
+QPushButton:pressed {
+  background: rgba(@SHADOW_RGB@, 0.10);
+}
+
+QPushButton:disabled {
+  color: palette(mid);
+  border-color: rgba(@SHADOW_RGB@, 0.10);
+}
+
+/* -------------------------------
    Emphasis buttons
    macOS marks the default button by filling it with the accent
    colour, which is exactly what primary= / accent= mean here.
-   The bezel, focus ring and metrics stay native.
 -------------------------------- */
 
 QPushButton[primary="true"],
@@ -208,6 +239,7 @@ QPushButton#primaryDialogButton {
   border: 1px solid palette(highlight);
   border-radius: 6px;
   padding: 4px 14px;
+  min-height: 15px;
   font-weight: 600;
 }
 
