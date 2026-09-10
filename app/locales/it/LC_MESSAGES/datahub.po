@@ -4576,3 +4576,19 @@ msgstr "Una nota di testo fissata a questo punto: x = {x}, y = {y}."
 
 msgid "Annotation text:"
 msgstr "Testo dell'annotazione:"
+
+
+msgid "Font"
+msgstr "Carattere"
+
+
+msgid "Size"
+msgstr "Dimensione"
+
+
+msgid "Annotations are stored in axis options. Color, font and size have their own columns; anything else goes in Kwargs JSON, for example: {\"xytext\": [10, 10], \"textcoords\": \"offset points\"}."
+msgstr "Le annotazioni sono salvate nelle opzioni dell'asse. Colore, carattere e dimensione hanno una colonna dedicata; tutto il resto va in Kwargs JSON, per esempio: {\"xytext\": [10, 10], \"textcoords\": \"offset points\"}."
+
+
+msgid "A vertical or horizontal line across the whole axes, at a value in data coordinates. Color and style have their own columns; anything else goes in Kwargs JSON, for example: {\"linewidth\": 2, \"label\": \"limit\"}."
+msgstr "Una linea verticale o orizzontale attraverso tutta l'area del grafico, a un valore in coordinate dati. Colore e stile hanno una colonna dedicata; tutto il resto va in Kwargs JSON, per esempio: {\"linewidth\": 2, \"label\": \"limit\"}."

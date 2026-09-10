@@ -23,6 +23,18 @@ underneath it, which is the difference from adding a two-point series that
 happens to look like a line. See todo.txt N-8, which asked for these from
 the chart's own context menu; the storage and the drawing are here, and
 the context menu can write the same key when it arrives.
+
+**Auto-apply.** There is no Apply button: every edit - a cell, a combo, a
+spin box, adding or deleting a row - queues an apply through
+``BaseProperties._queue_auto_apply``, so the chart follows the panel the
+same way the Figure/Axis/Series panels do.
+
+**Visual editors.** The colour, the line style, the annotation font and
+its size each have their own column with a real widget - a colour combo, a
+line-style combo, a font combo, a point-size spin box - instead of only a
+line of JSON. The ``Kwargs JSON`` column stays for everything those four
+do not cover (``arrowprops``, ``bbox``, ``xytext``, ``alpha`` ...); the
+four widgets win over whatever the JSON says for their own keys.
 """
 from __future__ import annotations
 
@@ -30,12 +42,14 @@ import json
 from typing import Any, Final, cast
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFontDatabase
 from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
     QSizePolicy,
+    QSpinBox,
     QHeaderView,
     QTableWidget,
     QTableWidgetItem,
@@ -44,17 +58,19 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.charts.kwarg_spec import DEFAULT
 from app.logs.logger import applogger
 from app.styles.style import (
     MARGIN_PANEL,
     apply_card_layout,
-    create_action_button,
     create_card_widget,
     create_section_title,
     stdSizeAndlayout,
 )
 from app.utils.i18n import _
 from app.widgets.base_properties import BaseProperties
+from app.widgets.color_combo import MatplotlibColorCombo
+from app.widgets.line_combo import LineStyleCombo
 
 #: The three shapes ``BaseAxisRenderer.apply_annotation`` knows how to draw.
 ANNOTATION_TYPES: Final[tuple[str, ...]] = ("arrow", "text", "boxed text")
@@ -70,6 +86,32 @@ LINE_ORIENTATIONS: Final[tuple[tuple[str, str], ...]] = (
 #: properties column, large enough to show three or four rows without
 #: scrolling - which is how many annotations a figure usually has.
 TABLE_MIN_HEIGHT: Final[int] = 120
+
+#: Width the combo/spin columns are given. Interactive, not ResizeToContents:
+#: a colour combo sized to its content is either far too wide (the longest
+#: ``xkcd:`` name) or, with a minimum contents length, too narrow to read.
+WIDGET_COLUMN_WIDTH: Final[int] = 122
+
+# Annotation table columns.
+_ANN_COL_X: Final[int] = 0
+_ANN_COL_Y: Final[int] = 1
+_ANN_COL_TYPE: Final[int] = 2
+_ANN_COL_TEXT: Final[int] = 3
+_ANN_COL_COLOR: Final[int] = 4
+_ANN_COL_FONT: Final[int] = 5
+_ANN_COL_SIZE: Final[int] = 6
+_ANN_COL_KWARGS: Final[int] = 7
+
+# Line table columns.
+_LINE_COL_ORIENTATION: Final[int] = 0
+_LINE_COL_VALUE: Final[int] = 1
+_LINE_COL_COLOR: Final[int] = 2
+_LINE_COL_STYLE: Final[int] = 3
+_LINE_COL_KWARGS: Final[int] = 4
+
+#: The largest point size the font spin box offers. Above this an annotation
+#: is a title, not a label, and belongs on the figure.
+_MAX_FONT_SIZE: Final[int] = 200
 
 
 class OverlayPropertiesWidget(BaseProperties):
@@ -114,11 +156,12 @@ class OverlayPropertiesWidget(BaseProperties):
         root.addWidget(self._tabs, 1)
 
     def _build_axis_card(self) -> QWidget:
-        """Name the axis being edited, and carry the Apply button.
+        """Name the axis being edited.
 
         A label rather than a second axis combo: two selectors for one
         choice is two things to keep in step, and the one in the Axis
         properties panel is already where a user goes to pick an axis.
+        There is no Apply button - the panel auto-applies every edit.
         """
         card = create_card_widget(self, "overlayAxisCard")
         layout = QVBoxLayout(card)
@@ -128,17 +171,6 @@ class OverlayPropertiesWidget(BaseProperties):
         self._axis_label = QLabel(_("No axis selected"), card)
         self._axis_label.setWordWrap(True)
         layout.addWidget(self._axis_label)
-
-        action_row = QHBoxLayout()
-        stdSizeAndlayout(action_row)
-        self._btn_apply = create_action_button(
-            parent=card,
-            action_id="apply",
-            action=self._emit_overlay_options_requested,
-            layout=action_row,
-        )
-        action_row.addStretch(1)
-        layout.addLayout(action_row)
         return card
 
     def _build_annotations_tab(self) -> QWidget:
@@ -148,11 +180,13 @@ class OverlayPropertiesWidget(BaseProperties):
 
             {"annotations": [{"x": 1.0, "y": 2.0, "type": "arrow",
                               "text": "Label",
-                              "kwargs": {"xytext": [10, 10]}}]}
+                              "kwargs": {"color": "#d62728", "fontsize": 11,
+                                         "xytext": [10, 10]}}]}
 
-        ``kwargs`` is edited as JSON so that Matplotlib options such as
-        ``arrowprops``, ``bbox``, ``xycoords``, ``textcoords``, ``ha`` and
-        ``va`` can be stored without a widget for every possible key.
+        ``color``, ``fontfamily`` and ``fontsize`` are edited in their own
+        columns; the rest of ``kwargs`` (``arrowprops``, ``bbox``,
+        ``xycoords``, ``ha``, ``va`` ...) stays in the JSON column so a
+        widget is not needed for every possible Matplotlib text option.
         """
         card = create_card_widget(self._tabs, "overlayAnnotationsCard")
         layout = QVBoxLayout(card)
@@ -161,11 +195,17 @@ class OverlayPropertiesWidget(BaseProperties):
         self._annotations_table = self._build_table(
             card,
             "axisAnnotationsTable",
-            (_("X"), _("Y"), _("Type"), _("Text"), _("Kwargs JSON")),
-            _(
-                "Annotations are stored in axis options. Kwargs must be JSON, "
-                "for example: {\"xytext\": [10, 10], \"textcoords\": \"offset points\"}."
+            (
+                _("X"), _("Y"), _("Type"), _("Text"),
+                _("Color"), _("Font"), _("Size"), _("Kwargs JSON"),
             ),
+            _(
+                "Annotations are stored in axis options. Color, font and size "
+                "have their own columns; anything else goes in Kwargs JSON, "
+                "for example: {\"xytext\": [10, 10], \"textcoords\": \"offset "
+                "points\"}."
+            ),
+            interactive_columns=(_ANN_COL_COLOR, _ANN_COL_FONT, _ANN_COL_SIZE),
         )
         layout.addWidget(self._annotations_table, 1)
 
@@ -184,11 +224,12 @@ class OverlayPropertiesWidget(BaseProperties):
         Stored axis option format::
 
             {"lines": [{"orientation": "horizontal", "value": 2.5,
-                        "kwargs": {"color": "red", "linestyle": "--"}}]}
+                        "kwargs": {"color": "#d62728", "linestyle": "--"}}]}
 
-        The same JSON kwargs column as the annotations, and for the same
-        reason: ``axhline`` takes every Line2D property there is, and a
-        widget per property would be a worse editor than a text field.
+        ``color`` and ``linestyle`` are edited in their own columns; the
+        rest of ``kwargs`` (``linewidth``, ``alpha``, ``label`` ...) stays
+        in the JSON column, because ``axhline`` takes every Line2D property
+        there is and a widget per property would be a worse editor.
         """
         card = create_card_widget(self._tabs, "overlayLinesCard")
         layout = QVBoxLayout(card)
@@ -197,13 +238,14 @@ class OverlayPropertiesWidget(BaseProperties):
         self._lines_table = self._build_table(
             card,
             "axisLinesTable",
-            (_("Orientation"), _("Value"), _("Kwargs JSON")),
+            (_("Orientation"), _("Value"), _("Color"), _("Style"), _("Kwargs JSON")),
             _(
                 "A vertical or horizontal line across the whole axes, at a "
-                "value in data coordinates. Kwargs must be JSON, for "
-                "example: {\"color\": \"red\", \"linestyle\": \"--\", "
-                "\"label\": \"limit\"}."
+                "value in data coordinates. Color and style have their own "
+                "columns; anything else goes in Kwargs JSON, for example: "
+                "{\"linewidth\": 2, \"label\": \"limit\"}."
             ),
+            interactive_columns=(_LINE_COL_COLOR, _LINE_COL_STYLE),
         )
         layout.addWidget(self._lines_table, 1)
 
@@ -222,6 +264,8 @@ class OverlayPropertiesWidget(BaseProperties):
         object_name: str,
         headers: tuple[str, ...],
         tooltip: str,
+        *,
+        interactive_columns: tuple[int, ...] = (),
     ) -> QTableWidget:
         """One table, built the same way for both tabs."""
         table = QTableWidget(0, len(headers), parent)
@@ -241,6 +285,13 @@ class OverlayPropertiesWidget(BaseProperties):
                 column, QHeaderView.ResizeMode.ResizeToContents
             )
         header.setStretchLastSection(True)
+
+        # The combo/spin columns hold a fixed-width widget, so size them
+        # once and leave them alone: ResizeToContents fights the widget's
+        # own size hint every time a row is added.
+        for column in interactive_columns:
+            header.setSectionResizeMode(column, QHeaderView.ResizeMode.Interactive)
+            table.setColumnWidth(column, WIDGET_COLUMN_WIDTH)
         return table
 
     def _build_row_buttons(
@@ -266,6 +317,105 @@ class OverlayPropertiesWidget(BaseProperties):
         row_layout.addStretch(1)
         layout.addWidget(row, 0)
         return add, delete
+
+    # ------------------------------------------------------------------
+    # Cell widgets
+    # ------------------------------------------------------------------
+    def _make_color_combo(self, parent: QWidget) -> MatplotlibColorCombo:
+        """A Matplotlib colour combo sized to sit in a table cell.
+
+        ``none_label="(none)"`` and not ``"Default"``: an empty value here
+        means "no explicit colour, leave the kwarg out", the same as the
+        JSON column omitting the key - it does not mean "let a cycle
+        decide", which is what a series' colour combo's empty entry means.
+        """
+        combo = MatplotlibColorCombo(parent, include_none=True, none_label="(none)")
+        stdSizeAndlayout(combo, minimum_contents_length=6)
+        combo.setMaximumWidth(WIDGET_COLUMN_WIDTH)
+        return combo
+
+    def _make_line_combo(self, parent: QWidget) -> LineStyleCombo:
+        combo = LineStyleCombo(parent)
+        stdSizeAndlayout(combo, minimum_contents_length=6)
+        combo.setMaximumWidth(WIDGET_COLUMN_WIDTH)
+        return combo
+
+    #: The CSS generic families Matplotlib resolves through its own
+    #: ``font.<generic>`` lists. Offered above the installed faces because a
+    #: portable descriptor wants "monospace", not "Menlo".
+    _GENERIC_FONT_FAMILIES: Final[tuple[str, ...]] = (
+        "sans-serif", "serif", "monospace", "cursive", "fantasy",
+    )
+
+    def _make_font_combo(self, parent: QWidget) -> QComboBox:
+        """A plain combo of font families, "Default" first.
+
+        Not ``QFontComboBox``: that widget always has a family selected and
+        gives no way to say "no explicit family", which is the state every
+        annotation starts in. A first entry with an empty value does. The
+        five CSS generics come next, then a separator, then every installed
+        face.
+        """
+        combo = QComboBox(parent)
+        combo.addItem(_("Default"), "")
+        for generic in self._GENERIC_FONT_FAMILIES:
+            combo.addItem(generic, generic)
+        combo.insertSeparator(combo.count())
+        for family in QFontDatabase.families():
+            combo.addItem(family, family)
+        stdSizeAndlayout(combo, minimum_contents_length=6)
+        combo.setMaximumWidth(WIDGET_COLUMN_WIDTH)
+        return combo
+
+    def _make_size_spin(self, parent: QWidget) -> QSpinBox:
+        """A point-size spin box whose zero reads as "Default"."""
+        spin = QSpinBox(parent)
+        spin.setRange(0, _MAX_FONT_SIZE)
+        spin.setSpecialValueText(_("Default"))
+        spin.setMaximumWidth(WIDGET_COLUMN_WIDTH)
+        return spin
+
+    def _select_color(self, combo: MatplotlibColorCombo, value: Any) -> bool:
+        """Select the entry for *value*; return whether one was found.
+
+        A ``False`` tells the caller the combo cannot represent this colour
+        (an arbitrary hex such as ``#123456`` is not in Matplotlib's named
+        tables) and it should stay in the JSON column instead of vanishing.
+        """
+        text = str(value or "").strip()
+        if not text:
+            return False
+        return combo.set_current_hex(text) or combo.set_current_name(text)
+
+    def _select_font(self, combo: QComboBox, value: Any) -> bool:
+        text = str(value or "").strip()
+        if not text:
+            return False
+        index = combo.findData(text)
+        if index < 0:
+            index = combo.findText(text, Qt.MatchFlag.MatchFixedString)
+        if index < 0:
+            return False
+        combo.setCurrentIndex(index)
+        return True
+
+    def _set_size_spin(self, spin: QSpinBox, value: Any) -> None:
+        number = self._coerce_number(value)
+        if number is not None and number > 0:
+            spin.setValue(min(int(round(number)), _MAX_FONT_SIZE))
+
+    @staticmethod
+    def _coerce_number(value: Any) -> float | None:
+        if isinstance(value, bool) or value is None:
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value.strip())
+            except ValueError:
+                return None
+        return None
 
     # ------------------------------------------------------------------
     # Public API
@@ -370,6 +520,9 @@ class OverlayPropertiesWidget(BaseProperties):
     # ------------------------------------------------------------------
     def _add_annotation_row(self, annotation: dict[str, Any] | None = None) -> None:
         annotation = dict(annotation or {})
+        kwargs, color, family, size = self._split_annotation_kwargs(
+            annotation.get("kwargs")
+        )
         # Inserting the row and filling its default cells fires itemChanged;
         # the guard keeps that from queuing an apply for a row the user has
         # not touched yet. Their first cell edit is what commits it.
@@ -377,40 +530,120 @@ class OverlayPropertiesWidget(BaseProperties):
             row = self._annotations_table.rowCount()
             self._annotations_table.insertRow(row)
 
-            combo = QComboBox(self._annotations_table)
+            type_combo = QComboBox(self._annotations_table)
             for annotation_type in ANNOTATION_TYPES:
-                combo.addItem(annotation_type, annotation_type)
-            index = combo.findData(str(annotation.get("type", "text")))
-            combo.setCurrentIndex(index if index >= 0 else 0)
-            combo.currentIndexChanged.connect(self._queue_auto_apply)
+                type_combo.addItem(annotation_type, annotation_type)
+            index = type_combo.findData(str(annotation.get("type", "text")))
+            type_combo.setCurrentIndex(index if index >= 0 else 0)
+            type_combo.currentIndexChanged.connect(self._queue_auto_apply)
 
-            self._annotations_table.setItem(row, 0, self._item(annotation.get("x", 0.0)))
-            self._annotations_table.setItem(row, 1, self._item(annotation.get("y", 0.0)))
-            self._annotations_table.setCellWidget(row, 2, combo)
-            self._annotations_table.setItem(row, 3, self._item(annotation.get("text", "")))
+            color_combo = self._make_color_combo(self._annotations_table)
+            if color and not self._select_color(color_combo, color):
+                kwargs["color"] = color
+            color_combo.currentIndexChanged.connect(self._queue_auto_apply)
+
+            font_combo = self._make_font_combo(self._annotations_table)
+            if family and not self._select_font(font_combo, family):
+                kwargs["fontfamily"] = family
+            font_combo.currentIndexChanged.connect(self._queue_auto_apply)
+
+            size_spin = self._make_size_spin(self._annotations_table)
+            self._set_size_spin(size_spin, size)
+            size_spin.valueChanged.connect(self._queue_auto_apply)
+
             self._annotations_table.setItem(
-                row, 4, self._item(self._kwargs_text(annotation.get("kwargs")))
+                row, _ANN_COL_X, self._item(annotation.get("x", 0.0))
+            )
+            self._annotations_table.setItem(
+                row, _ANN_COL_Y, self._item(annotation.get("y", 0.0))
+            )
+            self._annotations_table.setCellWidget(row, _ANN_COL_TYPE, type_combo)
+            self._annotations_table.setItem(
+                row, _ANN_COL_TEXT, self._item(annotation.get("text", ""))
+            )
+            self._annotations_table.setCellWidget(row, _ANN_COL_COLOR, color_combo)
+            self._annotations_table.setCellWidget(row, _ANN_COL_FONT, font_combo)
+            self._annotations_table.setCellWidget(row, _ANN_COL_SIZE, size_spin)
+            self._annotations_table.setItem(
+                row, _ANN_COL_KWARGS, self._item(self._kwargs_text(kwargs))
             )
 
     def _add_line_row(self, line: dict[str, Any] | None = None) -> None:
         line = dict(line or {})
+        kwargs, color, linestyle = self._split_line_kwargs(line.get("kwargs"))
         with self._reloading_controls():
             row = self._lines_table.rowCount()
             self._lines_table.insertRow(row)
 
-            combo = QComboBox(self._lines_table)
+            orientation_combo = QComboBox(self._lines_table)
             for label, value in LINE_ORIENTATIONS:
-                combo.addItem(_(label), value)
+                orientation_combo.addItem(_(label), value)
             stored = str(line.get("orientation", "vertical") or "vertical").lower()
-            index = combo.findData("horizontal" if stored.startswith("h") else "vertical")
-            combo.setCurrentIndex(index if index >= 0 else 0)
-            combo.currentIndexChanged.connect(self._queue_auto_apply)
-
-            self._lines_table.setCellWidget(row, 0, combo)
-            self._lines_table.setItem(row, 1, self._item(line.get("value", 0.0)))
-            self._lines_table.setItem(
-                row, 2, self._item(self._kwargs_text(line.get("kwargs")))
+            index = orientation_combo.findData(
+                "horizontal" if stored.startswith("h") else "vertical"
             )
+            orientation_combo.setCurrentIndex(index if index >= 0 else 0)
+            orientation_combo.currentIndexChanged.connect(self._queue_auto_apply)
+
+            color_combo = self._make_color_combo(self._lines_table)
+            if color and not self._select_color(color_combo, color):
+                kwargs["color"] = color
+            color_combo.currentIndexChanged.connect(self._queue_auto_apply)
+
+            style_combo = self._make_line_combo(self._lines_table)
+            if str(linestyle or "").strip() and not style_combo.set_current_linestyle(
+                str(linestyle)
+            ):
+                kwargs["linestyle"] = linestyle
+            style_combo.currentIndexChanged.connect(self._queue_auto_apply)
+
+            self._lines_table.setCellWidget(
+                row, _LINE_COL_ORIENTATION, orientation_combo
+            )
+            self._lines_table.setItem(
+                row, _LINE_COL_VALUE, self._item(line.get("value", 0.0))
+            )
+            self._lines_table.setCellWidget(row, _LINE_COL_COLOR, color_combo)
+            self._lines_table.setCellWidget(row, _LINE_COL_STYLE, style_combo)
+            self._lines_table.setItem(
+                row, _LINE_COL_KWARGS, self._item(self._kwargs_text(kwargs))
+            )
+
+    def _split_annotation_kwargs(
+        self, raw: Any
+    ) -> tuple[dict[str, Any], Any, Any, Any]:
+        """Pull the four widget-backed keys out of a stored kwargs mapping.
+
+        Returns ``(remainder, color, fontfamily, fontsize)``. A non-numeric
+        ``fontsize`` (Matplotlib also accepts ``"small"``, ``"x-large"``)
+        is left in the remainder so the JSON column keeps editing it rather
+        than the size spin box silently dropping it.
+        """
+        kwargs = dict(raw) if isinstance(raw, dict) else {}
+        color = kwargs.pop("color", "")
+        family = (
+            kwargs.pop("fontfamily", None)
+            or kwargs.pop("family", None)
+            or kwargs.pop("fontname", None)
+        )
+        size = kwargs.pop("fontsize", None)
+        alt_size = kwargs.pop("size", None)
+        if size is None:
+            size = alt_size
+        if size is not None and self._coerce_number(size) is None:
+            kwargs["fontsize"] = size
+            size = None
+        return kwargs, color, family, size
+
+    def _split_line_kwargs(self, raw: Any) -> tuple[dict[str, Any], Any, Any]:
+        """Pull ``color`` and ``linestyle`` out of a stored kwargs mapping."""
+        kwargs = dict(raw) if isinstance(raw, dict) else {}
+        color = kwargs.pop("color", "")
+        linestyle = kwargs.pop("linestyle", None)
+        alt = kwargs.pop("ls", None)
+        if linestyle is None:
+            linestyle = alt
+        return kwargs, color, linestyle
 
     def _kwargs_text(self, kwargs: Any) -> str:
         """Render a stored kwargs mapping back into the JSON column."""
@@ -465,10 +698,11 @@ class OverlayPropertiesWidget(BaseProperties):
     # ------------------------------------------------------------------
     def _annotations_payload(self) -> list[dict[str, Any]]:
         annotations: list[dict[str, Any]] = []
-        for row in range(self._annotations_table.rowCount()):
+        table = self._annotations_table
+        for row in range(table.rowCount()):
             try:
-                x = float(self._cell_text(self._annotations_table, row, 0))
-                y = float(self._cell_text(self._annotations_table, row, 1))
+                x = float(self._cell_text(table, row, _ANN_COL_X))
+                y = float(self._cell_text(table, row, _ANN_COL_Y))
             except ValueError:
                 applogger.warning(
                     "Skipping annotation row %s with invalid x/y", row + 1,
@@ -477,7 +711,7 @@ class OverlayPropertiesWidget(BaseProperties):
                 continue
 
             annotation_type = "text"
-            editor = self._annotations_table.cellWidget(row, 2)
+            editor = table.cellWidget(row, _ANN_COL_TYPE)
             if isinstance(editor, QComboBox):
                 annotation_type = str(
                     editor.currentData() or editor.currentText()
@@ -490,26 +724,38 @@ class OverlayPropertiesWidget(BaseProperties):
                 )
                 annotation_type = "text"
 
+            kwargs = self._parse_kwargs(
+                self._cell_text(table, row, _ANN_COL_KWARGS),
+                what="annotation",
+                row=row,
+            )
+            self._merge_color(kwargs, table.cellWidget(row, _ANN_COL_COLOR))
+            font_combo = table.cellWidget(row, _ANN_COL_FONT)
+            if isinstance(font_combo, QComboBox):
+                family = str(font_combo.currentData() or "").strip()
+                if family:
+                    kwargs["fontfamily"] = family
+            size_spin = table.cellWidget(row, _ANN_COL_SIZE)
+            if isinstance(size_spin, QSpinBox) and size_spin.value() > 0:
+                kwargs["fontsize"] = size_spin.value()
+
             annotations.append(
                 {
                     "x": x,
                     "y": y,
                     "type": annotation_type,
-                    "text": self._cell_text(self._annotations_table, row, 3),
-                    "kwargs": self._parse_kwargs(
-                        self._cell_text(self._annotations_table, row, 4),
-                        what="annotation",
-                        row=row,
-                    ),
+                    "text": self._cell_text(table, row, _ANN_COL_TEXT),
+                    "kwargs": kwargs,
                 }
             )
         return annotations
 
     def _lines_payload(self) -> list[dict[str, Any]]:
         lines: list[dict[str, Any]] = []
-        for row in range(self._lines_table.rowCount()):
+        table = self._lines_table
+        for row in range(table.rowCount()):
             try:
-                value = float(self._cell_text(self._lines_table, row, 1))
+                value = float(self._cell_text(table, row, _LINE_COL_VALUE))
             except ValueError:
                 applogger.warning(
                     "Skipping line row %s with no usable value", row + 1,
@@ -518,22 +764,37 @@ class OverlayPropertiesWidget(BaseProperties):
                 continue
 
             orientation = "vertical"
-            editor = self._lines_table.cellWidget(row, 0)
+            editor = table.cellWidget(row, _LINE_COL_ORIENTATION)
             if isinstance(editor, QComboBox):
                 orientation = str(editor.currentData() or "vertical").lower()
+
+            kwargs = self._parse_kwargs(
+                self._cell_text(table, row, _LINE_COL_KWARGS),
+                what="line",
+                row=row,
+            )
+            self._merge_color(kwargs, table.cellWidget(row, _LINE_COL_COLOR))
+            style_combo = table.cellWidget(row, _LINE_COL_STYLE)
+            if isinstance(style_combo, LineStyleCombo):
+                linestyle = style_combo.current_linestyle().strip()
+                if linestyle and linestyle != DEFAULT:
+                    kwargs["linestyle"] = linestyle
 
             lines.append(
                 {
                     "orientation": orientation,
                     "value": value,
-                    "kwargs": self._parse_kwargs(
-                        self._cell_text(self._lines_table, row, 2),
-                        what="line",
-                        row=row,
-                    ),
+                    "kwargs": kwargs,
                 }
             )
         return lines
+
+    def _merge_color(self, kwargs: dict[str, Any], combo: QWidget | None) -> None:
+        """Write the combo's colour into ``kwargs["color"]``, or leave it out."""
+        if isinstance(combo, MatplotlibColorCombo):
+            hex_color = combo.current_hex().strip()
+            if hex_color:
+                kwargs["color"] = hex_color
 
     def _emit_overlay_options_requested(self) -> None:
         """Send both lists for the selected axis.
@@ -563,6 +824,5 @@ class OverlayPropertiesWidget(BaseProperties):
             self._lines_table,
             self._btn_add_line,
             self._btn_delete_line,
-            self._btn_apply,
         ):
             widget.setEnabled(enabled)

@@ -36,6 +36,14 @@ LINE = {
     "value": 0.5,
     "kwargs": {"color": "red", "linestyle": "--"},
 }
+#: What LINE round-trips to once its colour has been through the colour
+#: combo, which normalises every named colour to its canonical hex - the
+#: same normalisation the Series colour combo already does.
+LINE_ROUND_TRIPPED = {
+    "orientation": "horizontal",
+    "value": 0.5,
+    "kwargs": {"color": "#ff0000", "linestyle": "--"},
+}
 
 
 @pytest.fixture
@@ -141,7 +149,7 @@ def test_an_annotation_written_before_this_panel_existed_loads_into_it(
     assert table.item(0, 0).text() == "3.0"
     assert table.item(0, 3).text() == "peak"
     assert table.cellWidget(0, 2).currentData() == "arrow"
-    assert "xytext" in table.item(0, 4).text()
+    assert "xytext" in table.item(0, 7).text()
 
 
 def test_the_annotations_round_trip_through_the_payload(
@@ -185,7 +193,8 @@ def test_a_stored_line_loads_into_the_table(
     assert table.rowCount() == 1
     assert table.cellWidget(0, 0).currentData() == "horizontal"
     assert table.item(0, 1).text() == "0.5"
-    assert "red" in table.item(0, 2).text()
+    assert table.cellWidget(0, 2).current_hex() == "#ff0000"
+    assert table.cellWidget(0, 3).current_linestyle() == "--"
 
 
 def test_a_new_line_reaches_the_payload(widget: OverlayPropertiesWidget) -> None:
@@ -196,7 +205,7 @@ def test_a_new_line_reaches_the_payload(widget: OverlayPropertiesWidget) -> None
     widget._emit_overlay_options_requested()
 
     assert sent[0]["lines"] == [
-        LINE,
+        LINE_ROUND_TRIPPED,
         {"orientation": "vertical", "value": 7.0, "kwargs": {}},
     ]
 
@@ -211,14 +220,14 @@ def test_a_row_with_no_usable_value_is_skipped_not_stored(
 
     widget._emit_overlay_options_requested()
 
-    assert sent[0]["lines"] == [LINE]
+    assert sent[0]["lines"] == [LINE_ROUND_TRIPPED]
 
 
 def test_invalid_kwargs_json_costs_the_kwargs_not_the_line(
     widget: OverlayPropertiesWidget,
 ) -> None:
     widget._add_line_row({"orientation": "vertical", "value": 2.0, "kwargs": {}})
-    widget._lines_table.setItem(1, 2, widget._item("{not json"))
+    widget._lines_table.setItem(1, 4, widget._item("{not json"))
     sent: list[dict] = []
     widget.overlay_options_requested.connect(sent.append)
 
@@ -229,6 +238,149 @@ def test_invalid_kwargs_json_costs_the_kwargs_not_the_line(
         "value": 2.0,
         "kwargs": {},
     }
+
+
+# ----------------------------------------------------------------------
+# Visual editors: colour, line style, font, size
+# ----------------------------------------------------------------------
+def test_there_is_no_apply_button_every_edit_auto_applies(
+    widget: OverlayPropertiesWidget,
+) -> None:
+    assert not hasattr(widget, "_btn_apply")
+
+
+def test_changing_a_cell_widget_queues_an_auto_apply(
+    widget: OverlayPropertiesWidget,
+) -> None:
+    assert not widget._auto_apply_timer.isActive()
+
+    widget._lines_table.cellWidget(0, 3).set_current_linestyle(":")
+
+    assert widget._auto_apply_timer.isActive()
+
+
+def test_a_stored_line_splits_colour_and_style_out_of_the_json_cell(
+    widget: OverlayPropertiesWidget,
+) -> None:
+    """The JSON column shows only what the dedicated widgets do not cover."""
+    assert widget._lines_table.item(0, 4).text() == ""
+
+
+def test_the_line_widgets_write_back_into_kwargs(
+    widget: OverlayPropertiesWidget,
+) -> None:
+    widget._add_line_row({"orientation": "vertical", "value": 4.0, "kwargs": {}})
+    widget._lines_table.cellWidget(1, 2).set_current_name("blue")
+    widget._lines_table.cellWidget(1, 3).set_current_linestyle(":")
+    sent: list[dict] = []
+    widget.overlay_options_requested.connect(sent.append)
+
+    widget._emit_overlay_options_requested()
+
+    assert sent[0]["lines"][1]["kwargs"] == {"color": "#0000ff", "linestyle": ":"}
+
+
+def test_line_json_kwargs_still_reach_the_payload_alongside_the_widgets(
+    widget: OverlayPropertiesWidget,
+) -> None:
+    widget._add_line_row(
+        {"orientation": "vertical", "value": 4.0, "kwargs": {"linewidth": 3}}
+    )
+    widget._lines_table.cellWidget(1, 2).set_current_name("green")
+
+    sent: list[dict] = []
+    widget.overlay_options_requested.connect(sent.append)
+    widget._emit_overlay_options_requested()
+
+    assert sent[0]["lines"][1]["kwargs"] == {"linewidth": 3, "color": "#008000"}
+
+
+def test_a_stored_annotation_splits_colour_font_and_size_into_widgets(
+    qapp, repo: SqliteRepo, figure_with_axis
+) -> None:
+    figure_id, axis_id = figure_with_axis
+    options = repo.get_axis_options(axis_id) or {}
+    options["annotations"] = [
+        {
+            "x": 1.0,
+            "y": 2.0,
+            "type": "text",
+            "text": "hi",
+            "kwargs": {"color": "red", "fontfamily": "monospace",
+                       "fontsize": 13, "rotation": 45},
+        }
+    ]
+    repo.set_axis_options(axis_id, options)
+
+    widget = OverlayPropertiesWidget()
+    widget.set_connected_figure(repo, figure_id, Figure())
+    widget.set_axis(axis_id)
+
+    table = widget._annotations_table
+    assert table.cellWidget(0, 4).current_hex() == "#ff0000"
+    assert table.cellWidget(0, 5).currentData() == "monospace"
+    assert table.cellWidget(0, 6).value() == 13
+    # Only the leftover kwarg stays in the JSON cell.
+    assert "rotation" in table.item(0, 7).text()
+    assert "fontsize" not in table.item(0, 7).text()
+
+    sent: list[dict] = []
+    widget.overlay_options_requested.connect(sent.append)
+    widget._emit_overlay_options_requested()
+
+    assert sent[0]["annotations"][0]["kwargs"] == {
+        "rotation": 45,
+        "color": "#ff0000",
+        "fontfamily": "monospace",
+        "fontsize": 13,
+    }
+
+
+def test_an_arbitrary_hex_colour_stays_in_the_json_cell(
+    qapp, repo: SqliteRepo, figure_with_axis
+) -> None:
+    """The colour combo only knows Matplotlib's named colours, so a hex it
+    cannot show must keep being edited as JSON rather than disappear."""
+    figure_id, axis_id = figure_with_axis
+    options = repo.get_axis_options(axis_id) or {}
+    options["lines"] = [
+        {"orientation": "vertical", "value": 1.0, "kwargs": {"color": "#123456"}}
+    ]
+    repo.set_axis_options(axis_id, options)
+
+    widget = OverlayPropertiesWidget()
+    widget.set_connected_figure(repo, figure_id, Figure())
+    widget.set_axis(axis_id)
+
+    assert widget._lines_table.cellWidget(0, 2).current_hex() == ""
+    assert "#123456" in widget._lines_table.item(0, 4).text()
+
+    sent: list[dict] = []
+    widget.overlay_options_requested.connect(sent.append)
+    widget._emit_overlay_options_requested()
+    assert sent[0]["lines"][0]["kwargs"] == {"color": "#123456"}
+
+
+def test_a_non_numeric_font_size_is_left_in_the_json_cell(
+    qapp, repo: SqliteRepo, figure_with_axis
+) -> None:
+    """Matplotlib accepts fontsize="small"; the size spin cannot, so that
+    value must stay where the JSON column can still edit it."""
+    figure_id, axis_id = figure_with_axis
+    options = repo.get_axis_options(axis_id) or {}
+    options["annotations"] = [
+        {"x": 0.0, "y": 0.0, "type": "text", "text": "t",
+         "kwargs": {"fontsize": "small"}}
+    ]
+    repo.set_axis_options(axis_id, options)
+
+    widget = OverlayPropertiesWidget()
+    widget.set_connected_figure(repo, figure_id, Figure())
+    widget.set_axis(axis_id)
+
+    table = widget._annotations_table
+    assert table.cellWidget(0, 6).value() == 0
+    assert "small" in table.item(0, 7).text()
 
 
 # ----------------------------------------------------------------------
