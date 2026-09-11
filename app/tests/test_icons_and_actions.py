@@ -613,7 +613,9 @@ def test_symbols_are_not_painted_in_the_windows_grey(qapp) -> None:
     assert QColor(tint).isValid()
 
 
-def test_the_tint_follows_the_applied_theme_not_the_palette(qapp) -> None:
+def test_the_tint_follows_the_applied_theme_not_the_palette(
+    qapp, quiet_stylesheet
+) -> None:
     """A hard-coded black icon is invisible on a dark toolbar - and a white one
     is invisible on a light toolbar, which is the failure this replaced.
 
@@ -622,6 +624,12 @@ def test_the_tint_follows_the_applied_theme_not_the_palette(qapp) -> None:
     Mac whose system appearance is dark it comes back light-on-dark even while
     the application is wearing a light theme, so the glyphs went white on white
     buttons.  The applied theme is the only thing that actually knows.
+
+    ``quiet_stylesheet`` keeps the six ``apply_platform_style`` calls below
+    from installing six full sheets over every live widget: the tint is
+    decided before the sheet is installed, and the palette - which this test
+    really does read back - stays real.  Without it this one test restyled
+    the whole application six times and left the last sheet behind.
     """
     original = qapp.palette()
     try:

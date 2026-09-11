@@ -199,13 +199,14 @@ def test_saving_a_style_still_records_it_for_the_next_start(
     ],
 )
 def test_a_forced_style_is_applied_whatever_the_platform(
-    preference: str, expected: str, qapp
+    preference: str, expected: str, qapp, suppressed_restyle
 ) -> None:
     """Picking Windows' sheet on a Mac is the point: it previews the other one."""
     resolved = style.apply_platform_style(qapp, preference)
 
     assert resolved.qss_file is not None
     assert resolved.qss_file.name == expected
+    assert suppressed_restyle["sheet"], "the sheet it resolved is the one it installs"
 
 
 @pytest.mark.parametrize("qss_name", ["fluent_win11.qss", "macos_native.qss"])
@@ -231,7 +232,7 @@ def test_every_stylesheet_actually_styles_create_card_widget(qss_name: str) -> N
 
 @pytest.mark.parametrize("preference", ["fluent_win11", "macos_native", "dark"])
 def test_a_themed_stylesheet_does_not_force_an_app_wide_qt_style(
-    preference: str, qapp, monkeypatch: pytest.MonkeyPatch
+    preference: str, qapp, suppressed_restyle
 ) -> None:
     """macos_native.qss's own header explains why standard controls
     (QPushButton, QComboBox, QMenu, QScrollBar...) are deliberately left
@@ -243,29 +244,17 @@ def test_a_themed_stylesheet_does_not_force_an_app_wide_qt_style(
     views that need it instead (test_table_list.py /
     test_table_preview.py), not applied here.
     """
-    calls: list[str] = []
-    monkeypatch.setattr(
-        type(qapp), "setStyle", lambda self, name: calls.append(str(name))
-    )
-
     style.apply_platform_style(qapp, preference)
 
-    assert calls == []
+    assert suppressed_restyle["style"] == []
 
 
-def test_an_explicit_qt_style_is_still_applied(
-    qapp, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_an_explicit_qt_style_is_still_applied(qapp, suppressed_restyle) -> None:
     """Picking a Qt style plugin by name is a real app.setStyle() case,
     unrelated to the themed-stylesheet path above."""
-    calls: list[str] = []
-    monkeypatch.setattr(
-        type(qapp), "setStyle", lambda self, name: calls.append(str(name))
-    )
-
     style.apply_platform_style(qapp, f"{style.QT_STYLE_PREFIX}windows")
 
-    assert calls == ["Windows"]
+    assert suppressed_restyle["style"] == ["Windows"]
 
 
 def test_an_unknown_style_reads_as_automatic(qapp) -> None:
@@ -476,7 +465,11 @@ def test_the_sentinel_is_never_what_gets_saved(
     assert _written(temp_config)["app_style"] != dialog._BROWSE_SENTINEL
 
 
-def test_a_chosen_sheet_resolves_and_applies(qapp, custom_qss: Path) -> None:
+def test_a_chosen_sheet_resolves_and_applies(
+    qapp, custom_qss: Path, restored_app_style
+) -> None:
+    """The one test that reads the sheet back off the application, so it
+    installs a real one - a two-line one, and it is put back afterwards."""
     key = style.qss_file_style_key(custom_qss)
 
     assert style.resolve_app_style(key) == key

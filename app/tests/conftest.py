@@ -167,3 +167,93 @@ def qapp():
         pytest.skip("PySide6 widgets are not usable in this environment")
 
     yield app
+
+
+# ----------------------------------------------------------------------
+# Application-wide restyling, which is not free
+# ----------------------------------------------------------------------
+# ``QApplication.setStyleSheet`` re-polishes *every live widget*, and ``qapp``
+# is session-scoped: widgets built by earlier tests are still alive, so the
+# cost of installing one of the big sheets grows through a run.  Offscreen it
+# is cheap; on a real desktop it is not, and a suite that installed a full
+# sheet a dozen times read as a hang rather than as slowness.
+#
+# Neither fixture is about avoiding work for its own sake.  A test that asks
+# what ``apply_platform_style`` *decides* does not need Qt to repaint to find
+# out, and a test that leaves the shared application wearing macos_native.qss
+# has changed the conditions for every test after it.
+
+
+@pytest.fixture
+def suppressed_restyle(qapp, monkeypatch: pytest.MonkeyPatch) -> dict[str, list]:
+    """Record the application-wide styling calls instead of performing them.
+
+    Returns ``{"style": [...], "sheet": [...], "palette": [...]}`` - what the
+    code under test asked for, which is what these tests are checking.
+    """
+    calls: dict[str, list] = {"style": [], "sheet": [], "palette": []}
+    monkeypatch.setattr(
+        type(qapp), "setStyle", lambda self, name: calls["style"].append(str(name))
+    )
+    monkeypatch.setattr(
+        type(qapp), "setStyleSheet", lambda self, sheet: calls["sheet"].append(sheet)
+    )
+    monkeypatch.setattr(
+        type(qapp), "setPalette", lambda self, palette: calls["palette"].append(palette)
+    )
+    return calls
+
+
+@pytest.fixture
+def quiet_stylesheet(qapp, monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Suppress only the sheet install, leaving palette and style real.
+
+    For a test that has to read the palette back afterwards - the icon tint
+    follows the applied theme, and proving it does *not* follow a palette
+    pushed in from outside needs that palette to actually arrive.
+    """
+    installed: list[str] = []
+    monkeypatch.setattr(
+        type(qapp), "setStyleSheet", lambda self, sheet: installed.append(sheet)
+    )
+    return installed
+
+
+@pytest.fixture
+def restored_app_style(qapp):
+    """Put the application's styling back after a test that really changes it."""
+    sheet, palette = qapp.styleSheet(), qapp.palette()
+    yield
+    qapp.setStyleSheet(sheet)
+    qapp.setPalette(palette)
+
+
+@pytest.fixture(autouse=True)
+def _no_leftover_application_stylesheet():
+    """Fail the test that leaves the shared QApplication restyled.
+
+    Not tidiness: the sheet stays installed for every test that follows, and
+    each of those then builds its widgets against it - which is how one test
+    makes a whole suite slower, in a way that shows up as "the run got slow
+    somewhere around here" rather than as a failure anyone can place.
+
+    Costs nothing when no QApplication exists, so the many tests that never
+    touch Qt do not pay for it and are not forced to create one.
+    """
+    from PySide6.QtWidgets import QApplication
+
+    app = QApplication.instance()
+    before = app.styleSheet() if app is not None else None
+
+    yield
+
+    app = QApplication.instance()
+    if app is None or before is None:
+        return
+    if app.styleSheet() != before:
+        app.setStyleSheet(before)  # leave the next test a clean one either way
+        pytest.fail(
+            "this test left a stylesheet installed on the shared QApplication; "
+            "use the suppressed_restyle / quiet_stylesheet / restored_app_style "
+            "fixtures (see conftest.py) rather than restyling the whole app"
+        )
