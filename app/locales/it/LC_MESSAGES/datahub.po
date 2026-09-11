@@ -4844,3 +4844,19 @@ msgstr "Correzione della linea di base"
 
 msgid "Subtract a spectrum's background (AsLS or rubber band)"
 msgstr "Sottrae lo sfondo di uno spettro (AsLS o rubber band)"
+
+
+msgid "Classic demos - Anscombe, Lissajous, and a signal spectrum"
+msgstr "Demo classiche - Anscombe, Lissajous e uno spettro di segnale"
+
+
+msgid "Three teaching examples from mathematics, physics and signal processing: Anscombe's quartet on a shared-scale grid (the matplotlib gallery's own multi-axis example), four Lissajous figures at different frequency ratios, and a noisy signal beside the frequency spectrum that recovers its three true tones - the same signal the Filtering operation's IIR/FIR/Hilbert models can run on directly (its 5, 20 and 50 Hz tones are exact targets for a lowpass, a bandpass, or an envelope)."
+msgstr "Tre esempi didattici da matematica, fisica ed elaborazione dei segnali: il quartetto di Anscombe su una griglia a scala condivisa (l'esempio multi-asse della stessa galleria di matplotlib), quattro figure di Lissajous a diversi rapporti di frequenza, e un segnale rumoroso accanto allo spettro di frequenza che ne recupera i tre toni veri - lo stesso segnale su cui i modelli IIR/FIR/Hilbert dell'operazione Filtraggio possono lavorare direttamente (i suoi toni a 5, 20 e 50 Hz sono bersagli esatti per un passa-basso, un passa-banda o un inviluppo)."
+
+
+msgid "Quality and spectroscopy - two new series operations"
+msgstr "Qualità e spettroscopia - due nuove operazioni sulle serie"
+
+
+msgid "Textbook defective-unit counts for the Attribute Chart operation (p/np/c/u), and a synthetic spectrum with a drifting, wandering background for Baseline Correction (AsLS or rubber band) - both figures already carry an annotation and a reference line with an explicit colour, so opening Overlay properties shows its colour/line/font/size editors populated rather than empty."
+msgstr "Conteggi di unità difettose da manuale per l'operazione Carta per attributi (p/np/c/u), e uno spettro sintetico con uno sfondo che deriva e ondeggia per la Correzione della linea di base (AsLS o rubber band) - entrambe le figure portano già un'annotazione e una linea di riferimento con un colore esplicito, cosi' aprendo le proprietà delle sovrapposizioni si vedono gli editor di colore/linea/carattere/dimensione già popolati invece che vuoti."

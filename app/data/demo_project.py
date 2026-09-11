@@ -32,6 +32,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
+import numpy as np
 import pandas as pd
 
 from app.charts import layout_presets
@@ -276,6 +277,47 @@ def _signal_spectrum() -> pd.DataFrame:
     return pd.read_csv(SAMPLE_DATA_DIR / "signal_spectrum.csv")
 
 
+def _attribute_chart_counts() -> pd.DataFrame:
+    """Montgomery's *Introduction to Statistical Quality Control*, Example
+    6.1: 20 samples of 50 printed circuit boards, each with its count of
+    defective units. p-bar works out to 0.214, the UCL to 0.388 and the LCL
+    to 0.040 - textbook numbers a p-chart run over this table should
+    reproduce exactly, with sample 15 (22 defectives) the one point outside
+    them. ``inspected`` is included as its own column, not folded into a
+    fixed constant, so the Attribute Chart operation's own "sample size
+    column" picker has something to pick.
+    """
+    defectives = [
+        12, 15, 8, 10, 4, 7, 16, 9, 14, 10,
+        5, 6, 17, 12, 22, 8, 10, 5, 13, 11,
+    ]
+    return pd.DataFrame(
+        {
+            "sample": range(1, len(defectives) + 1),
+            "defectives": defectives,
+            "inspected": [50] * len(defectives),
+        }
+    )
+
+
+def _baseline_spectrum() -> pd.DataFrame:
+    """A synthetic spectrum: two Gaussian peaks on a background that both
+    drifts (a linear ramp) and wanders (a slow sine) - the two components a
+    convex rubber-band baseline cannot follow but AsLS can. Fixed random
+    seed, same convention as :func:`_signal_time_domain`: the noise looks
+    the same on every machine that builds this demo.
+    """
+    rng = np.random.default_rng(20260911)
+    x = np.linspace(0.0, 100.0, 400)
+    background = 5.0 + 0.02 * x + 3.0 * np.sin(x / 30.0)
+    peaks = (
+        10.0 * np.exp(-((x - 30.0) ** 2) / 4.0)
+        + 15.0 * np.exp(-((x - 70.0) ** 2) / 8.0)
+    )
+    intensity = background + peaks + 0.15 * rng.standard_normal(x.size)
+    return pd.DataFrame({"x": x, "intensity": intensity})
+
+
 #: Table name -> the function that loads it. A demo file writes only the
 #: tables its own figures read, which is what keeps a single-subject demo
 #: small enough to open and understand.
@@ -296,6 +338,8 @@ TABLE_SOURCES: dict[str, Callable[[], pd.DataFrame]] = {
     "lissajous": _lissajous,
     "signal_time_domain": _signal_time_domain,
     "signal_spectrum": _signal_spectrum,
+    "attribute_chart_counts": _attribute_chart_counts,
+    "baseline_spectrum": _baseline_spectrum,
 }
 
 #: Saved query name -> its SQL, and the table it reads.
@@ -652,6 +696,92 @@ def _figure_specs() -> list[FigureSpec]:
                     sql="SELECT x AS x, y AS y, t AS color FROM parametric_curve ORDER BY t",
                     roles={"x": "x", "y": "y", "color": "color"},
                     style={"marker": ".", "linestyle": "", "markersize": 5.0},
+                ),
+            ],
+        ),
+        FigureSpec(
+            name="23 · Defectives per sample - ready for the Attribute Chart operation",
+            key="attribute_counts",
+            tables=("attribute_chart_counts",),
+            queries=(),
+            chart_type="Scatter Plot",
+            title="Defective circuit boards, 20 samples of 50 (Montgomery 6.1)",
+            x_label="sample",
+            y_label="defectives",
+            # The annotation and the reference line double as a demo of the
+            # Overlay panel's colour/font/size editors: both carry an
+            # explicit colour and the annotation an explicit font and size,
+            # so opening Overlay properties on this axis shows every one of
+            # them already populated rather than at "(none)"/"Default".
+            axis_options={
+                "grid": True,
+                "annotations": [
+                    {
+                        "x": 15.0, "y": 22.0, "type": "text",
+                        "text": "sample 15: 22/50 - beyond the p-chart's UCL",
+                        "kwargs": {
+                            "color": "#c62828",
+                            "fontfamily": "sans-serif",
+                            "fontsize": 9,
+                            "xytext": [8, 10],
+                            "textcoords": "offset points",
+                        },
+                    },
+                ],
+                "lines": [
+                    {
+                        "orientation": "horizontal", "value": 10.7,
+                        "kwargs": {
+                            "color": "#2e7d32",
+                            "linestyle": "--",
+                            "label": "n x p-bar",
+                        },
+                    },
+                ],
+            },
+            series=[
+                SeriesSpec(
+                    name="Defectives",
+                    sql=(
+                        "SELECT sample AS x, defectives AS y, inspected AS n "
+                        "FROM attribute_chart_counts ORDER BY sample"
+                    ),
+                    roles={"x": "x", "y": "y"},
+                    style={"marker": "o", "linestyle": "-"},
+                ),
+            ],
+        ),
+        FigureSpec(
+            name="24 · Spectrum with background - ready for Baseline Correction",
+            key="baseline_spectrum",
+            tables=("baseline_spectrum",),
+            queries=(),
+            chart_type="Scatter Plot",
+            title="Two peaks on a drifting, wandering background",
+            x_label="x",
+            y_label="intensity",
+            axis_options={
+                "grid": True,
+                "annotations": [
+                    {
+                        "x": 70.0, "y": 23.0, "type": "text",
+                        "text": "background rises and wanders under both peaks",
+                        "kwargs": {
+                            "color": "#1565c0",
+                            "fontfamily": "serif",
+                            "fontsize": 9,
+                            "xytext": [-90, 12],
+                            "textcoords": "offset points",
+                        },
+                    },
+                ],
+            },
+            series=[
+                SeriesSpec(
+                    name="Spectrum",
+                    sql="SELECT x, intensity AS y FROM baseline_spectrum ORDER BY x",
+                    roles={"x": "x", "y": "y"},
+                    style={"marker": "", "linestyle": "-", "linewidth": 1.0},
                 ),
             ],
         ),
@@ -1021,8 +1151,21 @@ DEMO_PROJECTS: tuple[DemoProject, ...] = (
         "processing: Anscombe's quartet on a shared-scale grid (the "
         "matplotlib gallery's own multi-axis example), four Lissajous "
         "figures at different frequency ratios, and a noisy signal beside "
-        "the frequency spectrum that recovers its three true tones.",
+        "the frequency spectrum that recovers its three true tones - the "
+        "same signal the Filtering operation's IIR/FIR/Hilbert models can "
+        "run on directly (its 5, 20 and 50 Hz tones are exact targets for "
+        "a lowpass, a bandpass, or an envelope).",
         ("anscombe_quartet", "lissajous_grid", "signal_time_and_frequency"),
+    ),
+    DemoProject(
+        "Quality and spectroscopy - two new series operations",
+        "Textbook defective-unit counts for the Attribute Chart operation "
+        "(p/np/c/u), and a synthetic spectrum with a drifting, wandering "
+        "background for Baseline Correction (AsLS or rubber band) - both "
+        "figures already carry an annotation and a reference line with an "
+        "explicit colour, so opening Overlay properties shows its colour/"
+        "line/font/size editors populated rather than empty.",
+        ("attribute_counts", "baseline_spectrum"),
     ),
 )
 
