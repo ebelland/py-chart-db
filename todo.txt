@@ -136,6 +136,39 @@ P2-12 series operations: inline preview plot beside the numeric results
       publish_results emits text/HTML only; a fit or a peak-find is far more
       legible with a small plot next to it.
 
+P2-13 series operation: Filtering (scipy.signal)
+      IIR (iirfilter -> sosfiltfilt: Butterworth/Cheby1/Cheby2/Bessel/
+      Elliptic, low/high/band/bandstop) and FIR (firwin -> filtfilt) filters,
+      an analytic-signal model (hilbert: envelope / instantaneous phase /
+      instantaneous frequency), and detrend (linear/constant). fs inferred
+      from median dx, same non-uniform-sampling warning as the Spectral
+      Analysis dialog. Resample (resample_poly/decimate) is a separate,
+      later step - it changes the x grid, which needs its own temporal-x
+      handling.
+
+P2-14 series operations: scikit-learn models
+      Five candidates, roughly in this order:
+      - Transform: PowerTransformer (Yeo-Johnson/Box-Cox), QuantileTransformer,
+        StandardScaler, RobustScaler. Small, and a prerequisite for anything
+        that assumes normality (the X-chart, curve fits) on skewed data.
+      - GP Regression: GaussianProcessRegressor, kernel = RBF / Matern-3/2 /
+        Matern-5/2 / RationalQuadratic (+ WhiteKernel noise). Output is the
+        mean series *and* a +/-2 sigma credible band as two more series - the
+        one smoother here that quantifies its own uncertainty.
+      - Robust / ML regression: RANSACRegressor, HuberRegressor,
+        IsotonicRegression (guaranteed monotone), RandomForestRegressor,
+        GradientBoostingRegressor. Could be new models on the existing Fit
+        dialog rather than a new one - it already has the model_combo/
+        params/preview shape this needs.
+      - Anomaly detection: extend the existing Outliers dialog with
+        IsolationForest, LocalOutlierFactor, OneClassSVM, EllipticEnvelope -
+        reuses its hide/preview plumbing, catches shape-aware outliers the
+        z-score/IQR models miss.
+      - Decomposition: PCA / FastICA / NMF across several selected series on
+        a shared x grid -> N component series + an explained-variance
+        report. The one new shape here: many series in, many out (blind
+        source separation, common-mode removal).
+
 ================================================================
 P3 - LATER
 ================================================================
