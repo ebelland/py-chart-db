@@ -4864,3 +4864,31 @@ msgstr "Conteggi di unità difettose da manuale per l'operazione Carta per attri
 
 msgid "ChartLibre"
 msgstr "ChartLibre"
+
+
+msgid "Measurements above the line, counts below it."
+msgstr "Le misure sopra la riga, i conteggi sotto."
+
+
+msgid "The limits move with the sample size, so the zone rules (Nelson 5-8) do not apply and were not run."
+msgstr "I limiti cambiano con la dimensione del campione, quindi le regole di zona (Nelson 5-8) non si applicano e non sono state eseguite."
+
+
+msgid "Mean lower limit"
+msgstr "Limite inferiore medio"
+
+
+msgid "Monitor process stability (I-MR, X-bar, p, np, c, u)"
+msgstr "Monitora la stabilità del processo (I-MR, X-bar, p, np, c, u)"
+
+
+msgid "Flags runs, trends and other patterns that stay inside the limits - the signals a limits-only chart misses. The zone rules switch themselves off on a chart whose limits move."
+msgstr "Segnala sequenze, tendenze e altri andamenti che restano dentro i limiti - i segnali che una carta con i soli limiti non vede. Le regole di zona si disattivano da sole su una carta i cui limiti cambiano."
+
+
+msgid "Recomputes the limits without the points they flagged - the trial-limits-then-revised-limits pass every SPC text runs. Use only when the flagged points have an assigned cause you have removed; otherwise it hides the problem."
+msgstr "Ricalcola i limiti senza i punti che ha segnalato - il passaggio limiti di prova poi limiti rivisti che ogni testo di SPC esegue. Usalo solo quando ai punti segnalati è stata assegnata una causa che hai rimosso; altrimenti nasconde il problema."
+
+
+msgid "Textbook defective-unit counts for the Control Chart operation's attribute charts (p/np/c/u), and a synthetic spectrum with a drifting, wandering background for Baseline Correction (AsLS or rubber band) - both figures already carry an annotation and a reference line with an explicit colour, so opening Overlay properties shows its colour/line/font/size editors populated rather than empty."
+msgstr "Conteggi di unità difettose da manuale per le carte per attributi dell'operazione Carta di controllo (p/np/c/u), e uno spettro sintetico con uno sfondo che deriva e ondeggia per la Correzione della linea di base (AsLS o rubber band) - entrambe le figure portano già un'annotazione e una linea di riferimento con un colore esplicito, cosi' aprendo le proprietà delle sovrapposizioni si vedono gli editor di colore/linea/carattere/dimensione già popolati invece che vuoti."

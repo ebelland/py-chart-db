@@ -230,7 +230,7 @@ def test_the_employee_dataset_has_a_real_outlier(tmp_path: Path) -> None:
 def test_the_attribute_counts_reproduce_montgomerys_p_chart(tmp_path: Path) -> None:
     """The point of shipping this table: running a p-chart over it should
     give the textbook's own numbers, not just some plausible-looking chart."""
-    from app.series_operations.attribute_chart_dialog import ATTR_P, attribute_limits
+    from app.series_operations.control_chart_dialog import CHART_P, attribute_limits
 
     path = build_demo_project(tmp_path / "attributes.dhub", ("attribute_counts",))
     repo = SqliteRepo(db_path=path)
@@ -242,7 +242,7 @@ def test_the_attribute_counts_reproduce_montgomerys_p_chart(tmp_path: Path) -> N
         repo.close()
 
     _stat, center, upper, lower, meta = attribute_limits(
-        ATTR_P,
+        CHART_P,
         frame["defectives"].to_numpy(dtype=float),
         frame["inspected"].to_numpy(dtype=float),
         3.0,
@@ -261,7 +261,7 @@ def test_the_attribute_chart_annotation_and_line_carry_an_explicit_colour(
     size) combos already populated, not at "(none)"/"Default"."""
     path = build_demo_project(tmp_path / "attributes.dhub", ("attribute_counts",))
     descriptor = _load_axes(
-        path, "23 · Defectives per sample - ready for the Attribute Chart operation"
+        path, "23 · Defectives per sample - ready for the Control Chart operation"
     )
     options = descriptor.axes[0].options
     annotation = options["annotations"][0]

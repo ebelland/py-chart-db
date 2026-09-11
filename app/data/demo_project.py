@@ -284,8 +284,9 @@ def _attribute_chart_counts() -> pd.DataFrame:
     to 0.040 - textbook numbers a p-chart run over this table should
     reproduce exactly, with sample 15 (22 defectives) the one point outside
     them. ``inspected`` is included as its own column, not folded into a
-    fixed constant, so the Attribute Chart operation's own "sample size
-    column" picker has something to pick.
+    fixed constant, so the Control Chart operation's own "sample size
+    column" picker (shown for its attribute charts - p, np, u) has
+    something to pick.
     """
     defectives = [
         12, 15, 8, 10, 4, 7, 16, 9, 14, 10,
@@ -700,7 +701,7 @@ def _figure_specs() -> list[FigureSpec]:
             ],
         ),
         FigureSpec(
-            name="23 · Defectives per sample - ready for the Attribute Chart operation",
+            name="23 · Defectives per sample - ready for the Control Chart operation",
             key="attribute_counts",
             tables=("attribute_chart_counts",),
             queries=(),
@@ -1159,8 +1160,9 @@ DEMO_PROJECTS: tuple[DemoProject, ...] = (
     ),
     DemoProject(
         "Quality and spectroscopy - two new series operations",
-        "Textbook defective-unit counts for the Attribute Chart operation "
-        "(p/np/c/u), and a synthetic spectrum with a drifting, wandering "
+        "Textbook defective-unit counts for the Control Chart operation's "
+        "attribute charts (p/np/c/u), and a synthetic spectrum with a "
+        "drifting, wandering "
         "background for Baseline Correction (AsLS or rubber band) - both "
         "figures already carry an annotation and a reference line with an "
         "explicit colour, so opening Overlay properties shows its colour/"
