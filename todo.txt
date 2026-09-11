@@ -25,15 +25,6 @@ FATTO 2026-09-10 (N-5) sqlite_repo diviso per materia
       Nota: chart_panel (2.214), style (1.939), fit_dialog (1.760) e
       cluster_dialog (1.722) restano sopra le 1.500 righe.
 
-FATTO 2026-09-10 (N-8) linee verticali/orizzontali dal menu contestuale
-      Il click destro dentro un axes offre due voci che nominano il valore
-      ("Add vertical line at x = 12.5"), formattato dall'axis come il
-      readout della toolbar - su un asse a date legge la data. L'asse
-      arriva dal tag _dhub_axis_id che render_figure lascia su ogni axes,
-      quindi nessuna seconda mappa da tenere allineata. Scrive la stessa
-      chiave "lines" del pannello Overlay, ed e' annullabile come ogni
-      altra modifica ai descrittori.
-
 N-3   attribute control charts (p, np, c, u)
       The half of SPC N-1 does not cover. These plot a proportion or a count
       rather than a measurement, so the limits are binomial/Poisson rather
@@ -92,37 +83,12 @@ N-19  GUI: toward a more standard, easy, intuitive interface
 P2 - VALUABLE
 ================================================================
 
-FATTO 2026-09-10 (P2-14) renderer: boilerplate sulla base
-      valid_series() e single_series() su BaseAxisRenderer, _merge_options
-      cancellato in favore di merge_style() che gia' esisteva. 12 file,
-      -85 righe nette. Due test in test_shared_helpers.py impediscono che
-      le copie tornino; scatter e timeline restano fuori perche' leggono
-      "visible" dentro il loro loop, non filtrando una lista.
-
-FATTO 2026-09-10 (P3-x) peaks dialog: "Mark peaks only" rimosso
-      Nessuna delle due letture sopravviveva a cio' che il dialog gia' fa:
-      la tabella dei risultati porta tutte le misure perche' il report si
-      costruisce da li', e la serie disegna marker perche' unire i picchi
-      traccerebbe una curva nel nulla. Non restava un terzo comportamento
-      da scegliere. Un test in test_statistics_selection.py cammina tutte
-      le operazioni e chiede chi legge ogni parametro dichiarato.
-
 P2-3  series operation: baseline correction (ALS or rubber-band)
       Pure numpy/scipy. Prerequisite for meaningful peak areas.
 
 P2-4  ChartPanel: rubber-band region selection (RectangleSelector)
       The natural bridge between the chart and the operations: select a peak
       on screen, hand its limits to the integrator.
-
-FATTO 2026-09-10 (P2-11) undo per le modifiche ai descrittori
-      UndoStore copia le tabelle toccate in <progetto>.dhub.undo.db; ora
-      lo usano anche le sette scritture sui descrittori (proprieta' di
-      figura/asse/serie/overlay, riordino, eliminazione serie, azioni
-      sull'asse) e l'Apply delle operazioni. Quest'ultimo apre la voce
-      prima di resolve_target_axis_id - che puo' creare l'asse - e la
-      completa con il nome della tabella risultato: una azione, una voce,
-      un passo di undo. Il Preview non registra nulla: ha gia' il suo
-      savepoint. La voce di menu si aggiorna su aboutToShow.
 
 P2-12 series operations: inline preview plot beside the numeric results
       publish_results emits text/HTML only; a fit or a peak-find is far more
