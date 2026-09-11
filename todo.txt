@@ -95,6 +95,76 @@ N-19  GUI: toward a more standard, easy, intuitive interface
         is usually presented, though it is a real redesign, not a quick
         pass.
 
+N-20  other rendering backends and richer ChartPanel interactivity - a
+      brainstorm, not yet scoped work
+      Matplotlib stays the renderer of record: every chart type, every
+      series operation and the whole descriptor model are built on it, and
+      duplicating that surface for a second backend is not worth it. Two
+      narrower integrations pull their weight instead:
+      - pyqtgraph as a second, *optional* renderer for one axis at a time,
+        picked when interaction matters more than chart variety: OpenGL
+        line/scatter that stays smooth at counts where Matplotlib redraw is
+        the bottleneck, a built-in crosshair, and mouse-driven ROI/region
+        select for free (this is the natural engine behind P2-4, not a
+        replacement for it). A closer fit than QtCharts here - QtCharts is
+        fast but its chart-type and annotation vocabulary is much narrower
+        than what this app's descriptors already express.
+      - QWebEngineView + plotly.js (or Bokeh) for one export action -
+        "Export as interactive HTML" - so a chart leaves the app as
+        something a reader can hover/zoom/pan in a browser without
+        installing anything. Not a render path inside the app: it is a
+        second, heavy dependency (Chromium) that only earns its place at
+        the export boundary.
+      - VisPy/OpenGL is the answer if downsampling (already in Figure
+        properties) still is not enough at true multi-million-point series
+        - hold until that turns out to be a real ceiling, not a guess.
+      - A figure-descriptor -> Vega-Lite spec exporter is a cheap idea
+        worth a look later: the descriptors are already a declarative
+        JSON-ish shape, which is most of what a Vega-Lite spec is.
+
+      ChartPanel interactivity, roughly in order of how directly they
+      build on what is already there (hover readout, pick, context menu):
+      - A ruler/measure mode: click two points, show dx/dy/slope as a
+        transient annotation - a couple of clicks past the existing hover
+        readout.
+      - A crosshair synced across every axis of a figure (shared x), and an
+        optional "link x zoom/pan across axes" toggle - the standard
+        multi-panel-dashboard expectation, and this app's figures are
+        already multi-axis.
+      - Draggable annotations: let a mouse drag on an annotation's artist
+        write its new x/y back to the axis options (the Overlay panel
+        already owns that key) instead of only editing it by numbers.
+      - Box/lasso multi-select feeding "hide selected" / "new series from
+        selection" - the selection half of P2-4, generalized past one
+        rectangular region.
+      - "Export the current view as data": the rows actually on screen
+        after zoom and downsampling, as CSV - a natural sibling of the
+        existing copy/save-chart actions.
+      - A live/streaming toggle: redraw a chart on a timer, or when its
+        source table changes, for a rig or a long-running import someone
+        is watching fill in.
+
+      Broader, beyond the chart itself - things a data scientist, an
+      engineer or a student doing coursework would reach for:
+      - Notebook/script export: a figure's series are already SQL queries
+        plus a style dict, which is most of a pandas+matplotlib script or a
+        .ipynb cell already written - export it for handoff/reproducibility
+        outside this app.
+      - Unit-aware axes (pint): an axis label carries a unit, and a
+        "convert units" action rescales the display without touching the
+        underlying SQL - useful wherever engineering data mixes unit
+        systems.
+      - Uncertainty propagation: a series operation combining two series
+        with error columns (A+-dA op B+-dB) via the standard propagation
+        formulas, output as a value + error series pair.
+      - A one-click "chart + operation reports -> PDF/HTML" bundle -
+        formalizing what results_published/set_notes_html already produce
+        per operation into one exportable document.
+      - A small scripting console (Python or SQL) against the current
+        project's repo, for the point where a power user iterates faster
+        typing than clicking through dialogs - the same repo the series
+        operations already use, just without a dialog in front of it.
+
 
 ================================================================
 P2 - VALUABLE
@@ -146,7 +216,7 @@ P2-13 series operation: Filtering (scipy.signal)
       later step - it changes the x grid, which needs its own temporal-x
       handling.
 
-P2-14 series operations: scikit-learn models
+P2-15 series operations: scikit-learn models
       Five candidates, roughly in this order:
       - Transform: PowerTransformer (Yeo-Johnson/Box-Cox), QuantileTransformer,
         StandardScaler, RobustScaler. Small, and a prerequisite for anything
