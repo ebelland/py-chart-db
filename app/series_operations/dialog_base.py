@@ -520,8 +520,19 @@ class SeriesOperationDialogBase(QDialog):
             raise ValueError(message)
 
         if len(rows) > 1:
+            # Silent by default (applogger.warning's own policy) was exactly
+            # the trap here: an operation that reads one series at a time -
+            # Fit chief among them - would quietly act on whichever series
+            # happened to be first, and the only way to find out was to
+            # notice the chart it produced was not the one you meant. Shown,
+            # so the choice this makes is not a debugging exercise.
+            name = row_value(rows[0], "name", default="first")
             applogger.warning(
-                "Multiple source series selected; using the first selected series."
+                "%d series are selected; using only '%s'. Uncheck the "
+                "others, or reorder them, to use a different one.",
+                len(rows),
+                name,
+                show_dialog=True,
             )
 
         return rows[0]

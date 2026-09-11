@@ -261,3 +261,73 @@ def test_the_accessory_charts_read_the_fit_output_table(
 
     assert "residual" in queries["Residuals"]
     assert "y_fit" in queries["Measured vs. fit"]
+
+
+# ----------------------------------------------------------------------
+# Selecting more than one source series
+# ----------------------------------------------------------------------
+#
+# Fit optimises one parametric model against one series; there is no sense
+# in which two unrelated series share one set of parameters, so
+# _selected_series_row (dialog_base.py) picks the first selected series and
+# ignores the rest. That choice used to be a debug-log line only - visible
+# with applogger's own "silent by default" policy nowhere a user would see
+# it - so the accessory charts silently described whichever series happened
+# to be first in the list, with nothing on screen explaining why reordering
+# the series changed what a residual chart showed.
+def test_selecting_two_series_warns_which_one_is_used(
+    dialog: SeriesFitDialog, repo: SqliteRepo, figure_id: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.series_operations.dialog_base as module
+
+    repo.create_series_descriptor(
+        axis_id=repo.load_figure_descriptor(figure_id=figure_id).axes[0].id,
+        series_index=1,
+        name="SECOND",
+        sql_query="SELECT x AS x, y AS y FROM src",
+        roles={"x": "x", "y": "y"},
+        style={},
+    )
+    dialog.series_selector.reload(select_all_series=True)
+
+    seen: list[tuple[str, bool]] = []
+    original = module.applogger.warning
+
+    def spy(msg, *args, show_dialog=None, **kwargs):
+        seen.append((str(msg) % args if args else str(msg), bool(show_dialog)))
+        return original(msg, *args, show_dialog=show_dialog, **kwargs)
+
+    monkeypatch.setattr(module.applogger, "warning", spy)
+
+    dialog._selected_series_row()
+
+    assert seen, "selecting two series raised no warning at all"
+    message, shown = seen[-1]
+    assert shown, "the warning must be shown, not just logged - see applogger's own policy"
+    assert "DATA" in message or "SECOND" in message
+
+
+def test_only_the_first_selected_series_gets_a_residual_chart(
+    dialog: SeriesFitDialog, repo: SqliteRepo, figure_id: int
+) -> None:
+    """Pinning today's behaviour, not endorsing it: the accessory charts
+    describe exactly one series - whichever _selected_series_row picked -
+    never a silent mix of two."""
+    repo.create_series_descriptor(
+        axis_id=repo.load_figure_descriptor(figure_id=figure_id).axes[0].id,
+        series_index=1,
+        name="SECOND",
+        sql_query="SELECT x AS x, y AS y FROM src",
+        roles={"x": "x", "y": "y"},
+        style={},
+    )
+    dialog.series_selector.reload(select_all_series=True)
+    dialog._select_first_model()
+    dialog._residual_chart_check.setChecked(True)
+
+    dialog.apply()
+
+    descriptor = repo.load_figure_descriptor(figure_id=figure_id)
+    residual_axes = [axis for axis in descriptor.axes if str(axis.title) == "Residuals"]
+    assert len(residual_axes) == 1
+    assert len(residual_axes[0].series) == 1
