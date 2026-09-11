@@ -8,10 +8,8 @@ FIT_PROPORTIONAL modes.  The QScrollArea owns the visible chart viewport and the
 FigureCanvasQTAgg is the scroll area's widget directly.
 """
 
-from copy import deepcopy
 from io import BytesIO
 import math
-from collections.abc import MutableMapping
 from typing import Any, Final
 
 from PySide6.QtCore import QEvent, QObject, QPoint, QSize, Qt, QTimer, Signal
@@ -25,6 +23,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from matplotlib.patches import Patch, Rectangle, Wedge
 
+from app.charts.descriptor_grid import descriptor_axis_count, descriptor_prepared_for_render
 from app.charts.render_figure import render_figure_from_descriptor
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
@@ -78,9 +77,6 @@ CHART_AREA_MIN_HEIGHT: Final[int] = 160
 NOTES_MIN_HEIGHT: Final[int] = 0
 NOTES_FIRST_OPEN_MIN_HEIGHT: Final[int] = 80
 NOTES_INITIAL_FRACTION: Final[float] = 0.3
-GRID_ROW_KEYS: Final[tuple[str, ...]] = ("rows", "nrows", "n_rows", "row_count", "num_rows")
-GRID_COL_KEYS: Final[tuple[str, ...]] = ("cols", "columns", "ncols", "n_cols", "col_count", "num_cols")
-AXIS_COLLECTION_KEYS: Final[tuple[str, ...]] = ("axes", "subplots", "plots", "charts", "panels")
 
 #: How near the cursor has to be, in points, for a marker to count as picked.
 #: Five is about a default marker's own radius: close enough that a click has
@@ -1708,150 +1704,22 @@ class ChartPanel(QFrame):
     ) -> Any:
         """Return a render descriptor with oversized/inconsistent grids fixed.
 
-        Some saved descriptors can keep an old subplot grid after axes are
-        added or removed.  Matplotlib may then create extra slots or compute the
-        first layout against stale geometry.  Normalize the descriptor before it
-        reaches the renderer so the grid capacity is the smallest one that can
-        hold the descriptor's axes.
+        The grid-normalization logic itself lives in ``app.charts.
+        descriptor_grid`` - it is pure descriptor-tree manipulation with
+        nothing Qt about it, and is tested there directly.
         """
-        axis_count = (
-            int(axis_count_override)
-            if axis_count_override is not None
-            else self._descriptor_axis_count(descriptor)
+        prepared, changed = descriptor_prepared_for_render(
+            descriptor, axis_count_override=axis_count_override
         )
-        if axis_count <= 0:
-            return descriptor
-
-        prepared = deepcopy(descriptor)
-        changed = self._normalize_descriptor_grids(prepared, axis_count)
         if changed:
             applogger.debug(
                 "Normalized chart grid before render (figure_id=%s, axes=%s)",
                 self._figure_id,
-                axis_count,
+                axis_count_override
+                if axis_count_override is not None
+                else descriptor_axis_count(descriptor),
             )
         return prepared
-
-    def _descriptor_axis_count(self, value: Any) -> int:
-        """Best-effort axis count from a descriptor-like nested structure.
-
-        Important: this must count descriptor axes, not rendered Matplotlib axes.
-        A stale 2x1 grid can make the renderer construct two Matplotlib Axes even
-        when the descriptor contains only one real chart axis. If that rendered
-        count is fed back into grid normalization, the stale 2x1 grid becomes
-        self-confirming and never shrinks after a cancelled preview.
-        """
-        if isinstance(value, MutableMapping):
-            for key in AXIS_COLLECTION_KEYS:
-                collection = value.get(key)
-                if collection is not None and self._is_axis_collection(collection):
-                    return len(collection)
-            for child in value.values():
-                count = self._descriptor_axis_count(child)
-                if count > 0:
-                    return count
-        elif isinstance(value, list):
-            # Only recurse into generic lists. Do not treat every Sequence as an
-            # axis collection; strings, tuples of coordinates, and other list-
-            # like values can appear in chart descriptors but are not axes.
-            for child in value:
-                count = self._descriptor_axis_count(child)
-                if count > 0:
-                    return count
-        return 0
-
-    @staticmethod
-    def _is_axis_collection(value: Any) -> bool:
-        """Return True for descriptor collections that represent chart axes.
-
-        The old implementation returned True for any non-string Sequence. That
-        was too broad: it could count arbitrary lists as axes and, together with
-        rendered ``figure.axes`` counts, preserve stale grid sizes. Real axis
-        collections in the descriptor are lists of mappings.
-        """
-        if not isinstance(value, list):
-            return False
-        if not value:
-            return True
-        return all(isinstance(item, MutableMapping) for item in value)
-
-    def _normalize_descriptor_grids(self, value: Any, axis_count: int) -> bool:
-        """Normalize every row/column grid pair found in a descriptor tree."""
-        changed = False
-        if isinstance(value, MutableMapping):
-            changed = self._normalize_grid_mapping(value, axis_count) or changed
-            for child in value.values():
-                changed = self._normalize_descriptor_grids(child, axis_count) or changed
-        elif isinstance(value, list):
-            for child in value:
-                changed = self._normalize_descriptor_grids(child, axis_count) or changed
-        return changed
-
-    def _normalize_grid_mapping(self, mapping: MutableMapping[Any, Any], axis_count: int) -> bool:
-        """Normalize one mapping containing row and column grid keys."""
-        row_key = self._first_present_key(mapping, GRID_ROW_KEYS)
-        col_key = self._first_present_key(mapping, GRID_COL_KEYS)
-        if row_key is None or col_key is None:
-            return False
-
-        rows = self._positive_int(mapping.get(row_key))
-        cols = self._positive_int(mapping.get(col_key))
-        if rows is None or cols is None:
-            return False
-
-        if rows * cols == axis_count:
-            return False
-
-        new_rows, new_cols = self._minimum_grid_for_axis_count(
-            axis_count=axis_count,
-            old_rows=rows,
-            old_cols=cols,
-        )
-        mapping[row_key] = new_rows
-        mapping[col_key] = new_cols
-        return True
-
-    @staticmethod
-    def _first_present_key(mapping: MutableMapping[Any, Any], candidates: tuple[str, ...]) -> Any | None:
-        """Return the concrete key matching one of the candidate names."""
-        normalized = {str(key).strip().lower(): key for key in mapping.keys()}
-        for candidate in candidates:
-            key = normalized.get(candidate)
-            if key is not None:
-                return key
-        return None
-
-    @staticmethod
-    def _positive_int(value: Any) -> int | None:
-        """Parse a positive integer or return None."""
-        try:
-            parsed = int(value)
-        except (TypeError, ValueError):
-            return None
-        return parsed if parsed > 0 else None
-
-    @staticmethod
-    def _minimum_grid_for_axis_count(*, axis_count: int, old_rows: int, old_cols: int) -> tuple[int, int]:
-        """Return the minimum-cell grid that best preserves the old shape."""
-        if axis_count <= 0:
-            return 1, 1
-
-        old_ratio = float(old_cols) / float(old_rows) if old_rows > 0 else 1.0
-        best_rows = 1
-        best_cols = axis_count
-        best_score: tuple[int, float, int] | None = None
-
-        for rows in range(1, axis_count + 1):
-            cols = int(math.ceil(axis_count / rows))
-            cells = rows * cols
-            ratio = float(cols) / float(rows)
-            score = (cells, abs(ratio - old_ratio), abs(cols - old_cols) + abs(rows - old_rows))
-            if best_score is None or score < best_score:
-                best_score = score
-                best_rows = rows
-                best_cols = cols
-
-        return best_rows, best_cols
 
     def _prepare_canvas_geometry_before_render(self) -> None:
         """Synchronize Qt and Matplotlib sizes before rendering.
