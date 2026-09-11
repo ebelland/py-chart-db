@@ -496,3 +496,72 @@ def test_a_remembered_table_that_is_gone_falls_back_to_the_first(
     reopened._on_connect()
 
     assert reopened._tables.currentItem().text() == "readings"
+
+
+# ----------------------------------------------------------------------
+# Use a query
+# ----------------------------------------------------------------------
+def test_checking_use_a_query_swaps_the_list_for_a_text_box(
+    dialog: ConnectDatabaseDialog,
+) -> None:
+    assert dialog._table_stack.currentWidget() is dialog._tables
+
+    dialog._use_query.setChecked(True)
+
+    assert dialog._table_stack.currentWidget() is dialog._query_edit
+
+
+def test_confirming_a_query_sets_query_not_table(
+    dialog: ConnectDatabaseDialog, sqlite_db: Path
+) -> None:
+    dialog._sqlite_path.setText(str(sqlite_db))
+    dialog._on_connect()
+    dialog._use_query.setChecked(True)
+    dialog._query_edit.setPlainText("SELECT * FROM readings WHERE v > 0")
+
+    dialog._confirm()
+
+    assert dialog.query == "SELECT * FROM readings WHERE v > 0"
+    assert dialog.table is None
+    assert dialog.connection is not None
+    assert dialog.result() == ConnectDatabaseDialog.DialogCode.Accepted
+
+
+def test_an_empty_query_is_rejected(
+    dialog: ConnectDatabaseDialog, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.dialogs.connect_database_dialog as module
+
+    shown: list[str] = []
+    monkeypatch.setattr(
+        module, "show_message", lambda _p, message_id, **_k: shown.append(message_id)
+    )
+    dialog._use_query.setChecked(True)
+
+    dialog._confirm()
+
+    assert shown == ["import.database_query_invalid"]
+    assert dialog.query is None
+    assert dialog.result() != ConnectDatabaseDialog.DialogCode.Accepted
+
+
+def test_a_write_statement_is_rejected_even_disguised_as_a_query(
+    dialog: ConnectDatabaseDialog, sqlite_db: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """"Use a query" reads into the current project - it must not be a way
+    to run a DELETE against someone else's database instead."""
+    import app.dialogs.connect_database_dialog as module
+
+    shown: list[str] = []
+    monkeypatch.setattr(
+        module, "show_message", lambda _p, message_id, **_k: shown.append(message_id)
+    )
+    dialog._sqlite_path.setText(str(sqlite_db))
+    dialog._on_connect()
+    dialog._use_query.setChecked(True)
+    dialog._query_edit.setPlainText("DELETE FROM readings")
+
+    dialog._confirm()
+
+    assert shown == ["import.database_query_invalid"]
+    assert dialog.query is None

@@ -84,11 +84,30 @@ N-19  GUI: toward a more standard, easy, intuitive interface
         one-time label (or a "?" walkthrough) is worth the added chrome,
         given nav rail structure itself is being kept as-is per the
         Finder-sidebar discussion.
-      - Import dialog shows delimiter/encoding/skip-rows controls
-        regardless of the chosen source - irrelevant for Excel or a
-        database table, relevant only for delimited text. Progressive
-        disclosure (hide what the current source cannot use) would read as
-        less cluttered than always-visible-but-inert controls.
+      - FATTO 2026-09-11: Import dialog showed delimiter/encoding/skip-rows/
+        header/column-type controls regardless of the chosen source -
+        irrelevant for a database table, which has none of that to say.
+        Disabled (not hidden) once the source is a database:
+        _apply_source_dependent_enablement in import_data_dialog.py, run
+        after every _build_columns_table since that rebuilds the per-column
+        combos from scratch. Disabled rather than hidden - the row stays
+        where it was instead of the panel reflowing under the pointer mid-
+        preview. Left panel also grouped into labeled sections (Source /
+        Read options / Columns), the same create_compact_section_title
+        convention as the properties panels and the connect-database
+        dialog, instead of one flat form.
+        Also done in the same pass: ConnectDatabaseDialog gained "Use a
+        query" (a SQL box swapped in for the table list via a QStackedWidget,
+        validated with is_read_only_select so this cannot become a way to
+        DELETE against someone else's database), threaded through as
+        SERVER_DATABASE_QUERY_READERS / read_sqlite_query / read_from_link_
+        source's query branch so "Update link" also replays a query-sourced
+        import. And the web-source quick-pick gained its own "Web" row
+        label plus Add source/Delete source buttons - add_user_web_source/
+        remove_user_web_source in data_sources.py, backed by a
+        get_user_web_sources/set_user_web_sources section in user.json,
+        layered onto the bundled web_sources.json catalogue (WebDataSource.
+        custom marks which is which; only a custom entry can be deleted).
       - Manual spacing (Figure properties) asks for six raw 0..1 fractions
         with no visual feedback - a live-updating preview, or drag handles
         on the chart itself, is the more standard way this kind of control

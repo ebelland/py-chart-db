@@ -414,6 +414,20 @@
       "SegoeFluent": "E897",
       "ThemeIcon": "help-contents"
     },
+    "web_source_add": {
+      "text": "Add source",
+      "description": "Add a web source of your own to the quick-pick list",
+      "SFSymbol": "plus",
+      "SegoeFluent": "E710",
+      "ThemeIcon": "list-add"
+    },
+    "web_source_delete": {
+      "text": "Delete source",
+      "description": "Remove the selected web source from the quick-pick list",
+      "SFSymbol": "trash",
+      "SegoeFluent": "E74D",
+      "ThemeIcon": "list-remove"
+    },
     "web_sources": {
       "text": "Web source",
       "description": "A few ready-made web sources to try - pick one to fill the URL below",
@@ -530,6 +544,11 @@
       "title": "Import from database",
       "text": "Select a table to import."
     },
+    "import.database_query_invalid": {
+      "level": "warning",
+      "title": "Import from database",
+      "text": "{reason}"
+    },
     "import.web_failed": {
       "level": "error",
       "title": "Import from web",
@@ -539,6 +558,11 @@
       "level": "warning",
       "title": "Import from web",
       "text": "Enter a valid http:// or https:// URL."
+    },
+    "import.web_source_incomplete": {
+      "level": "warning",
+      "title": "Add source",
+      "text": "Enter both a name and a URL."
     },
     "import.failed": {
       "level": "error",

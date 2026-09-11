@@ -34,6 +34,7 @@ from typing import Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QFileDialog,
@@ -41,12 +42,15 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLineEdit,
     QListWidget,
+    QPlainTextEdit,
     QSizePolicy,
     QSpinBox,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
 
+from app.data.repo._common import is_read_only_select
 from app.logs.logger import applogger
 from app.styles.style import (
     apply_dialog_shell,
@@ -125,6 +129,10 @@ class ConnectDatabaseDialog(QDialog):
         self.setWindowIcon(load_icon("import_database"))
         self.connection: DatabaseConnection | None = None
         self.table: str | None = None
+        #: Set instead of ``table`` when "Use a query" is checked - mutually
+        #: exclusive with it, and the caller tells them apart by which one
+        #: is not None.
+        self.query: str | None = None
 
         #: The table named by the remembered connection, selected once a
         #: listing actually contains it. Kept as a field rather than applied
@@ -242,11 +250,25 @@ class ConnectDatabaseDialog(QDialog):
         return card
 
     def _build_table_card(self) -> QWidget:
-        """The right column: the tables, given the room to be read in."""
+        """The right column: the tables, given the room to be read in.
+
+        "Use a query" swaps the list for a SQL box rather than showing both
+        at once: the two answer the same question - which rows come back -
+        so a table picked while a query sits typed under it would leave
+        Accept looking at a state neither field alone explains.
+        """
         card = create_card_widget(self, "connectTablesCard")
         card_layout = QVBoxLayout(card)
         stdSizeAndlayout(card_layout)
-        card_layout.addWidget(create_compact_section_title(_("Tables"), card))
+
+        header_row = QHBoxLayout()
+        stdSizeAndlayout(header_row)
+        header_row.addWidget(create_compact_section_title(_("Tables"), card))
+        header_row.addStretch(1)
+        self._use_query = QCheckBox(_("Use a query"), card)
+        self._use_query.toggled.connect(self._on_use_query_toggled)
+        header_row.addWidget(self._use_query)
+        card_layout.addLayout(header_row)
 
         self._tables = QListWidget(card)
         mark_editor_panel(self._tables)
@@ -260,8 +282,19 @@ class ConnectDatabaseDialog(QDialog):
         # Double-click is the same answer as picking and pressing OK, and it
         # is the one a file-list gesture reaches for first.
         self._tables.itemDoubleClicked.connect(lambda _item: self._confirm())
-        card_layout.addWidget(self._tables, 1)
+
+        self._query_edit = QPlainTextEdit(card)
+        self._query_edit.setPlaceholderText(_("SELECT ... FROM ..."))
+        mark_editor_panel(self._query_edit)
+
+        self._table_stack = QStackedWidget(card)
+        self._table_stack.addWidget(self._tables)
+        self._table_stack.addWidget(self._query_edit)
+        card_layout.addWidget(self._table_stack, 1)
         return card
+
+    def _on_use_query_toggled(self, checked: bool) -> None:
+        self._table_stack.setCurrentWidget(self._query_edit if checked else self._tables)
 
     # ------------------------------------------------------------------
     # Engine switch
@@ -494,11 +527,25 @@ class ConnectDatabaseDialog(QDialog):
     # Result
     # ------------------------------------------------------------------
     def _confirm(self) -> None:
+        if self._use_query.isChecked():
+            sql = self._query_edit.toPlainText().strip()
+            ok, reason = is_read_only_select(sql)
+            if not ok:
+                show_message(self, "import.database_query_invalid", reason=reason)
+                return
+            self.connection = self._current_connection()
+            self.query = sql
+            self.table = None
+            self._remember_connection(self.connection, "")
+            self.accept()
+            return
+
         item = self._tables.currentItem()
         if item is None:
             show_message(self, "import.database_no_table_selected")
             return
         self.connection = self._current_connection()
         self.table = item.text()
+        self.query = None
         self._remember_connection(self.connection, self.table)
         self.accept()

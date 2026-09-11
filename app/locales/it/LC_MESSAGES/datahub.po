@@ -108,6 +108,10 @@ msgid "Add a series to the selected axis"
 msgstr "Aggiunge una serie all'asse selezionato"
 
 
+msgid "Add a web source of your own to the quick-pick list"
+msgstr "Aggiunge una fonte web personale all'elenco rapido"
+
+
 msgid "Add an axis to the current figure showing the analysed series. Preview draws it; closing without applying removes it again."
 msgstr "Aggiunge alla figura corrente un asse che mostra le serie analizzate. L'anteprima lo disegna; chiudendo senza applicare viene rimosso."
 
@@ -142,6 +146,10 @@ msgstr "Aggiungi nuovo asse"
 
 msgid "Add series"
 msgstr "Aggiungi serie"
+
+
+msgid "Add source"
+msgstr "Aggiungi fonte"
 
 
 msgid "Additional kwargs editor can be inserted here by the host."
@@ -590,6 +598,10 @@ msgid "Cols"
 msgstr "Colonne"
 
 
+msgid "Columns"
+msgstr "Colonne"
+
+
 msgid "Completions throughout, and the first draft of much of the dialog plumbing."
 msgstr "Completamenti ovunque, e la prima stesura di buona parte dell'impalcatura dei dialoghi."
 
@@ -880,6 +892,10 @@ msgstr "Elimina le tabelle selezionate…"
 
 msgid "Delete series"
 msgstr "Elimina serie"
+
+
+msgid "Delete source"
+msgstr "Elimina fonte"
 
 
 msgid "Delete table"
@@ -2668,6 +2684,10 @@ msgid "Rational 2/1"
 msgstr "Razionale 2/1"
 
 
+msgid "Read options"
+msgstr "Opzioni di lettura"
+
+
 msgid "Reciprocal"
 msgstr "Reciproca"
 
@@ -2730,6 +2750,10 @@ msgstr "Rimuove prima da ogni segmento un trend costante o lineare. Un trend si 
 
 msgid "Remove the selected property"
 msgstr "Rimuove la proprieta selezionata"
+
+
+msgid "Remove the selected web source from the quick-pick list"
+msgstr "Rimuove dall'elenco rapido la fonte web selezionata"
 
 
 msgid "Removed before integrating. Without this, a raised baseline contributes its offset times the width to the area."
@@ -2872,6 +2896,10 @@ msgstr "Esegui prima il fit, poi usa questo pulsante per aggiornare i parametri 
 
 msgid "Run the query"
 msgstr "Esegui la query"
+
+
+msgid "SELECT ... FROM ..."
+msgstr "SELECT ... FROM ..."
 
 
 msgid "SELECT over the chosen table"
@@ -3395,8 +3423,16 @@ msgid "URL:"
 msgstr "URL:"
 
 
+msgid "URL"
+msgstr "URL"
+
+
 msgid "Enter a valid http:// or https:// URL."
 msgstr "Inserisci un URL http:// o https:// valido."
+
+
+msgid "Enter both a name and a URL."
+msgstr "Inserisci sia un nome che un URL."
 
 
 msgid "Spacing"
@@ -3803,6 +3839,10 @@ msgid "Use Simpson's rule:"
 msgstr "Usa il metodo di Simpson:"
 
 
+msgid "Use a query"
+msgstr "Usa una query"
+
+
 msgid "Use current figure"
 msgstr "Usa la figura corrente"
 
@@ -4067,6 +4107,10 @@ msgid "not installed"
 msgstr "non installata"
 
 
+msgid "query"
+msgstr "query"
+
+
 msgid "series"
 msgstr "serie"
 
@@ -4109,6 +4153,10 @@ msgstr "{label}: {value}"
 
 msgid "{method} needs two series.\n\nSelect the reference series first, then the one to compare it with."
 msgstr "{method} richiede due serie.\n\nSeleziona prima la serie di riferimento, poi quella da confrontare."
+
+
+msgid "{reason}"
+msgstr "{reason}"
 
 
 msgid "{report}"

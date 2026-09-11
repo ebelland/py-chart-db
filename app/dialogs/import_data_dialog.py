@@ -46,6 +46,7 @@ from app.styles.style import (
     apply_dialog_shell,
     create_card_widget,
     create_action_button,
+    create_compact_section_title,
     load_icon,
     mark_editor_panel,
     stdSizeAndlayout,
@@ -72,6 +73,7 @@ from app.utils.data_sources import (  # noqa: E402
     IMPORT_FILE_FILTER,
     DatabaseConnection,
     WebDataSource,
+    add_user_web_source,
     filename_from_url,
     is_importable,
     is_valid_web_url,
@@ -85,6 +87,8 @@ from app.utils.data_sources import (  # noqa: E402
     read_postgres_table,
     read_sqlite_table,
     read_web_url,
+    remove_user_web_source,
+    SERVER_DATABASE_QUERY_READERS,
     SERVER_DATABASE_READERS,
     _extension_for_web_source,
 )
@@ -138,6 +142,65 @@ class DataFramePreviewModel(QAbstractTableModel):
         return "" if pd.isna(val) else str(val)
 
 
+class _AddWebSourceDialog(QDialog):
+    """Collects a name, a URL and an optional note for one quick-pick entry.
+
+    Small enough, and specific enough to this one caller, to live next to
+    ``ImportDataDialog`` rather than in its own module - the same reasoning
+    ``DataFramePreviewModel`` above already follows.
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(_("Add source"))
+        self.name = ""
+        self.url = ""
+        self.description = ""
+
+        root = QVBoxLayout(self)
+        apply_dialog_shell(self, root, size="small")
+
+        form = QFormLayout()
+        stdSizeAndlayout(form)
+
+        self._name_field = QLineEdit(self)
+        stdSizeAndlayout(self._name_field)
+        form.addRow(_("Name"), self._name_field)
+
+        self._url_field = QLineEdit(self)
+        self._url_field.setPlaceholderText(_("https://example.com/data.csv"))
+        stdSizeAndlayout(self._url_field)
+        form.addRow(_("URL"), self._url_field)
+
+        self._description_field = QLineEdit(self)
+        stdSizeAndlayout(self._description_field)
+        form.addRow(_("Description"), self._description_field)
+
+        root.addLayout(form)
+        root.addStretch(1)
+
+        btn_row = QHBoxLayout()
+        stdSizeAndlayout(btn_row)
+        btn_row.addStretch(1)
+        create_action_button(parent=self, action_id="apply", action=self._on_accept, layout=btn_row)
+        create_action_button(parent=self, action_id="close", action=self.reject, layout=btn_row)
+        root.addLayout(btn_row)
+
+    def _on_accept(self) -> None:
+        name = self._name_field.text().strip()
+        url = self._url_field.text().strip()
+        if not name or not url:
+            show_message(self, "import.web_source_incomplete")
+            return
+        if not is_valid_web_url(url):
+            show_message(self, "import.web_invalid_url")
+            return
+        self.name = name
+        self.url = url
+        self.description = self._description_field.text().strip()
+        self.accept()
+
+
 # -----------------------------------------------------------------------------
 # Import dialog
 # -----------------------------------------------------------------------------
@@ -189,6 +252,10 @@ class ImportDataDialog(QDialog):
         self._path: str = ""
         self._db_connection: DatabaseConnection | None = None
         self._db_table_name: str = ""
+        #: Set instead of _db_table_name when the connect dialog's "Use a
+        #: query" was checked - mutually exclusive with it, same as
+        #: ConnectDatabaseDialog's own table/query pair.
+        self._db_query: str = ""
         self._last_auto_table: str = ""
         self._picked_web_source: WebDataSource | None = None
 
@@ -203,6 +270,8 @@ class ImportDataDialog(QDialog):
         left = create_card_widget(self, "importOptionsCard")
         left_layout = QVBoxLayout(left)
         stdSizeAndlayout(left_layout)
+
+        left_layout.addWidget(create_compact_section_title(_("Source"), left))
 
         form = QFormLayout()
         stdSizeAndlayout(form)
@@ -245,11 +314,13 @@ class ImportDataDialog(QDialog):
                               )
         src_lay.addWidget(src_bottom)
 
+        form.addRow(_("Source"), src_row)
+
         # Web row: a quick-pick source (fills the URL field below), the URL
-        # itself, and Fetch. A separate row rather than a modal prompt: a
-        # URL needs to be typed, pasted or picked and then reviewed before
-        # it is fetched, not answered in a single dialog box.
-        src_web = QWidget(src_row)
+        # itself, and Fetch - its own labeled row rather than folded into
+        # "Source" above, since it is a second way to name a source, not one
+        # of the buttons for the first.
+        src_web = QWidget(left)
         src_web_lay = QHBoxLayout(src_web)
         stdSizeAndlayout(src_web_lay)
 
@@ -265,32 +336,11 @@ class ImportDataDialog(QDialog):
         self._web_source_button.setIcon(icon)
         self._web_source_button.setToolTip(tooltip)
         self._web_source_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-
-        # Every entry gets the same icon rather than one per category: what
-        # they have in common is that picking one downloads something, which
-        # is exactly what the "fetch_url" action already draws - reusing it
-        # needs no new catalogue entry, and a dozen bespoke subject glyphs
-        # (Astronomy, Sports, Entertainment...) would each need an SF Symbol,
-        # a Segoe Fluent glyph and a freedesktop theme name of their own to
-        # match how every other icon in this application is sourced.
-        entry_icon = load_icon("fetch_url")
         self._web_source_menu = QMenu(self._web_source_button)
-        by_category: dict[str, list[WebDataSource]] = {}
-        for source in WEB_DATA_SOURCES:
-            by_category.setdefault(source.category, []).append(source)
-        for category, sources in by_category.items():
-            # Categories and dataset names are data, not source text - see
-            # the note above on _(): they are deliberately not translated.
-            self._web_source_menu.addSection(category)
-            for source in sources:
-                menu_action = self._web_source_menu.addAction(entry_icon, source.name)
-                menu_action.setToolTip(source.description)
-                menu_action.triggered.connect(
-                    lambda _checked=False, s=source: self._on_web_source_picked(s)
-                )
         self._web_source_button.setMenu(self._web_source_menu)
         stdSizeAndlayout(self._web_source_button)
         src_web_lay.addWidget(self._web_source_button)
+        self._rebuild_web_source_menu()
 
         self._url = QLineEdit(src_web)
         self._url.setPlaceholderText(_("https://example.com/data.csv"))
@@ -303,9 +353,20 @@ class ImportDataDialog(QDialog):
                                action=self._on_fetch_url,
                                layout=src_web_lay,
                            )
-        src_lay.addWidget(src_web)
-
-        form.addRow(_("Source"), src_row)
+        self._btn_add_web_source = create_action_button(
+                                        parent=src_web,
+                                        action_id="web_source_add",
+                                        action=self._on_add_web_source,
+                                        layout=src_web_lay,
+                                    )
+        self._btn_delete_web_source = create_action_button(
+                                           parent=src_web,
+                                           action_id="web_source_delete",
+                                           action=self._on_delete_web_source,
+                                           layout=src_web_lay,
+                                       )
+        self._btn_delete_web_source.setEnabled(False)
+        form.addRow(_("Web"), src_web)
 
         # Excel worksheet selector (shown only for Excel files)
         self._sheet = QComboBox(left)
@@ -319,17 +380,23 @@ class ImportDataDialog(QDialog):
         if self._sheet_label is not None:
             self._sheet_label.setVisible(False)
 
+        left_layout.addLayout(form)
+
+        left_layout.addWidget(create_compact_section_title(_("Read options"), left))
+        options_form = QFormLayout()
+        stdSizeAndlayout(options_form)
+
         # Table name
         self._table = QLineEdit(left)
         self._table.setText(str(cfg.get("table", "")))
         stdSizeAndlayout(self._table)
-        form.addRow(_("Table"), self._table)
+        options_form.addRow(_("Table"), self._table)
 
         # Header
         self._has_header = QCheckBox(_("First row is header"), left)
         self._has_header.setChecked(bool(cfg.get("header", True)))
         stdSizeAndlayout(self._has_header)
-        form.addRow("", self._has_header)
+        options_form.addRow("", self._has_header)
 
         # Skip rows (top)
         self._skip_rows = QSpinBox(left)
@@ -340,7 +407,7 @@ class ImportDataDialog(QDialog):
         self._skip_rows.setButtonSymbols(QSpinBox.ButtonSymbols.UpDownArrows)
         # If global QSS breaks hit-testing, neutralize for this widget
         stdSizeAndlayout(self._skip_rows)
-        form.addRow(_("Skip top rows"), self._skip_rows)
+        options_form.addRow(_("Skip top rows"), self._skip_rows)
 
         # Skip rows (bottom)
         self._skip_last = QSpinBox(left)
@@ -350,7 +417,7 @@ class ImportDataDialog(QDialog):
         self._skip_last.setAccelerated(True)
         self._skip_last.setButtonSymbols(QSpinBox.ButtonSymbols.UpDownArrows)
         stdSizeAndlayout(self._skip_last)
-        form.addRow(_("Skip last rows"), self._skip_last)
+        options_form.addRow(_("Skip last rows"), self._skip_last)
 
         # Delimiter dropdown (editable)
         self._delim = QComboBox(left)
@@ -368,7 +435,7 @@ class ImportDataDialog(QDialog):
         if saved_delim:
             self._delim.setEditText(saved_delim)
         stdSizeAndlayout(self._delim)
-        form.addRow(_("Delimiter"), self._delim)
+        options_form.addRow(_("Delimiter"), self._delim)
 
         # Encoding dropdown (editable)
         self._encoding = QComboBox(left)
@@ -379,11 +446,12 @@ class ImportDataDialog(QDialog):
         saved_enc = (cfg.get("encoding", "auto") or "auto").strip() or "auto"
         self._encoding.setCurrentText(saved_enc)
         stdSizeAndlayout(self._encoding)
-        form.addRow(_("Encoding"), self._encoding)
+        options_form.addRow(_("Encoding"), self._encoding)
 
-        left_layout.addLayout(form)
+        left_layout.addLayout(options_form)
 
         # Column mapping table
+        left_layout.addWidget(create_compact_section_title(_("Columns"), left))
         self._col_table = QTableWidget(left)
         self._col_table.setColumnCount(2)
         self._col_table.setHorizontalHeaderLabels(["Column", "Type"])
@@ -611,6 +679,7 @@ class ImportDataDialog(QDialog):
 
             # Columns: keep empty columns (default Ignore)
             self._build_columns_table(include_empty=True)
+            self._apply_source_dependent_enablement()
 
             # Preview: hide empty columns
             df_prev = self._df
@@ -644,8 +713,18 @@ class ImportDataDialog(QDialog):
         )
 
     def _read_database_source(self) -> pd.DataFrame:
-        """Read the currently selected table from the other database."""
-        if self._db_connection is None or not self._db_table_name:
+        """Read the currently selected table, or query, from the other database."""
+        if self._db_connection is None:
+            return pd.DataFrame()
+        if self._db_query:
+            read_query = SERVER_DATABASE_QUERY_READERS[self._db_connection.kind]
+            return read_query(
+                self._db_connection,
+                self._db_query,
+                skiprows=int(self._skip_rows.value()),
+                skipfooter=int(self._skip_last.value()),
+            )
+        if not self._db_table_name:
             return pd.DataFrame()
         _list_tables, read_table = SERVER_DATABASE_READERS[self._db_connection.kind]
         return read_table(
@@ -737,6 +816,33 @@ class ImportDataDialog(QDialog):
             self._col_table.setCellWidget(r, 1, combo)
 
         self._col_table.resizeColumnsToContents()
+
+    def _apply_source_dependent_enablement(self) -> None:
+        """Disable the read-format controls a database source has no use for.
+
+        Skip rows/skip last/delimiter/header/encoding, and the per-column
+        type picker, all describe how to parse *text* - a database table has
+        none of that to say: no delimiter, no header row to detect, and
+        types of its own that ``read_sqlite_table``/``read_postgres_table``/
+        ``read_mysql_table`` already read as they are. Left enabled they
+        would invite "fixing" a setting nothing here reads. Re-run after
+        every ``_build_columns_table`` call, since that rebuilds the
+        per-column combos from scratch and a freshly built one defaults to
+        enabled.
+        """
+        text_only = self._source_mode != "database"
+        for widget in (
+            self._skip_rows,
+            self._skip_last,
+            self._delim,
+            self._has_header,
+            self._encoding,
+        ):
+            widget.setEnabled(text_only)
+        for row in range(self._col_table.rowCount()):
+            combo = self._col_table.cellWidget(row, 1)
+            if isinstance(combo, QComboBox):
+                combo.setEnabled(text_only)
 
     @staticmethod
     def _guess_sqlite_type(series: pd.Series) -> str:
@@ -881,27 +987,32 @@ class ImportDataDialog(QDialog):
         self._refresh_preview()
 
     def _on_import_database(self) -> None:
-        """Connect to another database, then import one of its tables.
+        """Connect to another database, then import one of its tables - or,
+        with "Use a query" checked, whatever that query returns.
 
-        Connecting and picking a table both happen in ConnectDatabaseDialog -
-        not the application's own ``self._repo``: this dialog only ever reads
-        a table out of a *different* database into the current one. That
-        dialog's own error handling covers a failed connection or a database
-        with nothing in it, so a plain cancel is the only outcome to handle
-        here.
+        Connecting, picking a table and typing a query all happen in
+        ConnectDatabaseDialog - not the application's own ``self._repo``:
+        this dialog only ever reads from a *different* database into the
+        current one. That dialog's own error handling covers a failed
+        connection, a database with nothing in it, or an invalid query, so a
+        plain cancel is the only outcome to handle here.
         """
         picker = ConnectDatabaseDialog(self)
-        if not picker.exec() or picker.connection is None or not picker.table:
+        if not picker.exec() or picker.connection is None:
+            return
+        if not picker.table and not picker.query:
             return
 
         self._source_mode = "database"
         self._db_connection = picker.connection
-        self._db_table_name = picker.table
+        self._db_table_name = picker.table or ""
+        self._db_query = picker.query or ""
         self._path = ""
-        self._set_file_name_label(f"{picker.connection.display_name()} · {picker.table}")
+        label = picker.table or _("query")
+        self._set_file_name_label(f"{picker.connection.display_name()} · {label}")
         self._update_sheet_choices("")
 
-        self._set_default_table_name(picker.table)
+        self._set_default_table_name(picker.table or f"{picker.connection.display_name()}_query")
         self._refresh_preview()
 
     def _on_web_source_picked(self, source: WebDataSource) -> None:
@@ -915,6 +1026,64 @@ class ImportDataDialog(QDialog):
         self._picked_web_source = source
         self._url.setText(source.url)
         self._url.setToolTip(source.description)
+        # Only a source the user added themselves can be removed again - a
+        # bundled entry ships with the application, not with this project.
+        self._btn_delete_web_source.setEnabled(source.custom)
+
+    def _rebuild_web_source_menu(self) -> None:
+        """(Re)build the quick-pick menu from the current catalogue.
+
+        Called once at construction and again after Add/Delete Source, since
+        either changes what ``load_web_data_sources()`` returns.
+        """
+        # Every entry gets the same icon rather than one per category: what
+        # they have in common is that picking one downloads something, which
+        # is exactly what the "fetch_url" action already draws - reusing it
+        # needs no new catalogue entry, and a dozen bespoke subject glyphs
+        # (Astronomy, Sports, Entertainment...) would each need an SF Symbol,
+        # a Segoe Fluent glyph and a freedesktop theme name of their own to
+        # match how every other icon in this application is sourced.
+        entry_icon = load_icon("fetch_url")
+        self._web_source_menu.clear()
+        by_category: dict[str, list[WebDataSource]] = {}
+        for source in load_web_data_sources():
+            by_category.setdefault(source.category, []).append(source)
+        for category, sources in by_category.items():
+            # Categories and dataset names are data, not source text - see
+            # the note above on _(): they are deliberately not translated.
+            # USER_WEB_SOURCE_CATEGORY is no exception: it reads the same as
+            # every other category here, plain text rather than chrome.
+            self._web_source_menu.addSection(category)
+            for source in sources:
+                menu_action = self._web_source_menu.addAction(entry_icon, source.name)
+                menu_action.setToolTip(source.description)
+                menu_action.triggered.connect(
+                    lambda _checked=False, s=source: self._on_web_source_picked(s)
+                )
+
+    def _on_add_web_source(self) -> None:
+        """Add a source of the user's own to the quick-pick catalogue."""
+        dialog = _AddWebSourceDialog(self)
+        if not dialog.exec():
+            return
+        source = add_user_web_source(dialog.name, dialog.url, dialog.description)
+        self._rebuild_web_source_menu()
+        self._on_web_source_picked(source)
+
+    def _on_delete_web_source(self) -> None:
+        """Remove the selected source from the user's own catalogue.
+
+        The button is only enabled while the last-picked source is one the
+        user added themselves (see ``_on_web_source_picked``), so this never
+        runs against a bundled entry.
+        """
+        picked = self._picked_web_source
+        if picked is None or not picked.custom:
+            return
+        remove_user_web_source(picked.name)
+        self._picked_web_source = None
+        self._btn_delete_web_source.setEnabled(False)
+        self._rebuild_web_source_menu()
 
     def _on_fetch_url(self) -> None:
         """Download the URL in the web-source field and load it as this
@@ -1046,7 +1215,10 @@ class ImportDataDialog(QDialog):
             return {"kind": "file", "path": self._path, "sheet": self._current_sheet()}
         if self._source_mode == "database" and self._db_connection is not None:
             settings = self._db_connection.to_link_settings()
-            settings["table"] = self._db_table_name
+            if self._db_query:
+                settings["query"] = self._db_query
+            else:
+                settings["table"] = self._db_table_name
             return settings
         if self._source_mode == "web":
             return {"kind": "web", "url": self._path}
@@ -1055,7 +1227,7 @@ class ImportDataDialog(QDialog):
     def _link_display_path(self) -> str:
         """Return the display string a saved link is listed under."""
         if self._source_mode == "database" and self._db_connection is not None:
-            return f"{self._db_connection.display_name()}#{self._db_table_name}"
+            return f"{self._db_connection.display_name()}#{self._db_table_name or self._db_query}"
         return self._path
 
     @staticmethod
