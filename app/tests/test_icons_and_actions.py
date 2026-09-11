@@ -262,6 +262,36 @@ def test_the_italian_locale_covers_every_operation() -> None:
     assert missing == []
 
 
+def test_the_italian_locale_covers_every_renderer() -> None:
+    """The chart types' wording needs the same sweep as the operations'.
+
+    A renderer's Name, Description and Category are declared on the class and
+    discovered by the scanner, so - exactly like a series operation - none of
+    the three is a literal any ``_()`` sweep can find. They reach the screen
+    through ``tr()`` in the chart picker and the axis properties panel, and
+    without this they would go back to being English in an Italian UI one
+    new chart type at a time.
+    """
+    from app.scanners.axis_renderer_scanner import renderers
+
+    catalog = i18n._parse_po(
+        i18n.LOCALES_DIR / "it" / "LC_MESSAGES" / f"{i18n.DOMAIN}.po"
+    )
+    missing = sorted(
+        {
+            text
+            for renderer in renderers
+            for text in (
+                renderer.get("value"),
+                renderer.get("description"),
+                renderer.get("category"),
+            )
+            if text and text not in catalog
+        }
+    )
+    assert missing == []
+
+
 def test_every_operation_icon_actually_draws(qapp) -> None:
     """A plugin's icon is markup, so it can be wrong in ways a path cannot.
 

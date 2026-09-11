@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import sys
-from pathlib import Path
 
 from PySide6 import __file__ as PYSIDE6_FILE
 

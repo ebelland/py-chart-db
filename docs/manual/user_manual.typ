@@ -1,4 +1,4 @@
-#set document(title: "Data Hub — User Manual", author: "Data Hub")
+#set document(title: "ChartLibre — User Manual", author: "ChartLibre")
 #set page(paper: "a4", margin: (x: 2.4cm, y: 2.4cm), numbering: "1")
 #set text(font: "New Computer Modern", size: 10.5pt, lang: "en")
 #set par(justify: true, leading: 0.65em)
@@ -46,7 +46,7 @@
 // ----------------------------------------------------------------------
 #align(center)[
   #v(4cm)
-  #text(size: 30pt, weight: "bold")[Data Hub]
+  #text(size: 30pt, weight: "bold")[ChartLibre]
   #v(0.3cm)
   #text(size: 15pt, style: "italic")[User Manual]
   #v(1.5cm)
@@ -60,13 +60,13 @@
 
 = Introduction
 
-Data Hub is a desktop application for Windows, macOS and Linux that lets you import tabular data, query it with SQL, and turn it into scientific charts — from histograms to 3D surfaces — without writing code.
+ChartLibre is a desktop application for Windows, macOS and Linux that lets you import tabular data, query it with SQL, and turn it into scientific charts — from histograms to 3D surfaces — without writing code.
 
 Every project is a single file with the extension `.dhub`: a SQLite database that holds both the imported data and the definitions of every chart (figures, axes, series and their drawing options). The file is therefore self-contained and portable — moving or sharing it carries both the data and every visualization built on top of it.
 
 == Who this manual is for
 
-This manual describes the application as it presents itself to a user: the main window, importing data, building queries, creating and customizing charts, running statistical operations on series, and the application's settings. A final chapter, @advanced, is aimed at developers who want to extend Data Hub with a new chart type or a new analysis operation.
+This manual describes the application as it presents itself to a user: the main window, importing data, building queries, creating and customizing charts, running statistical operations on series, and the application's settings. A final chapter, @advanced, is aimed at developers who want to extend ChartLibre with a new chart type or a new analysis operation.
 
 == Key concepts
 
@@ -80,7 +80,7 @@ This manual describes the application as it presents itself to a user: the main 
 
 = Starting up and managing databases
 
-On first launch, or whenever no file is given, Data Hub asks which database to open:
+On first launch, or whenever no file is given, ChartLibre asks which database to open:
 
 / New: creates an empty `.dhub` database at a path you choose.
 / Open: opens an existing `.dhub` file.
@@ -110,7 +110,7 @@ A vertical column of icons switches between the application's main sections:
 
 - *Data* — the list of tables and queries in the database, with a data preview.
 - *Chart Options* — properties of the currently selected figure, axis and series.
-- *Series Operations* — analysis tools (fit, statistics, filtering, ...) that apply to a series' data.
+- *Series Operations* — *Plot*, plus the analysis tools (fit, statistics, filtering, ...) that apply to a series' data.
 - *Menu* — opens the application's main menu (new, open, import, settings, credits, ...).
 
 == Data panel
@@ -133,7 +133,7 @@ Occupies the right side of the window and is organized into tabs — each tab is
 
 *Zoom to fit* brings the whole chart back within the panel's bounds in one click.
 
-The *New plot* button on the Data page creates a new, empty figure, configured as described in @creating-a-chart.
+The *Plot* button, at the top of the Series Operations panel, creates a new figure, configured as described in @creating-a-chart.
 
 = Importing data
 
@@ -145,16 +145,27 @@ The *New plot* button on the Data page creates a new, empty figure, configured a
   inset: 6pt,
   [*Open*], [A local file: `.csv`, `.tsv`, `.txt`, `.xlsx`, `.xlsm`, `.xls`, `.json`, `.xml`.],
   [*Paste*], [Whatever tabular text is currently on the clipboard.],
-  [*Database*], [One table read out of another database — SQLite (including another `.dhub` file), PostgreSQL, or MySQL.],
+  [*Database*], [One table — or the result of a query — read out of another database: SQLite (including another `.dhub` file), PostgreSQL, or MySQL.],
   [*Web*], [Whatever an http(s) URL returns — a CSV export, a JSON API, a spreadsheet.],
 )
 
 Whichever way the data arrives, the same preview, column-type mapping and destination-table name apply before anything is written. For Excel sources with more than one sheet, the dialog asks which one to import.
 
-*Database* opens its own small window: pick an engine (SQLite file, PostgreSQL or MySQL), fill in a file path or a host/port/database/username/password, and press *Connect* to list that database's own tables — never any internal bookkeeping tables Data Hub itself may have added to it, for a SQLite/`.dhub` source. Pick one and confirm to bring it back to the import dialog like any other source.
+The dialog's left panel is grouped into *Source* (where the data comes from, including the web row), *Read options* (destination table name, header row, skipped rows, delimiter, encoding) and *Columns* (the per-column type mapping). The read options describe how to parse *text*: when the source is a database table they are disabled, because a table already has its own column types, no delimiter and no header row to detect.
+
+*Database* opens its own small window:
+
++ Pick an engine — a SQLite file, another ChartLibre project (`.dhub`), PostgreSQL or MySQL.
++ Fill in a file path, or a host/port/username/password. For a server, *Connect* asks it which databases exist and offers them in a list, so the name does not have to be typed from memory; picking one lists its tables.
++ Choose a table — never any internal bookkeeping tables ChartLibre itself may have added, for a SQLite/`.dhub` source — or tick *Use a query* and write a `SELECT` instead, for a join, a filter or an aggregate.
++ Confirm to bring the result back to the import dialog like any other source.
+
+The last connection is remembered, password excepted, so reopening the window lands on the same server and table.
+
+*Web* has its own row: a quick-pick menu of ready-made public datasets grouped by subject, the URL itself, and *Fetch*. Picking an entry fills the URL in rather than downloading immediately, so it can be read and edited first. *Add source* saves a URL of your own to that menu under a name you choose, and *Delete source* removes one you added — the entries that ship with the application cannot be deleted.
 
 #note[
-  An imported table stays available to every query and chart in the project: importing is a one-time read, not a live link back to the original file, database or URL — the data does not change on its own afterwards. Every source *except* a paste can be re-read later, though: right-click the table and choose *Update link* to replace its contents with a fresh read from the same file, database table, or URL.
+  An imported table stays available to every query and chart in the project: importing is a one-time read, not a live link back to the original file, database or URL — the data does not change on its own afterwards. Every source *except* a paste can be re-read later, though: right-click the table and choose *Update link* to replace its contents with a fresh read from the same file, database table, query or URL.
 ]
 
 #note[
@@ -194,13 +205,15 @@ A saved query appears in the table list with a *Q* icon and can be used as the d
 
 = Creating a chart <creating-a-chart>
 
-*New plot* opens the chart-creation window: pick a *chart type* (a renderer) and define the first series — the SQL query that supplies the data.
+*Plot*, at the top of the Series Operations panel, opens the chart-creation window: pick a *chart type* (a renderer) and define the first series — the SQL query that supplies the data.
 
 Every chart type requires the query to produce columns with specific names, its *roles* — for instance `x` and `y` for a scatter plot. The window shows the roles a type requires and a link to that type's Matplotlib documentation.
 
 == Chart types <renderers>
 
-Data Hub ships 23 chart types (*renderers*), grouped into the same categories Matplotlib's own documentation uses. Each is a self-contained piece of code that receives the rows a series' SQL query returns and draws them; see @advanced-renderer for how a new one is added.
+ChartLibre ships 29 chart types (*renderers*), grouped into the same categories Matplotlib's own documentation uses. Each is a self-contained piece of code that receives the rows a series' SQL query returns and draws them; see @advanced-renderer for how a new one is added.
+
+The chart picker lists them section by section and its search box matches a name or a whole category, so typing "stat" brings up the statistical family at once.
 
 === Pairwise data (x, y)
 
@@ -212,14 +225,15 @@ Data Hub ships 23 chart types (*renderers*), grouped into the same categories Ma
   [*Horizontal Bar Chart*], [Horizontal bar chart],
   [*Broken Bar*], [Interval bars grouped by category (Gantt-style)],
   [*Broken Bar (Vertical)*], [The same, stacked in columns],
-  [*Scatter Plot*], [Scatter plot],
+  [*Scatter Plot*], [Scatter plot; optional `color` and `size` columns drive a colour map and marker sizing],
   [*Fill Between*], [The region between two y curves over a shared x — confidence bands, tolerance limits],
   [*Stack Plot*], [Series stacked into filled bands, showing how a total divides into its parts],
+  [*Stem Plot*], [A stem from a baseline to each value — impulses, spectra, anything sampled at discrete x],
+  [*Stairs*], [A step outline over bin edges, for values that hold constant between them],
   [*Table*], [A data table, rows and columns of text rather than a plot],
   [*Text*], [Text labels at data points, spread apart to avoid overlap],
   [*Time Series*], [Time series, with numeric or timestamp x],
   [*Timeline*], [Dated events on a baseline, each on its own stem — release histories, event lists],
-  [*Wind Barbs*], [A barb per point showing the direction and strength of a vector field (u/v components)],
 )
 
 === Statistical distributions
@@ -234,17 +248,33 @@ Data Hub ships 23 chart types (*renderers*), grouped into the same categories Ma
   [*ECDF*], [Empirical cumulative distribution function],
   [*Pareto Chart*], [Categories sorted by descending magnitude with a cumulative-percentage line],
   [*Pie Chart*], [Pie or donut chart of one series],
-  [*Stairs*], [A step outline over bin edges, for values that hold constant between them],
 )
 
-=== Gridded / irregularly gridded data
+=== Gridded data
+
+Values sampled on a complete, evenly spaced x/y grid.
 
 #table(
   columns: (auto, 1fr),
   stroke: none,
   inset: 6pt,
   [*Contour Plot*], [Filled or line contours of z over a regular x/y grid],
-  [*Contour Plot (Scattered)*], [The same, for scattered (non-gridded) x/y/z data],
+  [*Quiver*], [An arrow per sample showing a vector field's direction and magnitude (u/v components)],
+  [*Stream Plot*], [Streamlines traced through a vector field — where a flow goes, rather than what it does at each sample],
+  [*Wind Barbs*], [A barb per point encoding speed in flags, readable where a field of arrows is not],
+)
+
+=== Irregularly gridded data
+
+The same quantities measured wherever they could be measured, with no grid to assume.
+
+#table(
+  columns: (auto, 1fr),
+  stroke: none,
+  inset: 6pt,
+  [*Contour Plot (Scattered)*], [Filled or line contours for scattered x/y/z data],
+  [*Triangular Mesh*], [The triangulation itself, as edges and vertices — shows what an interpolating chart will assume between samples],
+  [*Triangular Color Mesh*], [Scattered samples triangulated and filled by value],
 )
 
 === 3D and volumetric data
@@ -255,7 +285,12 @@ Data Hub ships 23 chart types (*renderers*), grouped into the same categories Ma
   inset: 6pt,
   [*Surface Plot*], [3D surface over a regular x/y grid],
   [*Surface Plot (Scattered)*], [3D triangulated surface for scattered (non-gridded) x/y/z data],
+  [*Scatter Plot (3D)*], [Points in three dimensions, optionally coloured and sized by further columns],
 )
+
+#note[
+  A chart type that needs a complete grid says so and draws nothing when the rows it is given are not one — it never interpolates the missing cells and calls the result a measurement. Its scattered counterpart is named in the log entry; switch the axis to that one instead.
+]
 
 == How a renderer reads a series
 
@@ -292,23 +327,33 @@ Every setting shows a contextual description, so reading Matplotlib's own docume
 
 *Series Operations* applies statistical or mathematical transformations to an existing series' data, previewing the result before it is committed to the chart. Every operation dialog shares the same layout: on the left, the source axis/series, a model and its parameters; on the right, a preview of the result and a log of the computation.
 
+The panel itself is a grid of square buttons grouped by what they are for — *Plot*, *Analysis*, *Statistics*, *Signal Processing*, *Modeling* — with a bar along the bottom that describes whichever button the pointer (or the keyboard focus) is on.
+
 #table(
   columns: (auto, 1fr, 1.4fr),
   stroke: none,
   inset: 6pt,
-  [*Fit*], [Fit data models], [Fits a mathematical model (Gaussian, exponential, polynomial, a user function, ...) to a series by least squares, and adds the fitted curve alongside the data.],
-  [*Calculus*], [Differentiate or integrate], [Computes the numerical derivative or the cumulative integral of a series.],
-  [*Interpolate*], [Fill missing values], [Fills gaps in a series (linear, spline, nearest, ...), producing a complete curve from a sparse one.],
-  [*Smoothing*], [Reduce noise], [Applies a smoothing model (moving average, Savitzky-Golay, ...) to reduce noise while preserving the underlying shape.],
-  [*Outlier*], [Detect anomalies], [Flags points that deviate from the rest of a series by a chosen statistical criterion.],
   [*Peaks*], [Find and measure peaks], [Detects peaks in a series and reports their position, height and width.],
-  [*Spectral*], [Analyse frequencies], [Computes the frequency-domain content of a series (FFT-based).],
-  [*Control Chart*], [Monitor process stability], [Builds a statistical control chart (mean and control limits) and flags rule violations.],
-  [*Cluster*], [Group similar data], [Groups a series' points into clusters (k-means, DBSCAN, ...) and labels each point by cluster.],
+  [*Roots*], [Find where a series crosses a level], [Locates the x values at which a series crosses a chosen level — zero by default — by interpolating between the samples either side.],
+  [*Calculus*], [Differentiate or integrate], [Computes the numerical derivative or the cumulative integral of a series, with smoothing built into the first and baseline subtraction into the second.],
   [*Statistics*], [Compute metrics], [Reports summary statistics (mean, standard deviation, quantiles, ...) for a series.],
+  [*Outliers*], [Detect anomalies], [Flags points that deviate from the rest of a series by a chosen statistical criterion.],
+  [*Clustering*], [Group similar data], [Groups a series' points into clusters (k-means, DBSCAN, ...) and labels each point by cluster.],
+  [*Control Chart*], [Monitor process stability], [Builds a statistical control chart and flags rule violations — I-MR, X-bar-R and X-bar-S for measurements, p, np, c and u for counts.],
+  [*Smoothing*], [Reduce noise], [Applies a smoothing model (moving average, Savitzky-Golay, ...) to reduce noise while preserving the underlying shape.],
+  [*Spectral Analysis*], [Analyse frequencies], [Power spectral density, cross-spectral density, coherence, magnitude/phase spectra and auto/cross-correlation, on their own new axis.],
+  [*Filtering*], [Filter, detrend or demodulate], [Low/high/band-pass and band-stop filtering (Butterworth, Chebyshev, Bessel, FIR), trend removal, and the Hilbert envelope of a signal.],
+  [*Baseline Correction*], [Subtract a background], [Removes a drifting background from a spectrum — asymmetric least squares or a rubber band — and keeps the baseline it removed as its own series.],
+  [*Fit*], [Fit data models], [Fits a mathematical model (Gaussian, exponential, polynomial, a user function, ...) to a series by least squares, and adds the fitted curve alongside the data. Optionally adds a residuals chart and a measured-vs-fit chart.],
+  [*Interpolation*], [Fill missing values], [Fills gaps in a series (linear, spline, nearest, ...), producing a complete curve from a sparse one.],
+  [*Function*], [Plot a function], [Evaluates a function over a range and plots it — the one operation that reads no source series at all.],
 )
 
 A typical workflow is: select the axis and series to operate on, choose a model and its parameters, click *Preview* to see the result superimposed on the chart, adjust the parameters if needed, then confirm to add the result as a new series (or table) permanently. See @advanced-operation for how a new operation is added.
+
+#note[
+  An operation reads *one* source series. If several are ticked, the first one is used and the others are ignored — the status bar says which one it took. To operate on a different series, untick the others, or move the one you want to the top of the list.
+]
 
 = Appearance and styles
 
@@ -340,9 +385,9 @@ The *Log viewer* shows the history of the application's internal operations (sta
 
 *Credits* lists the application, the version in use, and the open-source libraries it is built on (including Qt/PySide6, Matplotlib, NumPy, pandas, SciPy and statsmodels).
 
-= Advanced: extending Data Hub <advanced>
+= Advanced: extending ChartLibre <advanced>
 
-Data Hub discovers chart types and series operations the same way: by scanning a folder for Python classes that directly subclass a known base class, at import time — no registration list to edit and keep in sync. Dropping a well-formed file into the right folder is enough for it to appear in the application.
+ChartLibre discovers chart types and series operations the same way: by scanning a folder for Python classes that directly subclass a known base class, at import time — no registration list to edit and keep in sync. Dropping a well-formed file into the right folder is enough for it to appear in the application.
 
 == Writing a custom chart renderer <advanced-renderer>
 
@@ -370,7 +415,9 @@ def render_axis(self, ax, series: list[SeriesData], options: dict | None = None)
     ...
 ```]
 
-which receives one `SeriesData` per series already queried into a DataFrame, and draws them onto `ax` (a Matplotlib `Axes`).
+which receives one `SeriesData` per series — already queried, with its columns in `sd.df` — and draws them onto `ax` (a Matplotlib `Axes`).
+
+`sd.df` is a `SeriesFrame` (`app.data.series_frame`): columns of NumPy arrays read straight from SQLite, read the way a DataFrame is (`sd.df["x"]`, `"x" in sd.df.columns`, `sd.df.loc[mask, "color"]`), with `sd.df.to_pandas()` available for the rare operation that genuinely needs a DataFrame. The developer guide's §4.1 covers it.
 
 *Practical steps:*
 

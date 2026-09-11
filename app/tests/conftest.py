@@ -1,4 +1,4 @@
-"""Shared pytest fixtures and options for the Data Hub test suite.
+"""Shared pytest fixtures and options for the ChartLibre test suite.
 
 Artifacts (databases, saved figures) go to the directory chosen by
 ``_artifacts_root``; set ``DHUB_TEST_ARTIFACTS`` to redirect them.

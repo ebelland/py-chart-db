@@ -94,6 +94,19 @@ def test_every_translated_string_is_in_the_italian_catalogue() -> None:
     assert missing == [], f"{len(missing)} strings have no Italian: {missing[:5]}"
 
 
+def test_the_catalogue_defines_each_message_once() -> None:
+    """Two entries for one msgid means one of them is dead and nobody knows
+    which. They were identical this time; the next pair need not be, and then
+    which translation shows depends on parse order."""
+    import re
+    from collections import Counter
+
+    ids = re.findall(r'^msgid "(.*)"$', PO_PATH.read_text(encoding="utf-8"), re.M)
+    repeated = sorted(message for message, count in Counter(ids).items() if count > 1)
+
+    assert repeated == []
+
+
 def test_labels_held_in_tables_are_translated_too() -> None:
     """The gap the ``_()`` sweep cannot see.
 

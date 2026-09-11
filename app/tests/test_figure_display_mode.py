@@ -173,7 +173,19 @@ def test_choosing_a_mode_in_the_combo_changes_the_panel(widget, panel) -> None:
 
 
 def test_choosing_a_mode_persists_it_to_the_descriptor(widget, panel, repo: SqliteRepo) -> None:
+    """Start somewhere else on purpose, so the combo really changes.
+
+    Reading the starting mode off the panel - whatever it happens to be -
+    made this test depend on two things it has no business depending on: the
+    order the file's tests run in, and the ``resize_mode`` in the *developer's
+    own* user.json. Landing on a panel already in FIXED, ``setCurrentIndex``
+    to the index it is already on emits nothing, the setter never runs, and
+    nothing is persisted - so the assertion failed for a reason that had
+    nothing to do with persisting.
+    """
+    panel.set_resize_mode("FIT", persist=False, redraw=False)
     widget.set_resize_mode_control(panel.resize_mode, panel.set_resize_mode)
+
     combo = widget._resize_mode_combo
     combo.setCurrentIndex(combo.findData("FIXED"))
 

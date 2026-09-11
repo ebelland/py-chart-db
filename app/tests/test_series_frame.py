@@ -118,6 +118,19 @@ def test_drop_column_is_a_no_op_when_the_column_is_absent(frame: SeriesFrame) ->
     assert dropped.columns == frame.columns
 
 
+def test_drop_column_shares_arrays_while_copy_does_not(frame: SeriesFrame) -> None:
+    """The two have different jobs, and the docstrings say which is which:
+    copy() is what the cache hands out, drop_column() is a view.
+
+    Checked by array identity rather than by writing through one of them:
+    a column comes back as a pandas Series, and under copy-on-write its
+    ``to_numpy()`` is read-only, so the public accessor cannot scribble on a
+    shared array even when one is shared.
+    """
+    assert frame.drop_column("label")._data["x"] is frame._data["x"]
+    assert frame.copy()._data["x"] is not frame._data["x"]
+
+
 # ----------------------------------------------------------------------
 # The escape hatch - pareto.py's groupby, table.py's row/column layout
 # ----------------------------------------------------------------------

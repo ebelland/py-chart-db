@@ -23,6 +23,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QFileDialog, QWidget
 
+from app import APP_NAME
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
 from app.utils.config import get_last_database
@@ -33,11 +34,24 @@ from app.utils.messages import show_message
 #: is the one place every desktop platform agrees the user can write to, and a
 #: fixed name, because the point is to have something to open rather than to
 #: name it well - Save as renames it later.
-DEFAULT_DATABASE_NAME: str = "Data Hub.dhub"
+DEFAULT_DATABASE_NAME: str = f"{APP_NAME}.dhub"
+
+#: What that file was called before the application was renamed.  Kept, and
+#: preferred when it is the one that actually exists, because the whole point
+#: of the default path is "return the user to their work": someone whose
+#: settings were reset would otherwise land in an empty ChartLibre.dhub with
+#: their tables sitting untouched in a Data Hub.dhub next to it.
+LEGACY_DEFAULT_DATABASE_NAME: str = "Data Hub.dhub"
+
+#: The project file's own filter line, for the New/Open/Save-as dialogs in
+#: the main window.  One definition rather than four: it was written out by
+#: hand in three more places, all of them still saying "Data Hub DB" after
+#: the rename, which is exactly the drift a shared constant prevents.
+PROJECT_FILE_FILTER: str = f"{APP_NAME} DB (*.dhub)"
 
 #: The open dialog's filter.  ``.dhub`` first so the file the user is looking
 #: for is the one they see.
-DATABASE_FILTER: str = "Data Hub DB (*.dhub);;All files (*.*)"
+DATABASE_FILTER: str = f"{PROJECT_FILE_FILTER};;All files (*.*)"
 
 
 def select_database(
@@ -110,7 +124,7 @@ def _default_database(parent: QWidget | None) -> Path | None:
     The open dialog survives as the fallback for the one case that cannot be
     solved by writing a file: a home directory that is not writable.
     """
-    path = Path.home() / DEFAULT_DATABASE_NAME
+    path = _default_database_path()
     applogger.info("No database remembered; starting on %s", path)
     try:
         return SqliteRepo.create_empty(path)
@@ -119,6 +133,22 @@ def _default_database(parent: QWidget | None) -> Path | None:
         applogger.exception("Could not create a database at %s: %s", path, exc)
         show_message(parent, "startup.default_database_failed", error=exc)
         return _ask_for_a_database(parent)
+
+
+def _default_database_path() -> Path:
+    """Return the home-directory database a fresh run should open.
+
+    ``ChartLibre.dhub`` normally; the pre-rename ``Data Hub.dhub`` when that
+    is the one already on disk and the new name is not, so the rename does
+    not quietly leave someone's work behind under the old filename.
+    """
+    home = Path.home()
+    current = home / DEFAULT_DATABASE_NAME
+    legacy = home / LEGACY_DEFAULT_DATABASE_NAME
+    if not current.exists() and legacy.exists():
+        applogger.info("Opening the pre-rename default database %s", legacy)
+        return legacy
+    return current
 
 
 def _ask_for_a_database(parent: QWidget | None) -> Path | None:

@@ -17,7 +17,7 @@ lives in a SQLite database (a `.dhub` file). The three moving parts:
   them.
 - **Render pipeline** — `app/charts/render_figure.py`. Pure function of a
   descriptor tree + a `SqliteRepo` → a populated `matplotlib.figure.Figure`.
-  No Qt in this module; it is unit-testable headlessly (see §9).
+  No Qt in this module; it is unit-testable headlessly (see §11).
 - **UI** — `app/dialogs/main_window.py` plus the widgets in `app/widgets/`.
   Property panels emit typed payloads (dicts) that the main window persists
   through the repo and then asks the chart panel to redraw.
@@ -32,32 +32,42 @@ directly from a widget.
 
 ```
 app/
-  charts/            One module per chart type (renderer), plus
-                      render_figure.py (the pipeline) and descriptors.py
-                      (the FigureDescriptor/AxisDescriptor/SeriesDescriptor
-                      dataclasses).
-  data/               SqliteRepo: schema, CRUD, import/export, data sources.
+  __init__.py         APP_NAME / APP_VERSION / APP_ICON - the one place the
+                      application is named. Nothing else hard-codes it.
+  charts/             One module per chart type (renderer), plus
+                      render_figure.py (the pipeline), base.py (SeriesData
+                      and BaseAxisRenderer), grids.py and descriptor_grid.py
+                      (the pure grid/pivot helpers the renderers share).
+  data/               descriptors.py (the FigureDescriptor/AxisDescriptor/
+                      SeriesDescriptor dataclasses), series_frame.py (what a
+                      renderer actually receives, see §4.1), sqlite_repo.py and
+                      repo/ - SqliteRepo split by subject: tables.py,
+                      descriptors.py, queries.py, maintenance.py - plus
+                      demo_project.py, which builds every shipped demo
+                      through SqliteRepo itself, so a demo cannot drift from
+                      the real schema. Run `python -m app.data.demo_project`
+                      to regenerate them after a schema or renderer change.
   dialogs/            Top-level QDialog/QMainWindow windows.
   widgets/            Panels embedded in dialogs/the main window
                       (properties editors, table list/preview, chart panel).
   series_operations/  One module per series operation (fit, smoothing,
                       outlier removal, spectral analysis, clustering,
-                      calculus, peaks, ...), plus parameter_spec.py /
+                      calculus, peaks, filtering, baseline correction, ...),
+                      plus dialog_base.py and parameter_spec.py /
                       parameter_form.py, the declarative parameter support
                       shared by all of them (see §7.2).
   scanners/           AST-based plugin discovery for renderers and series
-                      operations (see §4).
+                      operations (see §7).
   styles/             style.py (the shared widget/action/icon factory),
                       macos_native.qss, fluent_win11.qss, palettes.py.
   utils/              config.json access, i18n, coercion, messages, dialog
                       state persistence, DPI handling, LaTeX detection,
+                      data_sources.py (every way data arrives), startup.py,
                       figure_metrics.py (§5.2), series_validation.py (§7.2).
-  locales/            gettext-style .po catalogues (see §8).
+  locales/            gettext-style .po catalogues (see §9).
 mplstyles/            The bundled Matplotlib style library (see §7.3).
-_make_demo_project.py Builds "Demo Project.dhub" through SqliteRepo - the
-                      same code path the app uses, so the demo cannot drift
-                      from the real schema. Run it directly to regenerate
-                      the demo project after a schema or renderer change.
+docs/manual/          The user manual: user_manual.typ is the source, built
+                      with `typst compile user_manual.typ`.
 ```
 
 ## 3. The descriptor model
@@ -109,7 +119,7 @@ point. Order of operations, all of it re-run on every redraw:
    long-lived), `frameon`, `suptitle`.
 4. `_normalized_axes_for_grid` + `_create_axes_grid` — turn the axes list into
    a `GridSpec`-backed set of subplots. See §5, this is the layout system.
-5. Per axis: load each series' DataFrame through `repo.series_df(sql)`
+5. Per axis: load each series through `repo.series_frame(sql)`
    (cached — see the module docstring on why this matters for large
    databases), look up the renderer by `chart_type` through the scanner, call
    `renderer.render_axis(ax, series, options)`, then apply the
@@ -129,6 +139,44 @@ The renderer itself never sets labels, scale, grid, or figure size/DPI/frame.
 Width, height and DPI are owned by `ChartPanel` + rcParams specifically so a
 figure renders identically on screen and on export — see the module
 docstring.
+
+### 4.1 What a renderer receives: `SeriesData.df` is a `SeriesFrame`
+
+`SeriesData.df` is an `app.data.series_frame.SeriesFrame`, not a
+`pandas.DataFrame` (todo.txt P2-17). A `SeriesFrame` is a dict of numpy
+arrays, typed straight from the sqlite3 cursor: `from_rows` makes a column
+`float64` (NaN for NULL) when sqlite only ever handed back int/float/None
+for it, and leaves anything else as an object array — the same split
+`pd.read_sql_query` would make, without pandas to make it.
+
+Renderer code is unchanged by this, and new renderer code should keep
+reading it the same way:
+
+```python
+"x" in sd.df.columns          # tuple of names
+sd.df["x"]                    # a pandas.Series view over one array
+sd.df.loc[mask, "color"]      # filtered the same way
+sd.df.copy(); sd.df["X"] = …  # copy, and column assignment
+len(sd.df); sd.df.empty
+```
+
+Column access returns a `pandas.Series` over the underlying array, which is
+what lets `pd.to_numeric(...)`, `.to_numpy()` and `.tolist()` keep working
+at every call site. What is gone is the DataFrame *between the database and
+the renderer*: no block manager, no index alignment across unrelated
+columns, and no `pd.read_sql_query` parsing a whole result set before a
+renderer reads three columns of it.
+
+Two renderers do genuinely table-shaped work and call `sd.df.to_pandas()`
+for it — Pareto's category `groupby`, and the Table renderer's
+`.iloc`/`.astype`/`.index` layout. That is a deliberate, narrow escape
+hatch, not a fallback to lean on: reach for it only when the operation
+really is a DataFrame operation, and keep it to the one call that needs it.
+
+`SqliteRepo` exposes both shapes over one cache: `series_frame()` /
+`downsampled_series_frame()` are the render path, and `series_df()` /
+`downsampled_series_df()` are the same cached data wearing a DataFrame, for
+callers and tests that still want one. A hit on one is a hit on the other.
 
 ## 5. Figure layout: grid and spans
 
@@ -248,7 +296,13 @@ class MyRenderer(BaseAxisRenderer):
 
 Renaming `Name` later orphans every axis already saved with the old name;
 add the rename to `CHART_TYPE_ALIASES` in `axis_renderer_scanner.py` instead
-of just changing the string.
+of just changing the string. `Name`, `Description` and `Category` are all
+user-visible, so all three need an entry in the Italian catalogue —
+`test_the_italian_locale_covers_every_renderer` fails until they have one
+(§9).
+
+`s.df` is a `SeriesFrame`, not a DataFrame — read §4.1 before writing
+anything fancier than the column access above.
 
 Useful shared helpers already on the base class: `series_data_color` /
 `series_color` (per-series colour, with an optional `color` data column
@@ -380,19 +434,28 @@ assert what it must **not** reject.
 
 | Operation | Reads | Produces |
 | --- | --- | --- |
-| Fit | one series | fitted curve + parameters |
+| Fit | one series | fitted curve + parameters, optional residual / measured-vs-fit axes |
 | Interpolation | one series | resampled curve |
 | Smoothing | one series | smoothed curve |
+| Filtering | one series | filtered/detrended/demodulated curve |
+| Baseline Correction | one series | corrected curve + the baseline it removed |
 | Outliers | one series | `Hide` flags on the source rows |
-| Spectral | one series | spectrum on a new axis |
+| Spectral Analysis | one or two series | spectrum / correlation on a new axis |
 | Clustering | one series | cluster labels / split series |
 | Statistics | one series | a report, no series |
-| **Calculus** | one series | derivative or integral |
-| **Peaks** | one series | located peaks + measurements |
-| **Control Chart** | one series | chart values, limits, violations |
-| **Function** | *nothing* | an evaluated function |
+| Calculus | one series | derivative or integral |
+| Peaks | one series | located peaks + measurements |
+| Roots | one series | the x where it crosses a level |
+| Control Chart | one series | chart values, limits, violations |
+| Function | *nothing* | an evaluated function |
 
-Three of these are worth knowing about before touching them.
+An operation that reads a series reads **one**: `dialog_base.
+_selected_series_row()` takes the first selected row and warns (in the log
+and the status bar) when more than one is checked. That is right for a Fit —
+one model, one parameter set — but it is also why "why is the residual chart
+showing the other series?" has a one-word answer: order.
+
+Four of these are worth knowing about before touching them.
 
 **Calculus** builds smoothing into the derivative and baseline subtraction
 into the integral, rather than leaving either as a step the user must
@@ -424,6 +487,25 @@ limit, which is table rounding.
 Violations carry **every** Nelson rule a point broke, not the first: the rule
 numbers are historical, not a severity ranking.
 
+The same dialog also draws the **attribute** charts — p, np, c and u — which
+were a separate dialog until they were merged into this one (todo.txt N-3):
+"which control chart do I want" is one question, and answering it twice, in
+two places, was the only thing two dialogs bought. Attribute limits are
+binomial (p, np) or Poisson (c, u) rather than sigma-from-range, and they
+move per point whenever the subgroup size does, so `ControlChartResult`
+carries both a scalar `upper`/`lower`/`sigma` and the `*_band` arrays that
+are the real limits. Rules 5–8 read zones that only exist when sigma is
+constant, so `_find_violations` skips them when `np.ptp(sigma_band) > 0` —
+a varying-limit chart has no A/B/C zones to be two-of-three inside of.
+
+**Filtering** and **Baseline Correction** are the two scipy-heavy additions.
+Filtering wraps `scipy.signal` (Butterworth/Chebyshev/Bessel IIR, FIR
+windows, Hilbert envelope, `detrend`) and needs the sampling frequency, which
+it derives from x the same way the spectral dialog does. Baseline Correction
+offers asymmetric least squares (AsLS) and a rubber-band hull; both return
+the baseline alongside the corrected curve, because a baseline nobody can
+see is a correction nobody can check.
+
 **Function** is the odd one out — it reads no source series and generates one,
 so it overrides `selected_series()` to return `[]`. `_run_operation` resolves
 its target from the selected *axis*, which is unaffected. Its function library
@@ -433,7 +515,12 @@ registration. Its range controls are declared in `PARAMS`; the function's own
 parameters are a table, because their number and names change with the
 selection and a declaration cannot express that.
 
-Tests for all four: `app/tests/test_new_operations.py`.
+Tests: `app/tests/test_new_operations.py` for Calculus/Peaks/Control
+Chart/Function, `test_attribute_chart.py` for the p/np/c/u limits and which
+Nelson rules survive a varying sigma, `test_filter_dialog.py` and
+`test_baseline_dialog.py` for the two scipy ones, and
+`test_fit_accessory_charts.py` for the Fit dialog's residual /
+measured-vs-fit axes.
 
 ### 7.3 The `.mplstyle` library
 
@@ -585,314 +672,9 @@ Tests: `app/tests/test_chart_panel_selection.py`,
 
   `style.report_icon_sources()` returns the action ids each backend answers
   for *on the machine it runs on*, and what lands under `"none"` is what that
-  machine cannot draw at all. On GNOME/Adwaita it reports 51 of 51 from the
-  theme.
-
-### 7.2 Adding a series operation
-
-A series operation is a self-contained plugin: one file under
-`app/series_operations/`, dialog and artwork included (`Icon` is inline SVG
-path data on the class, not a file — see `app/series_operations/
-dialog_base.py`'s module docstring and any existing
-operation for the shape). `app/scanners/series_operation_scanner.py`
-discovers it the same way the renderer scanner discovers chart types.
-Operations write their result back as a new table prefixed with `_`
-(`generated_table_name`) so the source list can group/hide generated tables
-separately from imported ones.
-
-#### Declaring parameters instead of building them
-
-Set `PARAMS` on the class and the base builds the form, wires every control
-to `refresh_results`, reads the values back by name, and shows or hides each
-row — no `build_parameter_selector`, no signal connections, no
-`_refresh_visibility`:
-
-```python
-PARAMS = (
-    FloatParam("threshold", "Threshold:", default_value=3.0,
-               minimum=0.1, maximum=30.0,
-               visible_for={"model": (OUTLIER_ZSCORE, OUTLIER_MAD)}),
-    IntParam("window", "Window size:", default_value=11,
-             minimum=3, maximum=9999, odd_only=True,
-             visible_for={"model": (OUTLIER_ROLLING,)}),
-)
-```
-
-Read them with `self.parameter_values()`, which returns **every** declared
-name whether or not its row is visible — an operation reading a parameter
-belonging to another model gets that parameter's default rather than a
-`KeyError`.
-
-- `app/series_operations/parameter_spec.py` — the declarations. Plain data,
-  no Qt import, so they stay testable without a window server.
-- `app/series_operations/parameter_form.py` — builds the widgets.
-
-`visible_for` maps *another* parameter's name to the values for which this
-row is shown. It may name something the form does not own — `model` is the
-base's own combo — because `ParameterForm` takes a `context` callable;
-`parameter_context()` supplies `model` by default.
-
-`odd_only` matters more than it looks: `savgol_filter` and `medfilt` both
-reject an even window with an exception raised from inside SciPy that names
-neither the control the user moved nor the series it was moved on.
-
-`PARAMS` is optional. An operation that leaves it empty keeps overriding
-`build_parameter_selector` by hand, which is still the right answer for a
-genuinely unusual control. The outlier dialog is the converted example.
-
-Honest note on the payoff: converting the outlier dialog changed it from 790
-lines to 794. It did not shrink. The gain is in the invariants — visibility
-rules and widgets are the same data so they cannot drift, a new parameter
-cannot be added without its signal connection, and range clamping happens in
-one place — not in the line count.
-
-#### Validating input before the operation runs
-
-Declare what the operation needs of its data and the base checks it:
-
-```python
-INPUT_MINIMUM_POINTS = 3
-INPUT_REQUIRES_SORTED_X = True
-INPUT_REQUIRES_UNIQUE_X = True
-INPUT_REQUIRES_UNIFORM_X = False
-INPUT_REQUIRES_VARYING_Y = False
-```
-
-Then call one of two methods on the materialized arrays:
-
-- `prepare_input_xy(x, y, label=...)` — validates **and repairs**, returning
-  cleaned arrays. Drops non-finite points always; sorts and averages
-  duplicate x according to the declarations. Every repair is reported.
-- `validate_input_xy(x, y, label=..., raise_on_error=False)` — reports only.
-  Use this whenever the result is mapped back to source rows: the outlier
-  detector matches by rowid and the cluster dialog by frame position, so
-  reordering would move each mark onto a different row.
-
-Requirements are declared rather than assumed because a validator that
-rejects data an operation handles fine is worse than none — it blocks real
-work and teaches people to dismiss it. An FFT needs uniform spacing;
-`np.gradient` does not. A spline needs unique x; clustering reads an
-observation matrix where repeated x is two ordinary observations.
-
-Severity depends on whether a repair is coming: duplicate x is fatal to a
-spline, but averaging is a defensible fix, so it is an error when nobody
-will fix it and a warning when somebody will (`repairable=True`, which
-`prepare_input_xy` passes).
-
-The three failure modes this exists for all produce *wrong answers* rather
-than errors — unsorted x smoothed as a sequence, a spline through duplicate
-x, and `pd.to_numeric(errors="coerce")` turning a text column into an
-all-NaN array with no complaint.
-
-The check itself is `app/utils/series_validation.py`: pure numpy, no Qt, no
-pandas. Tests in `app/tests/test_series_validation.py`, about half of which
-assert what it must **not** reject.
-
-#### The operations that ship
-
-| Operation | Reads | Produces |
-| --- | --- | --- |
-| Fit | one series | fitted curve + parameters |
-| Interpolation | one series | resampled curve |
-| Smoothing | one series | smoothed curve |
-| Outliers | one series | `Hide` flags on the source rows |
-| Spectral | one series | spectrum on a new axis |
-| Clustering | one series | cluster labels / split series |
-| Statistics | one series | a report, no series |
-| **Calculus** | one series | derivative or integral |
-| **Peaks** | one series | located peaks + measurements |
-| **Control Chart** | one series | chart values, limits, violations |
-| **Function** | *nothing* | an evaluated function |
-
-Three of these are worth knowing about before touching them.
-
-**Calculus** builds smoothing into the derivative and baseline subtraction
-into the integral, rather than leaving either as a step the user must
-remember. Differentiation amplifies noise — Savitzky-Golay beats a raw
-`np.gradient` by about 8x RMS on noisy data — and a peak on a raised baseline
-integrates to mostly baseline: a gaussian of true area 1.77 on an offset of 5
-comes out at 51.8 without subtraction.
-
-`savgol_filter` must be given `delta` set to the sample spacing, or it returns
-a derivative per *sample index* — correct only when the step happens to be 1.
-
-**Control Chart** estimates sigma from within-subgroup variation (average
-moving range over d2, or average within-subgroup range/standard deviation),
-**never** from the standard deviation of all the data. That is the whole idea:
-a process that has drifted has a large overall standard deviation *because* it
-drifted, so limits built from it are wide enough to contain the drift and the
-chart declares the process fine.
-
-The SPC constants (d2, d3, c4, A2, D3, D4, B3, B4) are tabulated rather than
-computed. c4 has a closed form, but d2 and d3 are integrals over the range
-distribution with no elementary form, and using anything but the published
-table would put these limits at odds with every other tool's.
-
-X-bar limits are derived from d2 and divided by sqrt(n) rather than applying
-the tabulated A2 shortcut, because A2 has the 3 of "three sigma" baked into it
-and the sigma multiplier is configurable here. The two agree to ~1e-3 of the
-limit, which is table rounding.
-
-Violations carry **every** Nelson rule a point broke, not the first: the rule
-numbers are historical, not a severity ranking.
-
-**Function** is the odd one out — it reads no source series and generates one,
-so it overrides `selected_series()` to return `[]`. `_run_operation` resolves
-its target from the selected *axis*, which is unaffected. Its function library
-comes from `FunctionScanner`, the same one the fit dialog uses, so a class
-dropped into `app/functions/user_functions.py` appears in both with no
-registration. Its range controls are declared in `PARAMS`; the function's own
-parameters are a table, because their number and names change with the
-selection and a declaration cannot express that.
-
-Tests for all four: `app/tests/test_new_operations.py`.
-
-### 7.3 The `.mplstyle` library
-
-`mplstyles/` ships a large set of `.mplstyle` files, organized into
-subfolders (`color/`, `color/discrete-rainbow/`, `journals/`, `languages/`,
-`misc/`). The Style dropdown on the Figure panel
-(`FigurePropertiesWidget._list_mplstyle_files`) walks the whole tree
-(`Path.rglob("*.mplstyle")`), not just the top level, and labels each entry
-`folder.subfolder.name` (dots joining the path relative to `mplstyles/`,
-extension dropped) so a style's origin stays visible in a flat dropdown. The
-same dropdown has a **Browse…** entry that opens a native file picker for a
-style kept anywhere else entirely (`_browse_for_style_file`). Adding a style
-is just dropping a `.mplstyle` file anywhere under `mplstyles/`, including a
-new subfolder — no registration needed.
-
-### 7.4 ChartPanel interaction
-
-Everything the chart does under the pointer is wired in
-`app/widgets/chart_panel.py`, through Matplotlib's own event system
-rather than Qt's — Matplotlib already knows which artist owns each pixel and
-can give a position in data coordinates, and redoing either against Qt
-coordinates would mean reimplementing marker sizes, transforms and axis
-scales for every renderer.
-
-| Event | Does |
-| --- | --- |
-| `scroll_event` | Zoom about the point under the cursor |
-| `pick_event` | Read out a point, a bar/wedge, or toggle a legend entry |
-| `button_press_event` | Ctrl+click creates an axis annotation |
-| `motion_notify_event` | Hover readout |
-
-**Hover** is throttled to `HOVER_INTERVAL_MS` (40ms) and **blitted**. Both
-matter: mouse motion arrives far faster than a hit test plus a repaint can be
-done, and a full `draw()` re-runs every renderer for every series. Restoring
-a cached bitmap and drawing one text box costs ~2.5ms whatever the data size,
-against 12–26ms for a full draw. What grows with the data is the hit test,
-which at 500k points is already the larger half of the budget.
-
-Two traps in the blitting, both of which silently defeat it:
-
-- The background must be captured with the annotation *hidden*, or it is
-  baked in and smears across the plot.
-- `_invalidate_hover_background` (on `draw_event`/`resize_event`) must drop
-  only the bitmap, never `_hover_axes`. Clearing both makes every hover
-  rebuild the annotation and force the full draw that blitting exists to
-  avoid — the blit path is then never reached at all.
-  `_discard_hover_annotation` is the separate, stronger reset, called from
-  `reload()` because `figure.clear()` destroys the artist itself.
-
-Hit distance is measured in **display pixels**, not data units: a chart of
-millivolts against seconds would otherwise treat a step along x as thousands
-of times nearer than one along y.
-
-**Picking** arms lines and collections with a tolerance in points, and
-patches with `picker=True` — a patch is a filled area, so "inside the shape"
-is the test, and a distance from its edge leaves the middle of a tall bar
-unclickable. Patches read out through `_describe_patch` rather than the point
-path: a bar reports its category and value, a wedge its share. Bar
-orientation comes from the `BarContainer`, not from the geometry, because a
-tall thin `barh` bar and a tall thin `bar` bar are the same rectangle.
-
-**Legend picking** toggles a series' visibility. Handles are matched to
-artists by label rather than by position, so a series drawn as several
-artists — a line plus its error bars — toggles as one. The entry dims instead
-of disappearing, so a hidden series still has something to click. Hidden
-series are skipped by the hover hit test.
-
-Tests: `app/tests/test_chart_panel_selection.py`,
-`app/tests/test_chart_panel_buffer.py`.
-
-## 8. Styling (`app/styles/`)
-
-- `style.py` is the shared factory: every button/menu-item/card in the app
-  goes through `create_action_button` / `create_menu_item` / `create_menu` /
-  `create_card_widget` rather than raw Qt constructors, so label/tooltip/icon
-  come from one place (`config.json`'s `actions` catalogue,
-  `action_presentation(action_id)`) and stay consistent. `MenuItem.icon`
-  accepts either a string (looked up through `load_icon`: action id → SVG
-  file name → Fluent glyph token, in that order) or a `QIcon` built
-  elsewhere (`icon_from_svg_source`) when a menu entry has to render
-  pixel-identical to an icon defined somewhere else in the app, e.g. the same
-  action's own inline-SVG artwork.
-- Two platform stylesheets, `macos_native.qss` and `fluent_win11.qss`, loaded
-  based on `sys.platform`. They are **not** symmetric by design: the macOS
-  file explicitly leaves standard controls (`QPushButton`, `QComboBox`, ...)
-  unstyled because Qt's Aqua style already renders them natively, and only
-  opts in bespoke, app-specific chrome by object name (read the file's own
-  "PLATFORM PARITY NOTES" header before touching either file). The Windows
-  file takes the opposite approach — a generic `QToolButton { ... }` fallback
-  rule styles every tool button uniformly. A consequence: a new
-  `QToolButton` built through `create_toolbar_button` gets Fluent styling
-  "for free" on Windows but needs its own `QToolButton#<action_id>Button`
-  rule added to `macos_native.qss` explicitly, or it falls through to the
-  unstyled native bevel. `zoom_fitButton` (the "Adatta"/fit-to-window
-  button) is the worked example.
-- Icons: four backends, tried in this order by `icon_from_action_spec` (read
-  its docstring for the reasoning):
-  1. `SFSymbol` on macOS — the system's own set;
-  2. `SegoeFluent` on Windows — likewise;
-  3. `ThemeIcon` anywhere, through `QIcon.fromTheme` — a freedesktop name,
-     which is what covers Linux: the desktop already has an icon theme the
-     user chose, and this makes the app's Open look like every other Open on
-     that machine;
-  4. the SVG in `app/icons/common/`, as the last resort.
-
-  Inline SVG source (`icon_from_svg_source`) is separate and still the way
-  plugin-carried artwork arrives.
-
-  Adding an action means adding all four to its `config.json` entry. The
-  theme name must be one Qt standardises (`QIcon.ThemeIcon`, read at import
-  by `_standard_theme_icon_names`) or one listed in
-  `style.EXTRA_THEME_ICON_NAMES`; a test enforces it, because the failure
-  mode otherwise is silent — `fromTheme` returns a null icon on a typo and
-  the SVG quietly takes over, so the only symptom is one icon that never
-  looks like the rest.
-
-  Two theme quirks are handled and worth knowing. GNOME's Adwaita dropped the
-  full-colour action icons at version 45, so `document-open` is gone there
-  and `document-open-symbolic` is the icon; `_theme_icon_candidates` asks for
-  the plain name and then the symbolic one, which covers both Adwaita and
-  Breeze. And theme icons are *not* tinted, unlike the two glyph backends:
-  the theme already ships light and dark variants, and painting over one
-  would replace artwork the user chose with a flat silhouette.
-
-  `ensure_icon_theme()` (called from `main.py`) is what makes step 3 work on
-  a desktop that names no theme. GNOME and KDE set one through their platform
-  integration; a bare window manager does not, and `fromTheme` then fails for
-  everything — silently, because the SVG takes over. It probes Qt's search
-  paths, names an installed theme, and sets a fallback theme in every case.
-  Nothing is overridden: a user who chose Papirus keeps Papirus. `hicolor`
-  counts as unset, since it carries almost no action icons.
-
-  There used to be three SVG folders — `macOs/` and `win11/` searched ahead
-  of `common/` — from when a hand-drawn icon was the only way to look like
-  the platform it was drawn for. Three real icon sets answer ahead of any SVG
-  now, so those were reached only when a Mac had no pyobjc or a PC had no
-  Fluent font, and what they gave there was a second drawing of the same
-  thing. They are gone; `common/` is the single last resort, and the lookup
-  no longer depends on which machine is asking.
-
-  `style.report_icon_sources()` returns the action ids each backend answers
-  for *on the machine it runs on*. That is how to find out which of the 35
-  remaining SVGs are still doing work before deleting any more — and it has
-  to be run on a GNOME box, a KDE box, a Mac and a Windows machine, because
-  each answers differently. On GNOME/Adwaita it reports 49 of 51 from the
-  theme; the two left are the Plot button and the SQL filter, which have no
-  system equivalent.
+  machine cannot draw at all — run it rather than trusting a count written
+  down here, which goes stale on the next action added. On GNOME/Adwaita the
+  theme has answered for the whole catalogue.
 
 ## 9. Localization (`app/utils/i18n.py`)
 
@@ -918,6 +700,28 @@ code needs a matching `msgid`/`msgstr` pair appended to
 `app/locales/it/LC_MESSAGES/datahub.po` (any position — the file is not
 order-sensitive, blank-line-separated blocks — see the existing entries for
 the exact format) to actually show translated, not just be translatable.
+
+**Four sweeps, because a literal is not the only way text reaches a user.**
+`test_localization.py` walks the AST for `_("…")`/`tr("…")` literals, which
+is everything written inline. Text that lives as *data* is invisible to it
+and gets a sweep of its own in `test_icons_and_actions.py`:
+
+| Sweep | Covers |
+| --- | --- |
+| `test_every_translated_string_is_in_the_italian_catalogue` | every `_()`/`tr()` literal in the source |
+| `test_the_italian_locale_covers_every_action` | `config.json`'s action catalogue: every button's text and description |
+| `test_the_italian_locale_covers_every_operation` | every series operation's `Name` and `Description` |
+| `test_the_italian_locale_covers_every_renderer` | every chart type's `Name`, `Description` and `Category` |
+
+The last two exist because a plugin declares its wording on the class, so it
+reaches the screen as `tr(some_variable)` — the chart picker and the axis
+properties panel translate at the display site and keep the raw English name
+in `UserRole`/the signal, since that string is also the `chart_type` stored
+in the database. Translate what is read; never translate what is looked up.
+
+`app/tests/test_messages.py` additionally checks that a translation keeps
+every `{placeholder}` its English original had — a dropped one is a silently
+wrong sentence, not a crash.
 
 ## 10. `config.json` and `user.json`
 
@@ -961,6 +765,16 @@ the machine.
   the test hangs. Split menu *construction* from *showing* it as a testable
   method — `TablePreviewPanel._build_context_menu(pos) -> QMenu | None` /
   `_show_context_menu` is the pattern — and test the builder.
+- The same trap reaches in from *production* code through
+  `applogger.warning(..., show_dialog=True)` and friends.
+  `AppLogger._show_message_box` skips the dialog only when there is no
+  `QApplication` **at all**; the `qapp` fixture provides one, so under test
+  it really does call `QMessageBox.exec()`. Offscreen QPA returns from that
+  immediately, which is why such a call can pass a full green suite here and
+  hang the first run on a real desktop. Keep `show_dialog=True` for terminal
+  outcomes a user must acknowledge — never on a path that runs per keystroke,
+  per preview or per redraw. A WARNING already reaches the status bar without
+  it (`AppLogger._log_with_policy`).
 - `tmp_db_path` / `test_results_dir` / `plots_dir` fixtures give each test an
   isolated `.dhub` path and a directory for saved plots
   (`DHUB_TEST_ARTIFACTS` env var to redirect).

@@ -358,6 +358,45 @@ FATTO 2026-09-11 (bug) Fit: due serie selezionate, una sceglie in silenzio
       leggibile. Nuovi test in test_fit_accessory_charts.py, incluso un
       assert che il messaggio NON usi show_dialog=True.
 
+FATTO 2026-09-11 (docs+i18n) revisione, localizzazione, manuale
+      Localizzazione: i 29 renderer non erano tradotti affatto - nome,
+      descrizione e categoria arrivavano allo schermo in inglese dal chart
+      picker e dal pannello assi, perche' sono dati dichiarati sulla classe
+      e nessuno sweep di _() letterali li poteva vedere. Ora passano da
+      tr() al punto di visualizzazione (il valore grezzo resta in UserRole
+      e nel segnale: e' il chart_type salvato nel database), 59 voci nuove
+      nel .po, e test_the_italian_locale_covers_every_renderer impedisce
+      che il prossimo renderer torni a essere inglese. La ricerca del
+      picker ora accetta sia il nome inglese sia quello tradotto.
+      Rinomina: restavano "Data Hub" nel nome del file di default
+      (Data Hub.dhub), nel filtro dei dialoghi File - scritto a mano in tre
+      punti, tutti e tre ancora col vecchio nome - e in vari docstring.
+      Ora derivano tutti da APP_NAME; startup.PROJECT_FILE_FILTER e' l'unica
+      definizione. LEGACY_DEFAULT_DATABASE_NAME resta e vince quando e' lui
+      il file che esiste davvero, cosi' la rinomina non lascia indietro il
+      lavoro di chi aveva gia' un Data Hub.dhub.
+      Documentazione: DEVELOPMENT.md aveva 306 righe duplicate (le sezioni
+      7.2-8 comparivano due volte, la seconda copia ferma a una revisione
+      precedente: "quattro backend di icone" e app/icons/ che non esiste
+      piu'). Rimosse; aggiunta la §4.1 su SeriesFrame, la tabella delle
+      operazioni aggiornata a 14, le quattro sweep di localizzazione, e la
+      nota su show_dialog=True che passa headless e blocca su un desktop
+      vero. Manuale utente: rinominato, 23 -> 29 tipi di grafico con le
+      categorie giuste, 10 -> 14 operazioni coi nomi veri, import dialog
+      (sezioni, riga Web, aggiungi/elimina fonte, "Use a query", controlli
+      disabilitati per una sorgente database) e SeriesFrame al posto di
+      DataFrame nel capitolo per sviluppatori. Il PDF va ricompilato con
+      typst (non installato qui). test_manual_is_current.py ora verifica
+      che ogni renderer e ogni operazione siano elencati, che il numero
+      citato nel testo sia giusto e che il nome dell'app sia quello.
+      Pulizia: import morti (json e app.data.descriptors in sqlite_repo,
+      QPushButton in axis_properties, Path in main, field in demo_project).
+      Trovato e corretto un test che dipendeva dall'ordine di esecuzione e
+      dal user.json dello sviluppatore: test_choosing_a_mode_persists_it_to_
+      the_descriptor passava solo se qualcun altro aveva gia' cambiato la
+      modalita' - partendo da FIXED, setCurrentIndex(FIXED) non emette
+      nulla e non c'era niente da persistere.
+
 ================================================================
 P3 - LATER
 ================================================================

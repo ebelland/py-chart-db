@@ -132,6 +132,12 @@ class SeriesFrame:
         return SeriesFrame({name: self._data[name] for name in names})
 
     def __setitem__(self, column: str, values: Any) -> None:
+        """Set one column, storing what it is given.
+
+        No type inference here, unlike :meth:`from_rows`: that one is reading
+        a database and has to decide what a column *is*, while this one is
+        being handed an array by code that already knows.
+        """
         if isinstance(values, pd.Series):
             values = values.to_numpy()
         array = np.asarray(values)
@@ -151,16 +157,32 @@ class SeriesFrame:
         return self[column]
 
     def copy(self) -> "SeriesFrame":
+        """A frame of this one's values that shares nothing with it.
+
+        Every array is copied, because this is what ``SqliteRepo`` hands out
+        of its cache: a caller that adds a column - or writes into one - must
+        not be editing the cached entry every other chart reads.
+        """
         clone = SeriesFrame.__new__(SeriesFrame)
         clone._data = {name: values.copy() for name, values in self._data.items()}
         clone._length = self._length
         return clone
 
     def drop_column(self, column: str) -> "SeriesFrame":
-        """Return a copy without *column*; a no-op if it is not present."""
-        if column not in self._data:
-            return self.copy()
-        return SeriesFrame({name: values for name, values in self._data.items() if name != column})
+        """Return a frame without *column*, over the same arrays.
+
+        A view, not a copy: the one caller is ``downsampled_series_frame``,
+        dropping the row-number column off a frame ``series_frame`` already
+        copied out of the cache for it, and copying a decimated series a
+        second time to throw one column away would be work for nobody.
+        Adding or replacing a column on either frame leaves the other alone,
+        and a column read through ``[]`` is a pandas Series whose
+        ``to_numpy()`` is read-only under copy-on-write - so sharing is not
+        reachable as a surprise from the outside.
+        """
+        return SeriesFrame(
+            {name: values for name, values in self._data.items() if name != column}
+        )
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"SeriesFrame(columns={self.columns!r}, rows={len(self)})"

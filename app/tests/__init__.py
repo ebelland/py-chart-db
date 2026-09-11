@@ -1,1 +1,1 @@
-"""Test package for 2026 Data Hub."""
+"""Test package for ChartLibre."""

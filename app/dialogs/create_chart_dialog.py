@@ -41,7 +41,7 @@ from app.styles.style import (
     stdPlainTextEdit,
     stdSizeAndlayout,
 )
-from app.utils.i18n import _
+from app.utils.i18n import _, tr
 
 
 @dataclass(slots=True)
@@ -441,13 +441,16 @@ class NewPlotTabDialog(QDialog):
             mark_editor_panel(renderer_list)
 
             for renderer in self._renderers_in(category):
-                item = QListWidgetItem(str(renderer["value"]))
+                # Shown translated, stored raw: the name in UserRole is the
+                # chart_type written to the database and matched against
+                # elsewhere, so only the label a user reads goes through tr().
+                item = QListWidgetItem(tr(str(renderer["value"])))
                 item.setData(Qt.ItemDataRole.UserRole, renderer["value"])
-                item.setToolTip(str(renderer.get("description") or ""))
+                item.setToolTip(tr(str(renderer.get("description") or "")))
                 renderer_list.addItem(item)
 
             self._lists_by_category[category] = renderer_list
-            self._types_toolbox.addItem(renderer_list, category)
+            self._types_toolbox.addItem(renderer_list, tr(category))
 
         apply_toolbox_header_metrics(self._types_toolbox)
 
@@ -564,6 +567,11 @@ class NewPlotTabDialog(QDialog):
         Matching on the category as well as the name, so typing "stat" brings
         up the whole statistical family - the categories are half of why the
         list is worth searching.
+
+        Both spellings of every name are matched - the English one stored in
+        UserRole and the translated one on screen - so a search works whether
+        the word that came to mind was the one being read or the one in the
+        Matplotlib documentation it came from.
         """
         needle = str(text or "").strip().lower()
 
@@ -571,7 +579,10 @@ class NewPlotTabDialog(QDialog):
         # count while a search is active, so it is not a stable key.
         for index, category in enumerate(self._lists_by_category):
             renderer_list = self._lists_by_category[category]
-            category_matches = needle in category.lower()
+            translated_category = tr(category)
+            category_matches = (
+                needle in category.lower() or needle in translated_category.lower()
+            )
 
             visible = 0
             for row in range(renderer_list.count()):
@@ -580,6 +591,7 @@ class NewPlotTabDialog(QDialog):
                     not needle
                     or category_matches
                     or needle in str(item.data(Qt.ItemDataRole.UserRole)).lower()
+                    or needle in item.text().lower()
                 )
                 item.setHidden(not matches)
                 visible += int(matches)
@@ -589,7 +601,10 @@ class NewPlotTabDialog(QDialog):
             # section back to its list.
             self._types_toolbox.setItemEnabled(index, visible > 0)
             self._types_toolbox.setItemText(
-                index, category if not needle else f"{category}  ({visible})"
+                index,
+                translated_category
+                if not needle
+                else f"{translated_category}  ({visible})",
             )
 
         # Bound once: two calls could disagree, and the second one is what the

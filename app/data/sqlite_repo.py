@@ -1,4 +1,4 @@
-"""SQLite repository for Data Hub: the connection, and everything on it.
+"""SQLite repository for ChartLibre: the connection, and everything on it.
 
 ``SqliteRepo`` is the one class the application talks to - 77 call sites
 write ``from app.data.sqlite_repo import SqliteRepo`` and none of them
@@ -20,7 +20,6 @@ size, so that reading about one of them means reading one file.
 """
 from __future__ import annotations
 
-import json
 import re
 import sqlite3
 import uuid
@@ -33,7 +32,6 @@ from typing import ClassVar
 
 import pandas as pd
 
-import app.data.descriptors
 from app.data.series_frame import SeriesFrame
 from app.data.undo_store import UndoEntry, UndoStore
 from app.logs.logger import applogger
@@ -71,7 +69,7 @@ class SqliteRepo(
     QueriesMixin,
     MaintenanceMixin,
 ):
-    """SQLite repository for Data Hub.
+    """SQLite repository for ChartLibre.
 
     Manages:
       - DataFrame queries and imports

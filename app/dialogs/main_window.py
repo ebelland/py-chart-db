@@ -67,6 +67,7 @@ from app.utils.config import (
     set_section,
 )
 from app.utils.dialog_state import restore_window_geometry, save_window_geometry
+from app.utils.startup import PROJECT_FILE_FILTER
 from app.utils.messages import show_message
 from app.logs.logger import applogger
 from app.utils.i18n import _
@@ -1563,7 +1564,7 @@ class MainWindow(QMainWindow):
             self,
             _("New database"),
             base_dir,
-            "Data Hub DB (*.dhub)",
+            PROJECT_FILE_FILTER,
         )
         if not file_path:
             return
@@ -1635,7 +1636,7 @@ class MainWindow(QMainWindow):
             self,
             _("Open database"),
             base_dir,
-            "Data Hub DB (*.dhub)",
+            PROJECT_FILE_FILTER,
         )
         if not file_path:
             return
@@ -1662,7 +1663,7 @@ class MainWindow(QMainWindow):
             self,
             _("Save database as"),
             base_dir,
-            "Data Hub DB (*.dhub)",
+            PROJECT_FILE_FILTER,
         )
         if not file_path:
             return

@@ -1,10 +1,13 @@
-"""Strict-typed, responsive axis properties editor for Data Hub.
+"""Strict-typed, responsive axis properties editor for ChartLibre.
 
-Drop-in replacement for ``app/widgets/axis_properties.py``.
+Edits one axis: its title and labels, its scale and limits, its grid and
+legend, and the selected renderer's own Kwargs/Options, which are built from
+the renderer's declarations rather than laid out by hand (see
+``app/charts/base.py``).
 
-The implementation keeps the existing public signals and host-facing API while
-reducing signal cascades during reloads and replacing the Pylance-problematic
-renderer scanner imports with typed wrappers.
+Reloads route every control through ``_FormSignalBlocker`` so that
+repopulating the form does not read back as the user editing it - a cascade
+that used to apply an edit per widget on every axis change.
 """
 from __future__ import annotations
 
@@ -23,7 +26,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QPushButton,
     QScrollArea,
     QSizePolicy,
     QSpinBox,
@@ -59,7 +61,7 @@ AxisPayload: TypeAlias = dict[str, Any]
 ButtonSlot: TypeAlias = Callable[..., Any]
 
 from app.scanners.axis_renderer_scanner import get_renderer,import_class_from_file
-from app.utils.i18n import _
+from app.utils.i18n import _, tr
 MAX_QT_HEIGHT: Final[int] = 16_777_215
 
 # The editor offers exactly what the renderer knows how to apply, so the two
@@ -1213,7 +1215,9 @@ class AxisPropertiesWidget(BaseProperties):
             )
             self._load_extended_axis_options(options)
 
-        self._renderer_value.setText(renderer)
+        # Translated for reading; the raw chart_type is what the signal
+        # carries, since every listener looks the renderer up by that name.
+        self._renderer_value.setText(tr(renderer))
         self.renderer_changed.emit(renderer)
 
     class _FormSignalBlocker:

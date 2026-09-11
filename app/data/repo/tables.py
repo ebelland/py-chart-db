@@ -22,6 +22,7 @@ import pandas as pd
 from pandas._typing import DtypeArg
 
 import app.data.descriptors
+from app import APP_NAME
 from app.data.data_source import DataSource
 from app.data.repo._common import (
     _RETURNS_ROWS_RE,
@@ -1293,7 +1294,9 @@ class TablesMixin:
         if column_name.lower() == "rowid":
             applogger.error("Cannot delete rowid.")
         if column_name == "Hide":
-            applogger.error("Column 'Hide' is managed by Data Hub and cannot be deleted.")
+            applogger.error(
+                "Column 'Hide' is managed by %s and cannot be deleted.", APP_NAME
+            )
 
         # A dropped column takes its data with it and SQLite has no way back,
         # which is what makes this worth a snapshot of the whole table.

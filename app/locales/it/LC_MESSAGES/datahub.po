@@ -1,8 +1,8 @@
-# Italian translation for 2026 Data Hub.
+# Italian translation for ChartLibre.
 # Message ids are the English source strings.
 msgid ""
 msgstr ""
-"Project-Id-Version: 2026 Data Hub\n"
+"Project-Id-Version: ChartLibre\n"
 "Language: it\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -824,10 +824,6 @@ msgstr "Tratteggiata"
 
 msgid "Data"
 msgstr "Dati"
-
-
-msgid "Data Hub"
-msgstr "Data Hub"
 
 
 msgid "Data source:"
@@ -4394,8 +4390,6 @@ msgstr "{chart} disegna una serie per asse: le {count} qui sotto avranno ciascun
 msgid "{chart} draws up to {limit} series per axis: the {count} below will be split across {axes} axes."
 msgstr "{chart} disegna fino a {limit} serie per asse: le {count} qui sotto saranno distribuite su {axes} assi."
 
-msgid "Series"
-msgstr "Serie"
 
 msgid "{chart} draws {limit} series per axis, and this axis already has {existing}. Choose 'Add new axis' instead, or remove {wanted} series."
 msgstr "{chart} disegna {limit} serie per asse e questo asse ne ha già {existing}. Scegli 'Aggiungi nuovo asse' oppure rimuovi {wanted} serie."
@@ -4894,8 +4888,6 @@ msgid "Subtract a spectrum's background (AsLS or rubber band)"
 msgstr "Sottrae lo sfondo di uno spettro (AsLS o rubber band)"
 
 
-msgid "Classic demos - Anscombe, Lissajous, and a signal spectrum"
-msgstr "Demo classiche - Anscombe, Lissajous e uno spettro di segnale"
 
 
 msgid "Three teaching examples from mathematics, physics and signal processing: Anscombe's quartet on a shared-scale grid (the matplotlib gallery's own multi-axis example), four Lissajous figures at different frequency ratios, and a noisy signal beside the frequency spectrum that recovers its three true tones - the same signal the Filtering operation's IIR/FIR/Hilbert models can run on directly (its 5, 20 and 50 Hz tones are exact targets for a lowpass, a bandpass, or an envelope)."
@@ -4968,3 +4960,243 @@ msgstr "Punta un'operazione per i dettagli"
 
 msgid "Signal Processing"
 msgstr "Elaborazione del segnale"
+
+# --- Chart types: renderer names, descriptions and categories -------
+# Shown in the chart picker (create_chart_dialog) and in the axis
+# properties panel. Swept by test_the_italian_locale_covers_every_renderer.
+
+
+msgid "Pairwise data"
+msgstr "Dati a coppie"
+
+
+msgid "Gridded data"
+msgstr "Dati su griglia"
+
+
+msgid "Irregularly gridded data"
+msgstr "Dati su griglia irregolare"
+
+
+msgid "3D and volumetric data"
+msgstr "Dati 3D e volumetrici"
+
+
+msgid "Bar Chart"
+msgstr "Grafico a barre"
+
+
+msgid "Horizontal Bar Chart"
+msgstr "Grafico a barre orizzontali"
+
+
+msgid "Broken Bar"
+msgstr "Barre a intervalli"
+
+
+msgid "Broken Bar (Vertical)"
+msgstr "Barre a intervalli (verticali)"
+
+
+msgid "Scatter Plot"
+msgstr "Grafico a dispersione"
+
+
+msgid "Scatter Plot (3D)"
+msgstr "Grafico a dispersione (3D)"
+
+
+msgid "Fill Between"
+msgstr "Area tra due curve"
+
+
+msgid "Stack Plot"
+msgstr "Aree impilate"
+
+
+msgid "Stem Plot"
+msgstr "Grafico a steli"
+
+
+msgid "Stairs"
+msgstr "Gradini"
+
+
+msgid "Time Series"
+msgstr "Serie temporale"
+
+
+msgid "Timeline"
+msgstr "Linea del tempo"
+
+
+msgid "Histogram"
+msgstr "Istogramma"
+
+
+msgid "Box Plot"
+msgstr "Box plot"
+
+
+msgid "Violin Plot"
+msgstr "Grafico a violino"
+
+
+msgid "ECDF"
+msgstr "ECDF"
+
+
+msgid "Pareto Chart"
+msgstr "Diagramma di Pareto"
+
+
+msgid "Pie Chart"
+msgstr "Grafico a torta"
+
+
+msgid "Contour Plot"
+msgstr "Grafico di contorno"
+
+
+msgid "Contour Plot (Scattered)"
+msgstr "Grafico di contorno (dati sparsi)"
+
+
+msgid "Surface Plot"
+msgstr "Superficie 3D"
+
+
+msgid "Surface Plot (Scattered)"
+msgstr "Superficie 3D (dati sparsi)"
+
+
+msgid "Triangular Mesh"
+msgstr "Mesh triangolare"
+
+
+msgid "Triangular Color Mesh"
+msgstr "Mesh triangolare a colori"
+
+
+msgid "Quiver"
+msgstr "Campo di vettori"
+
+
+msgid "Stream Plot"
+msgstr "Linee di flusso"
+
+
+msgid "Wind Barbs"
+msgstr "Barbe del vento"
+
+
+msgid "Vertical bar chart"
+msgstr "Grafico a barre verticali"
+
+
+msgid "Horizontal bar chart"
+msgstr "Grafico a barre orizzontali"
+
+
+msgid "Interval bars grouped by category (Gantt-style)."
+msgstr "Barre a intervalli raggruppate per categoria (stile Gantt)."
+
+
+msgid "Interval bars grouped by category, stacked in columns."
+msgstr "Barre a intervalli raggruppate per categoria, impilate in colonne."
+
+
+msgid "Text labels at data points, spread apart to avoid overlap."
+msgstr "Etichette di testo nei punti dati, distanziate per evitare sovrapposizioni."
+
+
+msgid "A data table, rows and columns of text rather than a plot."
+msgstr "Una tabella di dati, righe e colonne di testo invece di un grafico."
+
+
+msgid "Time series"
+msgstr "Serie temporale"
+
+
+msgid "Dated events on a baseline, each on a stem with its label, for release histories and anything else that is a list of moments."
+msgstr "Eventi datati su una linea di base, ognuno su uno stelo con la sua etichetta, per storici di versioni e ogni altro elenco di momenti."
+
+
+msgid "The region between two y curves over a shared x, for confidence bands and tolerance limits."
+msgstr "La regione tra due curve y su una x condivisa, per bande di confidenza e limiti di tolleranza."
+
+
+msgid "Series stacked into filled bands over a shared x, for showing how a total divides between its parts."
+msgstr "Serie impilate in bande piene su una x condivisa, per mostrare come un totale si divide tra le sue parti."
+
+
+msgid "A stem from a baseline to each value, for impulses, spectra and anything else sampled at discrete x."
+msgstr "Uno stelo dalla linea di base a ogni valore, per impulsi, spettri e qualsiasi altra cosa campionata a x discrete."
+
+
+msgid "A step outline over bin edges, for values that hold constant between them rather than sloping."
+msgstr "Un profilo a gradini sui bordi dei bin, per valori che restano costanti tra un bordo e l'altro invece di variare con pendenza."
+
+
+msgid "Histogram supporting multiple data sets."
+msgstr "Istogramma con supporto per più insiemi di dati."
+
+
+msgid "Draw a box and whisker plot."
+msgstr "Disegna un box plot (scatola e baffi)."
+
+
+msgid "Show the estimated distribution of one or more samples."
+msgstr "Mostra la distribuzione stimata di uno o più campioni."
+
+
+msgid "Empirical cumulative distribution function."
+msgstr "Funzione di distribuzione cumulativa empirica."
+
+
+msgid "Categories sorted by descending magnitude with a cumulative percentage line, for finding the few causes behind most of an effect."
+msgstr "Categorie ordinate per grandezza decrescente con una linea di percentuale cumulata, per trovare le poche cause dietro la maggior parte di un effetto."
+
+
+msgid "Pie or donut chart of one series."
+msgstr "Grafico a torta o a ciambella di una singola serie."
+
+
+msgid "Filled or line contours of z over a regular x/y grid."
+msgstr "Contorni pieni o a linee di z su una griglia x/y regolare."
+
+
+msgid "Filled or line contours for scattered (non-gridded) x/y/z data."
+msgstr "Contorni pieni o a linee per dati x/y/z sparsi (non su griglia)."
+
+
+msgid "3D surface over a regular x/y grid."
+msgstr "Superficie 3D su una griglia x/y regolare."
+
+
+msgid "3D triangulated surface for scattered (non-gridded) x/y/z data."
+msgstr "Superficie 3D triangolata per dati x/y/z sparsi (non su griglia)."
+
+
+msgid "Points in three dimensions, optionally coloured and sized by further columns - a cloud read for its shape rather than a surface."
+msgstr "Punti in tre dimensioni, facoltativamente colorati e dimensionati da altre colonne - una nuvola letta per la sua forma piuttosto che una superficie."
+
+
+msgid "The triangulation of scattered points, drawn as edges and vertices. Shows where the samples are and what an interpolating renderer will assume between them."
+msgstr "La triangolazione di punti sparsi, disegnata come spigoli e vertici. Mostra dove sono i campioni e cosa un renderer interpolante assumerà tra di essi."
+
+
+msgid "Scattered samples triangulated and filled by value - the unstructured answer to a pcolormesh, for a field measured wherever it could be measured."
+msgstr "Campioni sparsi triangolati e riempiti in base al valore - la risposta non strutturata a un pcolormesh, per un campo misurato ovunque fosse possibile misurarlo."
+
+
+msgid "An arrow at each sample showing a vector field's direction and magnitude, read from u and v components. Draws wherever the samples are; use Stream Plot for the flow through an even grid."
+msgstr "Una freccia per ogni campione che mostra direzione e intensità di un campo vettoriale, lette dalle componenti u e v. Disegna dove sono i campioni; usa Linee di flusso per il flusso attraverso una griglia regolare."
+
+
+msgid "Streamlines traced through a vector field, for seeing where a flow goes rather than what it does at each sample. Needs an evenly spaced grid; use Quiver for scattered samples."
+msgstr "Linee di corrente tracciate attraverso un campo vettoriale, per vedere dove va un flusso invece di cosa fa in ogni campione. Richiede una griglia a spaziatura regolare; usa Campo di vettori per campioni sparsi."
+
+
+msgid "A barb per point showing the direction and strength of a vector field, read from u and v components. Barbs encode speed in flags, so they stay readable where a field of arrows does not."
+msgstr "Una barba per punto che mostra direzione e intensità di un campo vettoriale, lette dalle componenti u e v. Le barbe codificano la velocità con le bandierine, quindi restano leggibili dove un campo di frecce non lo sarebbe."
