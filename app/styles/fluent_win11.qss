@@ -1029,33 +1029,6 @@ QDialog
    SeriesOperationWidget
    ========================================================== */
 
-/* Command rows */
-
-QFrame#operationRow {
-    background: transparent;
-    border: none;
-    border-radius: 8px;
-}
-
-/* Fluent hover */
-
-QFrame#operationRow:hover {
-    background: rgba(@SHADOW_RGB@, 0.045);
-}
-
-/* Pressed */
-
-QFrame#operationRow:pressed {
-    background: rgba(@SHADOW_RGB@, 0.08);
-}
-
-/* Keyboard focus */
-
-QFrame#operationRow:focus {
-    background: rgba(@ACCENT_RGB@, 0.05);
-    border-left: 3px solid palette(highlight);
-}
-
 /* ----------------------------------------------------------
    Section headers
    ---------------------------------------------------------- */
@@ -1077,77 +1050,11 @@ QLabel[sectionTitle="true"] {
 }
 
 /* ----------------------------------------------------------
-   Command title
-   ---------------------------------------------------------- */
-
-QLabel[operationTitle="true"] {
-
-    font-size: 10pt;
-
-    font-weight: 600;
-
-    color: palette(window-text);
-
-    background: transparent;
-}
-
-
-
-
-/* ----------------------------------------------------------
-   Description
-   ---------------------------------------------------------- */
-
-QLabel[operationDescription="true"] {
-
-    background: transparent;
-
-    color: rgba(@NEUTRAL_RGB@, 0.92);
-
-    font-size: 9pt;
-}
-
-/* ----------------------------------------------------------
-   Operation Icon
-   ---------------------------------------------------------- */
-
-QLabel#operationIcon {
-
-    min-width: 20px;
-    max-width: 20px;
-
-    min-height: 20px;
-    max-height: 20px;
-
-    background: transparent;
-}
-
-/* ----------------------------------------------------------
-   Compact row variant
-   ---------------------------------------------------------- */
-
-QFrame#operationRow[compact="true"] {
-
-    border-radius: 6px;
-}
-
-/* ----------------------------------------------------------
-   Selected operation
-   ---------------------------------------------------------- */
-
-QFrame#operationRow[selected="true"] {
-
-    background: rgba(@ACCENT_RGB@, 0.08);
-
-    border-left: 3px solid palette(highlight);
-}
-
-/* ----------------------------------------------------------
    Operation tile (sectioned grid)
-   Same states as #operationRow above - hover, keyboard focus -
-   drawn as a bordered square instead of a border-left accent
-   stripe, since a tile has no long edge for a stripe to read as
-   "this one" against.
+   Every operation - Plot included - is one of these: a bordered
+   square with hover and keyboard-focus states, not a border-left
+   accent stripe, since a tile has no long edge for a stripe to
+   read as "this one" against.
    ---------------------------------------------------------- */
 
 QFrame#operationTile {

@@ -18,9 +18,15 @@ import pytest
 from app.widgets.axis_properties import AxisPropertiesWidget
 from app.widgets.base_properties import BaseProperties
 from app.widgets.figure_properties import FigurePropertiesWidget
+from app.widgets.series_operation import SeriesOperationWidget
 from app.widgets.series_properties import SeriesPropertiesWidget
 
-WIDGET_CLASSES = (FigurePropertiesWidget, AxisPropertiesWidget, SeriesPropertiesWidget)
+WIDGET_CLASSES = (
+    FigurePropertiesWidget,
+    AxisPropertiesWidget,
+    SeriesPropertiesWidget,
+    SeriesOperationWidget,
+)
 
 
 def test_base_properties_sets_no_layout_of_its_own(qapp) -> None:

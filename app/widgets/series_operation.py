@@ -1,21 +1,25 @@
-"""The Series Operations panel: New plot, then every operation in a grid.
+"""The Series Operations panel: New plot, then every operation, all tiles.
 
 Grouped into the same five sections the layout proposal settled on -
-Analysis (Peaks, Roots, Calculus), Statistics (Statistics, Outliers,
-Clustering, Control Chart), Signal Processing (Smoothing, Spectral
-Analysis, Filtering, Baseline Correction), Modeling (Fit, Interpolation,
-Function) - because "I want a control chart" is one decision, not "which of
-five sections is a control chart in, then which dialog in that section".
-New plot stays its own single wide row above the grid: it is not an
-analysis of a series, it is "make a new place to put one".
+Plot on its own, then Analysis (Peaks, Roots, Calculus), Statistics
+(Statistics, Outliers, Clustering, Control Chart), Signal Processing
+(Smoothing, Spectral Analysis, Filtering, Baseline Correction), Modeling
+(Fit, Interpolation, Function) - because "I want a control chart" is one
+decision, not "which of five sections is a control chart in, then which
+dialog in that section". Plot is a section of one for the same reason the
+others exist: naming what it is, above the button, rather than folding it
+wordlessly into "Analysis".
 
-Each operation is a square tile - an icon over its name - rather than the
-old one-row-per-operation list with the description written out inline.
-Square tiles have no room for that description, so it moves to a bar fixed
-at the bottom of the panel (below the scroll area, not inside it) that
-hover *or* keyboard focus fills in - not a tooltip, which would vanish the
-moment the pointer left and say nothing to someone tabbing through with a
-keyboard instead of a mouse.
+Every operation - Plot included - is a square tile: an icon over its name,
+the same size and behaviour whichever section it is in, rather than the
+one-row-per-operation list an earlier version drew Plot as (a "this one is
+different" distinction the grid layout does not need: a tile that makes a
+place to put a series is not read differently from one that analyses what
+is already there). Square tiles have no room for a description, so it
+moves to a bar fixed at the bottom of the panel (below the scroll area,
+not inside it) that hover *or* keyboard focus fills in - not a tooltip,
+which would vanish the moment the pointer left and say nothing to someone
+tabbing through with a keyboard instead of a mouse.
 """
 from __future__ import annotations
 
@@ -25,7 +29,6 @@ from PySide6.QtCore import QEvent, QSize, Signal, Qt
 from PySide6.QtGui import (
     QEnterEvent,
     QFocusEvent,
-    QFont,
     QIcon,
     QKeyEvent,
     QMouseEvent,
@@ -34,7 +37,6 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
-    QHBoxLayout,
     QLabel,
     QScrollArea,
     QSizePolicy,
@@ -51,6 +53,7 @@ from app.styles.style import (
     stdSizeAndlayout,
 )
 from app.utils.i18n import _, tr
+from app.widgets.base_properties import BaseProperties
 
 _ACCENT = "#2563EB"
 
@@ -104,84 +107,6 @@ def _group_by_section(operations: list[dict]) -> list[tuple[str, list[dict]]]:
     if leftover:
         grouped.append((_FALLBACK_SECTION, leftover))
     return grouped
-
-
-class OperationRow(QFrame):
-    """One wide row: an icon, a title, a description. Used only for New
-    plot now - see the module docstring for why the rest are tiles."""
-
-    clicked = Signal()
-    ICON_SIZE = 20
-
-    def __init__(self, *, parent: QWidget, icon: QIcon, title: str, description: str) -> None:
-        super().__init__(parent)
-        self.setObjectName("operationRow")
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-
-        row_layout = QHBoxLayout(self)
-        row_layout.setContentsMargins(10, 8, 10, 8)
-        row_layout.setSpacing(10)
-
-        icon_label = QLabel(self)
-        icon_label.setObjectName("operationIcon")
-        icon_label.setProperty("fluentIcon", True)
-        icon_label.setFixedSize(self.ICON_SIZE, self.ICON_SIZE)
-        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_label.setPixmap(icon.pixmap(QSize(self.ICON_SIZE, self.ICON_SIZE)))
-        row_layout.addWidget(icon_label, 0, Qt.AlignmentFlag.AlignTop)
-
-        text_layout = QVBoxLayout()
-        text_layout.setContentsMargins(0, 0, 0, 0)
-        text_layout.setSpacing(1)
-
-        title_label = QLabel(title, self)
-        title_label.setProperty("operationTitle", True)
-        title_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
-        title_font = QFont(title_label.font())
-        title_point_size = title_font.pointSize()
-        if title_point_size > 0:
-            title_font.setPointSize(max(title_point_size, 10))
-        else:
-            title_font.setPixelSize(13)
-        title_font.setWeight(QFont.Weight.DemiBold)
-        title_label.setFont(title_font)
-
-        description_label = QLabel(description, self)
-        description_label.setProperty("operationDescription", True)
-        description_label.setWordWrap(False)
-        description_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
-        description_font = QFont(description_label.font())
-        description_point_size = description_font.pointSize()
-        if description_point_size > 0:
-            description_font.setPointSize(max(description_point_size - 1, 9))
-        else:
-            description_font.setPixelSize(12)
-
-        description_label.setFont(description_font)
-
-        text_layout.addWidget(title_label)
-        text_layout.addWidget(description_label)
-        row_layout.addLayout(text_layout, 1)
-
-        self.setAccessibleName(title)
-        self.setAccessibleDescription(description)
-
-    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
-        if event.button() == Qt.MouseButton.LeftButton and self.rect().contains(event.position().toPoint()):
-            self.clicked.emit()
-            event.accept()
-            return
-        super().mouseReleaseEvent(event)
-
-    def keyPressEvent(self, event: QKeyEvent) -> None:
-        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
-            self.clicked.emit()
-            event.accept()
-            return
-        super().keyPressEvent(event)
 
 
 class OperationTile(QFrame):
@@ -322,12 +247,11 @@ class OperationSection(QWidget):
         self._relayout(columns)
 
 
-class SeriesOperationWidget(QWidget):
+class SeriesOperationWidget(BaseProperties):
     operation_requested = Signal(dict)
 
-    def __init__(self, parent: QWidget):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         root_layout = QVBoxLayout(self)
         stdSizeAndlayout(root_layout)
@@ -354,16 +278,13 @@ class SeriesOperationWidget(QWidget):
         stdSizeAndlayout(layout)
         layout.setSpacing(2)
 
-        self._add_section_title(layout, _("Plot"))
-        self._add_operation_item(layout=layout, operation=self.plot_operation())
-
+        # Plot is a section of one, built the same way and out of the same
+        # tile as every operation below it - see the module docstring for
+        # why it no longer gets the old wide-row treatment.
+        self._add_section(content, layout, _("Plot"), [self.plot_operation()])
         layout.addSpacing(16)
         for title, operations in _group_by_section(list(series_operations)):
-            section = OperationSection(content, title, operations)
-            section.operation_clicked.connect(self.operation_requested)
-            section.tile_hovered.connect(self._show_hint)
-            section.tile_left.connect(self._clear_hint)
-            layout.addWidget(section)
+            self._add_section(content, layout, title, operations)
             layout.addSpacing(12)
 
         layout.addStretch(1)
@@ -376,6 +297,31 @@ class SeriesOperationWidget(QWidget):
         self._hint_label.setProperty("muted", True)
         self._hint_label.setWordWrap(True)
         page_layout.addWidget(self._hint_label, 0)
+
+    def _add_section(
+        self, content: QWidget, layout: QVBoxLayout, title: str, operations: list[dict]
+    ) -> OperationSection:
+        section = OperationSection(content, title, operations)
+        section.operation_clicked.connect(self.operation_requested)
+        section.tile_hovered.connect(self._show_hint)
+        section.tile_left.connect(self._clear_hint)
+        layout.addWidget(section)
+        return section
+
+    def _reload_from_descriptor(self) -> None:
+        """No-op: this panel lists operations, it does not edit a descriptor.
+
+        Required by BaseProperties; nothing here reads from a connected
+        figure, so there is nothing to reload when one changes.
+        """
+
+    def _set_enabled_state(self, enabled: bool) -> None:
+        """No-op for the same reason: every tile stays clickable regardless.
+
+        Whether an operation can actually run is decided where it is opened
+        (main_window._open_series_operation refuses without a current
+        chart), not by disabling the button that asks for one.
+        """
 
     def _show_hint(self, title: str, description: str) -> None:
         self._hint_label.setProperty("muted", False)
@@ -411,19 +357,3 @@ class SeriesOperationWidget(QWidget):
         # The wrapping lives in style.icon_from_svg_source now; the accent
         # colour is this list's own, so it is passed rather than assumed.
         return icon_from_svg_source(svg_source, color=_ACCENT)
-
-    def _add_section_title(self, layout: QVBoxLayout, title: str) -> None:
-        layout.addWidget(create_compact_section_title(title, self))
-
-    def _add_operation_item(self, *, layout: QVBoxLayout, operation: dict) -> None:
-        action_id = _operation_action_id(operation)
-        title = tr(action_id)
-        description = tr(str(operation.get("description") or "Open operation"))
-        row = OperationRow(
-            parent=self,
-            icon=self.plugin_icon(operation),
-            title=title,
-            description=description,
-        )
-        row.clicked.connect(lambda op=operation: self.operation_requested.emit(op))
-        layout.addWidget(row)

@@ -12,12 +12,24 @@ from PySide6.QtGui import QEnterEvent
 from PySide6.QtCore import QPointF
 
 from app.scanners.series_operation_scanner import series_operations
+from app.widgets.base_properties import BaseProperties
 from app.widgets.series_operation import (
     OperationSection,
     OperationTile,
     SeriesOperationWidget,
     _group_by_section,
 )
+
+
+# ----------------------------------------------------------------------
+# Shares the properties panels' look
+# ----------------------------------------------------------------------
+def test_the_panel_is_a_base_properties_widget(qapp) -> None:
+    """Same panel background/size-policy convention as Figure/Axis/Series/
+    Overlay properties, rather than a plain QWidget of its own."""
+    widget = SeriesOperationWidget(None)
+    assert isinstance(widget, BaseProperties)
+    assert widget.objectName() == "basePropertiesPanel"
 
 
 # ----------------------------------------------------------------------
@@ -182,12 +194,30 @@ def test_hovering_any_tile_updates_the_panels_hint_bar(qapp) -> None:
     assert tile._title not in widget._hint_label.text()
 
 
-def test_new_plot_stays_a_single_wide_row_not_a_tile(qapp) -> None:
-    """New plot is "make somewhere to put a series", not an analysis of
-    one - it keeps the old row treatment rather than joining the grid."""
-    from app.widgets.series_operation import OperationRow
+def test_new_plot_is_a_tile_like_every_other_operation(qapp) -> None:
+    """Plot used to keep an older one-row treatment; it is a section of one
+    tile now, styled and behaving exactly like the rest of the grid."""
+    widget = SeriesOperationWidget(None)
+    plot_tiles = [
+        tile for tile in widget.findChildren(OperationTile)
+        if tile.accessibleName() == "Plot"
+    ]
+    assert len(plot_tiles) == 1
+    assert plot_tiles[0].objectName() == "operationTile"
+
+
+def test_plot_gets_its_own_named_section(qapp) -> None:
+    from PySide6.QtWidgets import QLabel
 
     widget = SeriesOperationWidget(None)
-    rows = widget.findChildren(OperationRow)
-    assert len(rows) == 1
-    assert rows[0].accessibleName() == "Plot"
+    plot_section = next(
+        section
+        for section in widget.findChildren(OperationSection)
+        if any(tile.accessibleName() == "Plot" for tile in section.findChildren(OperationTile))
+    )
+    titles = [
+        label.text()
+        for label in plot_section.findChildren(QLabel)
+        if label.property("sectionTitle")
+    ]
+    assert titles == ["Plot"]
