@@ -33,6 +33,7 @@ import pandas as pd
 
 from app.charts.base import BaseAxisRenderer, SeriesData
 from app.charts.scatter import ScatterAxisRenderer
+from app.data.series_frame import SeriesFrame
 from app.logs.logger import applogger
 from app.utils.distribution_fit import (
     CURATED_DISTRIBUTIONS,
@@ -304,7 +305,7 @@ class EcdfAxisRenderer(ScatterAxisRenderer, BaseAxisRenderer):
         *,
         complementary: bool,
         as_percent: bool,
-    ) -> pd.DataFrame | None:
+    ) -> SeriesFrame | None:
         """Return a two-column x/y frame for one series, or None if unusable."""
         if "value" not in sd.df.columns:
             applogger.warning(
@@ -330,4 +331,4 @@ class EcdfAxisRenderer(ScatterAxisRenderer, BaseAxisRenderer):
             applogger.info("Series '%s' skipped: no finite values.", sd.name)
             return None
 
-        return pd.DataFrame({"x": x_values, "y": y_values})
+        return SeriesFrame({"x": x_values, "y": y_values})

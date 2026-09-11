@@ -21,6 +21,7 @@ from app.charts.base import (
     PATCH_KWARGS,
     BaseAxisRenderer,
     SeriesData,
+    SeriesFrame,
     merge,
     pick,
 )
@@ -335,7 +336,7 @@ class BarAxisRenderer(BaseAxisRenderer):
         self,
         *,
         kwargs: dict[str, Any],
-        df: pd.DataFrame,
+        df: SeriesFrame,
         style: dict[str, Any],
         layer_index: int,
     ) -> None:

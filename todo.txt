@@ -276,15 +276,34 @@ FATTO 2026-09-11 (P2-16) SqliteRepo.query_arrays: query_df senza DataFrame
       "rimozione completa", non del percorso di lettura snello. Vedi
       P2-17 se si vuole continuare in quella direzione.
 
-P2-17 continuare a snellire la lettura dati (query_arrays) nei renderer
-      La superficie rimasta e' quasi tutta app/charts/*.py: SeriesData.df e'
-      un pd.DataFrame in ogni renderer (scatter, bar, histogram, grids,
-      surface, ...). Migrarla vuol dire cambiare la forma di SeriesData
-      stessa - ~20 file di renderer, non solo i punti .to_numpy() - quindi
-      e' un progetto a se', non un'estensione rapida di P2-16. Le colonne
-      che restano genuinamente pandas anche dopo: le date/orari (coercion.py,
-      usato da quasi ogni asse x) e i due renderer che usano rolling/groupby
-      (pareto.py, time_series.py).
+FATTO 2026-09-11 (P2-17) SeriesData.df: SeriesFrame invece di pd.DataFrame
+      Prima di scrivere: il percorso di rendering e' gia' cache-backed
+      (SqliteRepo._series_cache), quindi il valore reale era piu' piccolo di
+      quanto sembrasse da P2-16 - segnalato, l'utente ha scelto di procedere
+      comunque. app/data/series_frame.py: SeriesFrame e' un dict di
+      np.ndarray tipizzato direttamente dal cursore sqlite3 (from_rows -
+      int/float/None -> float64 con NaN, tutto il resto resta object, la
+      stessa distinzione che pd.read_sql_query avrebbe fatto, senza pandas
+      per scoprirla). sd.df["x"], "x" in sd.df.columns, sd.df.copy(),
+      sd.df.loc[mask, "color"], assegnazione di colonna: tutti supportati,
+      e ogni accesso a una colonna restituisce ancora un pd.Series - e'
+      quello che lascia funzionare pd.to_numeric()/.to_numpy()/.tolist() in
+      ogni punto di chiamata dei ~20 file di renderer senza toccarli.
+      SqliteRepo: series_frame()/downsampled_series_frame() sono il nuovo
+      percorso (via _read_series_frame, cursore diretto, no
+      pd.read_sql_query); series_df()/downsampled_series_df() restano,
+      ora un .to_pandas() sulla stessa cache condivisa - stesso contratto,
+      stessi test (test_series_cache.py, test_downsample.py) verdi
+      invariati. render_figure._load_series_df chiama series_frame() /
+      downsampled_series_frame(); i tre punti che ricostruiscono una
+      SeriesData nuova (ecdf.py, timeline.py) costruiscono SeriesFrame
+      direttamente, zero pandas coinvolto.
+      Le due eccezioni deliberate, non riscritte in numpy:
+      pareto.py._apply_category_limit (groupby) e table.py._columns_to_draw
+      (.iloc/.astype/.index - una tabella e' un problema a forma di
+      DataFrame) chiamano sd.df.to_pandas() - un'unica conversione, non un
+      fallback silenzioso su cui il resto del tipo si appoggia.
+      Suite intera verde: 2025 passed, 3 skipped, 0 failed.
 
 ================================================================
 P3 - LATER

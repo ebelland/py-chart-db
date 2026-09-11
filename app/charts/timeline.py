@@ -20,6 +20,7 @@ from matplotlib import dates as mdates
 
 from app.charts.base import BaseAxisRenderer, SeriesData
 from app.charts.scatter import ScatterAxisRenderer
+from app.data.series_frame import SeriesFrame
 from app.logs.logger import applogger
 from app.utils.coercion import coerce_axis
 
@@ -147,7 +148,7 @@ class TimelineAxisRenderer(ScatterAxisRenderer, BaseAxisRenderer):
                 applogger.info("Series '%s' skipped: no dated events.", sd.name)
                 continue
 
-            frame = pd.DataFrame({"x": x[mask], "y": y[mask]})
+            frame = SeriesFrame({"x": x[mask], "y": y[mask]})
             for role in ("color", "size"):
                 if role in sd.df.columns:
                     frame[role] = sd.df[role].to_numpy()[mask]

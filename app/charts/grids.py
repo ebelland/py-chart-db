@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+from app.data.series_frame import SeriesFrame
 
 from app.logs.logger import applogger
 
@@ -29,7 +30,7 @@ MAX_GRID_CELLS: int = 4_000_000
 
 
 def pivot_to_grid(
-    df: pd.DataFrame,
+    df: SeriesFrame,
     *,
     x_role: str = "x",
     y_role: str = "y",
@@ -113,7 +114,7 @@ def pivot_to_grid(
 
 
 def finite_xyz(
-    df: pd.DataFrame,
+    df: SeriesFrame,
     *,
     x_role: str = "x",
     y_role: str = "y",
