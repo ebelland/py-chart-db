@@ -256,6 +256,36 @@ P2-15 series operations: scikit-learn models
         report. The one new shape here: many series in, many out (blind
         source separation, common-mode removal).
 
+FATTO 2026-09-11 (P2-16) SqliteRepo.query_arrays: query_df senza DataFrame
+      Misurato prima di scrivere: 42 file importano pandas, ma solo 2
+      (pareto.py, time_series.py) usano qualcosa che pandas fa e numpy no
+      (rolling/groupby); il resto - 76 punti di chiamata - era
+      query_df(...).to_numpy(): un DataFrame costruito e buttato via una
+      riga dopo. query_arrays() legge dal cursore DB-API direttamente
+      (fetchall/description), nessun DataFrame; QueryColumns e'
+      un dict[str, np.ndarray] con .columns/.empty/__getitem__.
+      coerce_numeric_array() replica pd.to_numeric(errors="coerce") a mano
+      (None/non parsabile -> NaN). control_chart_dialog._series_counts
+      migrato (le colonne conteggio/dimensione delle carte per attributi);
+      l'asse x resta su numeric_x/coerce_axis - vero riconoscimento di
+      date, non lo si riscrive qui, gli basta un pd.Series di una sola
+      colonna invece di un frame intero.
+      Non toccato, deliberatamente: l'intera pipeline di rendering
+      (app/charts/*.py, ~50 punti .to_numpy()) legge SeriesData.df come un
+      pd.DataFrame dappertutto - cambiare quella forma e' la portata di
+      "rimozione completa", non del percorso di lettura snello. Vedi
+      P2-17 se si vuole continuare in quella direzione.
+
+P2-17 continuare a snellire la lettura dati (query_arrays) nei renderer
+      La superficie rimasta e' quasi tutta app/charts/*.py: SeriesData.df e'
+      un pd.DataFrame in ogni renderer (scatter, bar, histogram, grids,
+      surface, ...). Migrarla vuol dire cambiare la forma di SeriesData
+      stessa - ~20 file di renderer, non solo i punti .to_numpy() - quindi
+      e' un progetto a se', non un'estensione rapida di P2-16. Le colonne
+      che restano genuinamente pandas anche dopo: le date/orari (coercion.py,
+      usato da quasi ogni asse x) e i due renderer che usano rolling/groupby
+      (pareto.py, time_series.py).
+
 ================================================================
 P3 - LATER
 ================================================================

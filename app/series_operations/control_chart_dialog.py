@@ -61,6 +61,7 @@ import pandas as pd
 from PySide6.QtWidgets import QComboBox, QFormLayout, QVBoxLayout, QWidget
 
 from app.data.data_source import parse_roles, row_value
+from app.data.repo.tables import QueryColumns, coerce_numeric_array
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
 from app.series_operations.parameter_spec import BoolParam, FloatParam, IntParam
@@ -548,12 +549,12 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
         wanted = self._size_column_combo.currentText()
         columns: list[str] = []
         for row in self.selected_series():
-            frame = self._safe_frame(row)
-            if frame is None:
+            result = self._safe_columns(row)
+            if result is None:
                 continue
-            for column in frame.columns:
-                if str(column) not in columns:
-                    columns.append(str(column))
+            for column in result.columns:
+                if column not in columns:
+                    columns.append(column)
 
         self._size_column_combo.blockSignals(True)
         self._size_column_combo.clear()
@@ -585,14 +586,26 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
     # ------------------------------------------------------------------
     # Input
     # ------------------------------------------------------------------
-    def _safe_frame(self, row: Any) -> pd.DataFrame | None:
+    def _safe_columns(self, row: Any) -> QueryColumns | None:
         query = str(row_value(row, "sql_query", "query", default="")).strip()
         if not query:
             return None
         try:
-            return self._repo.query_df(query)
+            return self._repo.query_arrays(query)
         except Exception:  # noqa: BLE001 - a bad query is reported at compute time
             return None
+
+    @staticmethod
+    def _looks_numeric(values: np.ndarray) -> bool:
+        """True when coercing *values* produces at least one real number.
+
+        The fallback-column heuristic below needs to tell "this column is
+        usable as counts" from "this column is text" without pandas' own
+        dtype introspection (there is no DataFrame here to introspect) - a
+        column that coerces to all-NaN is exactly the text case.
+        """
+        coerced = coerce_numeric_array(values)
+        return bool(coerced.size) and not bool(np.all(np.isnan(coerced)))
 
     def _series_counts(
         self, row: Any, name: str, chart: str,
@@ -601,24 +614,30 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
 
         Only the attribute charts come through here; the variables charts
         read x/y through the shared ``series_xy``, which they can because
-        they need no third column.
+        they need no third column. Read through query_arrays rather than
+        query_df: no DataFrame is built for a dialog that only ever wanted
+        two or three plain numeric columns out of it. The one column that
+        might be a timestamp - x - is still handed to numeric_x exactly as
+        it always was, wrapped in a single-column Series rather than a
+        whole frame, because that is real date-parsing logic this is not
+        trying to reimplement.
         """
-        frame = self._safe_frame(row)
-        if frame is None or frame.empty:
+        columns_result = self._safe_columns(row)
+        if columns_result is None or columns_result.empty:
             raise ValueError("the series query returned no rows")
 
         roles = parse_roles(row_value(row, "roles", default={}))
-        columns = [str(column) for column in frame.columns]
+        columns = list(columns_result.columns)
 
         y_col = str(roles.get("y") or "y")
         if y_col not in columns:
-            numeric = [c for c in columns if pd.api.types.is_numeric_dtype(frame[c])]
+            numeric = [c for c in columns if self._looks_numeric(columns_result[c])]
             y_col = numeric[-1] if numeric else columns[-1]
-        counts = pd.to_numeric(frame[y_col], errors="coerce").to_numpy(dtype=float)
+        counts = coerce_numeric_array(columns_result[y_col])
 
         x_col = str(roles.get("x") or "x")
         x_values = (
-            self.numeric_x(frame[x_col], name)
+            self.numeric_x(pd.Series(columns_result[x_col]), name)
             if x_col in columns
             else np.arange(counts.size, dtype=float)
         )
@@ -630,7 +649,7 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
                 raise ValueError(
                     "pick the column holding the sample size in the parameters pane"
                 )
-            sizes = pd.to_numeric(frame[size_col], errors="coerce").to_numpy(dtype=float)
+            sizes = coerce_numeric_array(columns_result[size_col])
         else:
             sizes = np.ones(counts.size, dtype=float)
 
