@@ -4800,3 +4800,47 @@ msgstr "Filtraggio"
 
 msgid "Filter, detrend or demodulate a series (scipy.signal)"
 msgstr "Filtra, detrenda o demodula una serie (scipy.signal)"
+
+
+msgid "Choose the baseline estimator."
+msgstr "Scegli lo stimatore della linea di base."
+
+
+msgid "Smoothness. Larger makes the baseline stiffer, so it bends less to follow narrow peaks."
+msgstr "Levigatezza. Più alto rende la linea di base più rigida, così si piega meno per seguire i picchi stretti."
+
+
+msgid "Lambda:"
+msgstr "Lambda:"
+
+
+msgid "Asymmetry. Smaller pushes the baseline further below the peaks; it should stay well under 0.5."
+msgstr "Asimmetria. Più basso spinge la linea di base più sotto i picchi; deve restare ben sotto 0.5."
+
+
+msgid "p:"
+msgstr "p:"
+
+
+msgid "Re-weighting passes."
+msgstr "Passaggi di riponderazione."
+
+
+msgid "Iterations:"
+msgstr "Iterazioni:"
+
+
+msgid "Draw the estimated baseline itself."
+msgstr "Disegna la linea di base stimata."
+
+
+msgid "Draw the baseline:"
+msgstr "Disegna la linea di base:"
+
+
+msgid "Baseline Correction"
+msgstr "Correzione della linea di base"
+
+
+msgid "Subtract a spectrum's background (AsLS or rubber band)"
+msgstr "Sottrae lo sfondo di uno spettro (AsLS o rubber band)"

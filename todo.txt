@@ -185,8 +185,19 @@ FATTO 2026-09-10 (P3-x) peaks dialog: "Mark peaks only" rimosso
       da scegliere. Un test in test_statistics_selection.py cammina tutte
       le operazioni e chiede chi legge ogni parametro dichiarato.
 
-P2-3  series operation: baseline correction (ALS or rubber-band)
-      Pure numpy/scipy. Prerequisite for meaningful peak areas.
+FATTO 2026-09-11 (P2-3) series operation: baseline correction (AsLS o rubber band)
+      Nuovo baseline_dialog.py. AsLS (Eilers & Boelens 2005): minimi quadrati
+      pesati in modo asimmetrico contro una penalita' sulla derivata seconda
+      (lambda = rigidita', p = asimmetria), riponderato per alcune iterazioni
+      - un picco pesa solo p, cosi' non tira su la linea di base verso di
+      se'. Rubber band: inviluppo convesso inferiore di (x, y), interpolato
+      linearmente tra i suoi vertici - senza parametri, ma segue solo forme
+      convesse (un avvallamento verso il basso *e'* il minimo vero e l'
+      inviluppo lo segue; e' un picco verso l'alto che viene saltato).
+      Scrive due serie per sorgente: quella corretta (y - baseline, il
+      risultato principale) e la baseline stessa (spuntabile). Pura in
+      numpy/scipy, verificata in test_baseline_dialog.py su una linea di
+      base nota piu' picchi noti. Prerequisito per aree di picco affidabili.
 
 P2-4  ChartPanel: rubber-band region selection (RectangleSelector)
       The natural bridge between the chart and the operations: select a peak
