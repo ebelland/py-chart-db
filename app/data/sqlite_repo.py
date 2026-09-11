@@ -1,4 +1,4 @@
-"""SQLite repository for Data Hub: the connection, and everything on it.
+"""SQLite repository for ChartLibre: the connection, and everything on it.
 
 ``SqliteRepo`` is the one class the application talks to - 77 call sites
 write ``from app.data.sqlite_repo import SqliteRepo`` and none of them
@@ -20,7 +20,6 @@ size, so that reading about one of them means reading one file.
 """
 from __future__ import annotations
 
-import json
 import re
 import sqlite3
 import uuid
@@ -33,7 +32,7 @@ from typing import ClassVar
 
 import pandas as pd
 
-import app.data.descriptors
+from app.data.series_frame import SeriesFrame
 from app.data.undo_store import UndoEntry, UndoStore
 from app.logs.logger import applogger
 from app.utils.config import load_config
@@ -70,7 +69,7 @@ class SqliteRepo(
     QueriesMixin,
     MaintenanceMixin,
 ):
-    """SQLite repository for Data Hub.
+    """SQLite repository for ChartLibre.
 
     Manages:
       - DataFrame queries and imports
@@ -90,8 +89,11 @@ class SqliteRepo(
     _is_connected: bool = False
     _preview_savepoint_name: str | None = None
 
-    # --- series DataFrame cache -----------------------------------------
-    _series_cache: OrderedDict[str, pd.DataFrame] = field(default_factory=OrderedDict)
+    # --- series cache -----------------------------------------------------
+    # Holds SeriesFrame, not DataFrame (todo.txt P2-17) - series_df()/
+    # downsampled_series_df() below are now a pandas-shaped view onto this
+    # same cache, kept for the callers and tests that still want a DataFrame.
+    _series_cache: OrderedDict[str, SeriesFrame] = field(default_factory=OrderedDict)
     _series_cache_stamp: tuple[int, int, int] | None = None
     _series_cache_enabled: bool = _SERIES_CACHE_DEFAULT_ENABLED
     _series_cache_max_entries: int = _SERIES_CACHE_DEFAULT_MAX_ENTRIES
@@ -277,25 +279,30 @@ class SqliteRepo(
         }
 
     @ensure_connection_wrapper
-    def series_df(self, sql: str) -> pd.DataFrame:
-        """Return the DataFrame for a series query, cached per database state.
+    def series_frame(self, sql: str) -> SeriesFrame:
+        """Return the SeriesFrame for a series query, cached per database state.
+
+        This is the render path (see ``render_figure._load_series_df``):
+        SQLite's own cursor, typed straight into numpy arrays - no
+        ``pd.read_sql_query`` between the database and the cache. ``series_df``
+        below is the same cache, wearing a DataFrame for the callers and tests
+        that still want one.
 
         The cache is keyed by SQL text and wholesale invalidated whenever
         ``_database_stamp`` changes, so a hit can only ever be served for the
         exact database state that produced it.
 
-        Contract: the returned frame is a shallow copy.  Adding or dropping
-        columns on it is safe; mutating values in place is not, because the
-        underlying blocks are shared with the cached frame.
+        Contract: the returned frame is a copy. Mutating it - adding a
+        column, changing one in place - never reaches the cached entry.
         """
         sql_text = (sql or "").strip()
         if not sql_text:
-            return pd.DataFrame()
+            return SeriesFrame()
 
         assert self._con is not None
 
         if not self._series_cache_enabled:
-            return pd.read_sql_query(sql_text, self._con)
+            return self._read_series_frame(sql_text)
 
         stamp = self._database_stamp()
         if stamp != self._series_cache_stamp:
@@ -306,17 +313,34 @@ class SqliteRepo(
         if cached is not None:
             self._series_cache_hits += 1
             self._series_cache.move_to_end(sql_text)
-            return cached.copy(deep=False)
+            return cached.copy()
 
         self._series_cache_misses += 1
-        frame = pd.read_sql_query(sql_text, self._con)
+        frame = self._read_series_frame(sql_text)
         self._series_cache[sql_text] = frame
 
         # Bound the cache; the oldest entry is the least recently used one.
         while len(self._series_cache) > self._series_cache_max_entries:
             self._series_cache.popitem(last=False)
 
-        return frame.copy(deep=False)
+        return frame.copy()
+
+    def _read_series_frame(self, sql_text: str) -> SeriesFrame:
+        assert self._con is not None
+        cursor = self._con.execute(sql_text)
+        names = tuple(str(d[0]) for d in cursor.description or ())
+        rows = cursor.fetchall()
+        return SeriesFrame.from_rows(names, rows)
+
+    def series_df(self, sql: str) -> pd.DataFrame:
+        """``series_frame`` as a DataFrame, for the callers still built on one.
+
+        Same cache, same invalidation contract as ``series_frame`` - a hit on
+        one is a hit on the other, so a dialog reading a series with
+        ``series_df`` and a chart reading the same SQL with ``series_frame``
+        pay the query once between them, not once each.
+        """
+        return self.series_frame(sql).to_pandas()
 
     @ensure_connection_wrapper
     def series_row_count(self, sql: str) -> int:
@@ -350,7 +374,7 @@ class SqliteRepo(
         return count
 
     @ensure_connection_wrapper
-    def downsampled_series_df(self, sql: str, *, threshold: int) -> pd.DataFrame:
+    def downsampled_series_frame(self, sql: str, *, threshold: int) -> SeriesFrame:
         """Return *sql*'s result, decimated to roughly ``threshold`` rows.
 
         Decided and applied entirely inside SQLite: one ``COUNT(*)``
@@ -360,18 +384,18 @@ class SqliteRepo(
         column. Every point-series query in this application selects the x
         role first (``SELECT x, y FROM ...``), so ordinal position 1 names
         it without needing to know the column's actual alias. The full
-        result is never read into pandas only to be thinned out afterwards -
-        that would keep the exact cost this exists to avoid.
+        result is never read only to be thinned out afterwards - that would
+        keep the exact cost this exists to avoid.
 
         ``threshold <= 0`` disables downsampling and reads the plain query.
         """
         sql_text = (sql or "").strip()
         if not sql_text or threshold <= 0:
-            return self.series_df(sql_text)
+            return self.series_frame(sql_text)
 
         total = self.series_row_count(sql_text)
         if total <= threshold:
-            return self.series_df(sql_text)
+            return self.series_frame(sql_text)
 
         stride = max(1, -(-total // threshold))  # ceil division
         wrapped = (
@@ -379,8 +403,11 @@ class SqliteRepo(
             f"SELECT *, ROW_NUMBER() OVER (ORDER BY 1) AS __dhub_rn__ FROM ({sql_text})"
             f") WHERE (__dhub_rn__ - 1) % {stride} = 0"
         )
-        frame = self.series_df(wrapped)
-        return frame.drop(columns="__dhub_rn__", errors="ignore")
+        return self.series_frame(wrapped).drop_column("__dhub_rn__")
+
+    def downsampled_series_df(self, sql: str, *, threshold: int) -> pd.DataFrame:
+        """``downsampled_series_frame`` as a DataFrame; see ``series_df``."""
+        return self.downsampled_series_frame(sql, threshold=threshold).to_pandas()
 
 
     @ensure_connection_wrapper

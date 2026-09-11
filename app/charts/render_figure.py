@@ -6,8 +6,10 @@ It does **not** own figure width, height, or DPI - those belong to ChartPanel
 and to rcParams, so the same descriptor renders identically on screen and on
 export.
 
-Series data is read through ``SqliteRepo.series_df`` so that repeated renders of
-an unchanged database are served from cache.
+Series data is read through ``SqliteRepo.series_frame`` so that repeated
+renders of an unchanged database are served from cache - and, since todo.txt
+P2-17, without a ``pd.DataFrame`` built on the way: see
+``app.data.series_frame`` for what a series looks like now.
 """
 from __future__ import annotations
 
@@ -21,7 +23,6 @@ from typing import Any, Literal
 import math
 
 import matplotlib.pyplot as plt
-import pandas as pd
 from matplotlib.figure import Figure
 from matplotlib.ticker import NullLocator
 
@@ -29,6 +30,7 @@ from app.scanners.axis_renderer_scanner import get_renderer, import_class_from_f
 from app.charts import axis_options
 from app.charts.base import SeriesData
 from app.data.descriptors import AxisDescriptor, FigureDescriptor, SeriesDescriptor
+from app.data.series_frame import SeriesFrame
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
 from app.utils.mpl_latex import filter_latex_style_text
@@ -617,9 +619,10 @@ def _clear_redundant_shared_axis_labels(shared_axes: set[Any]) -> None:
 # Series loading
 # ----------------------------------------------------------------------
 #: Figure option key for the row-count above which a series query is
-#: decimated before it ever reaches pandas - see _figure_downsample_threshold
-#: and SqliteRepo.downsampled_series_df. A figure that has never set it is
-#: decimated past DEFAULT_DOWNSAMPLE_THRESHOLD; an explicit 0 turns it off.
+#: decimated before it is ever materialised in Python - see
+#: _figure_downsample_threshold and SqliteRepo.downsampled_series_frame. A
+#: figure that has never set it is decimated past DEFAULT_DOWNSAMPLE_THRESHOLD;
+#: an explicit 0 turns it off.
 OPT_DOWNSAMPLE_THRESHOLD = "downsample_threshold"
 
 #: Applied when a figure descriptor carries no downsample_threshold of its
@@ -674,13 +677,15 @@ def _load_series_df(
     repo: SqliteRepo,
     series_desc: SeriesDescriptor,
     downsample_threshold: int = 0,
-) -> pd.DataFrame:
-    """Load one series DataFrame from its SQL query.
+) -> SeriesFrame:
+    """Load one series' data from its SQL query.
 
-    Goes through ``SqliteRepo.series_df`` (or ``downsampled_series_df`` when
-    a threshold is set) so repeated renders of an unchanged database are
+    Goes through ``SqliteRepo.series_frame`` (or ``downsampled_series_frame``
+    when a threshold is set) so repeated renders of an unchanged database are
     served from cache: SQLite row materialisation is ~89 % of the render
-    cost and cannot be optimised away in pure Python.
+    cost and cannot be optimised away in pure Python. Kept name-compatible
+    with its longtime callers even though it no longer returns a DataFrame -
+    see ``app.data.series_frame`` for what changed and why.
     """
     sql = str(series_desc.sql_query or "").strip()
     if not sql:
@@ -689,19 +694,19 @@ def _load_series_df(
             series_desc.id,
             series_desc.name,
         )
-        return pd.DataFrame()
+        return SeriesFrame()
 
     try:
         if downsample_threshold > 0:
-            return repo.downsampled_series_df(sql, threshold=downsample_threshold)
-        return repo.series_df(sql)
+            return repo.downsampled_series_frame(sql, threshold=downsample_threshold)
+        return repo.series_frame(sql)
     except Exception:
         applogger.exception(
             "Failed to load SQL data for series id=%r name=%r.",
             series_desc.id,
             series_desc.name,
         )
-        return pd.DataFrame()
+        return SeriesFrame()
 
 
 def _series_style(series_desc: SeriesDescriptor) -> dict[str, Any]:

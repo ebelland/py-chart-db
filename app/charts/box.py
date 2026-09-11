@@ -15,6 +15,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
 from app.charts.base import BaseAxisRenderer, SeriesData
+from app.data.series_frame import SeriesFrame
 from app.logs.logger import applogger
 
 
@@ -508,7 +509,7 @@ class BoxAxisRenderer(BaseAxisRenderer):
 
 
 
-    def _series_box_color(self, df: pd.DataFrame, style: dict[str, Any], layer_index: int) -> Any:
+    def _series_box_color(self, df: SeriesFrame, style: dict[str, Any], layer_index: int) -> Any:
         fallback_color = self.series_color(style, layer_index)
         if "color" in df.columns:
             return self.first_color_from_values(df["color"], fallback_color=fallback_color)

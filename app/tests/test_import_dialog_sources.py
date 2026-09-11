@@ -273,6 +273,69 @@ def test_a_database_import_remembers_its_source(
     assert source == {"kind": "sqlite", "path": str(other_db), "table": "readings"}
 
 
+def test_a_database_source_disables_the_text_parsing_controls(
+    dialog, other_db: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A database table has no delimiter, no header row to detect, and its
+    own types - none of skip rows/skip last/delimiter/header/encoding/
+    per-column type is read once the source is another database's table."""
+    _pick_database(dialog, other_db, monkeypatch)
+
+    assert not dialog._skip_rows.isEnabled()
+    assert not dialog._skip_last.isEnabled()
+    assert not dialog._delim.isEnabled()
+    assert not dialog._has_header.isEnabled()
+    assert not dialog._encoding.isEnabled()
+    assert dialog._col_table.rowCount() > 0
+    for row in range(dialog._col_table.rowCount()):
+        assert not dialog._col_table.cellWidget(row, 1).isEnabled()
+
+
+def test_opening_a_file_after_a_database_re_enables_them(
+    dialog, other_db: Path, csv_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _pick_database(dialog, other_db, monkeypatch)
+
+    dialog.load_file(csv_file)
+
+    assert dialog._skip_rows.isEnabled()
+    assert dialog._delim.isEnabled()
+    for row in range(dialog._col_table.rowCount()):
+        assert dialog._col_table.cellWidget(row, 1).isEnabled()
+
+
+def test_a_query_based_database_import_remembers_a_query_not_a_table(
+    dialog, other_db: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.dialogs.connect_database_dialog import ConnectDatabaseDialog
+    from app.utils.data_sources import DatabaseConnection
+
+    def fake_exec(self: ConnectDatabaseDialog) -> bool:
+        self.connection = DatabaseConnection(kind="sqlite", path=str(other_db))
+        self.table = None
+        self.query = "SELECT t, v FROM readings WHERE v > 2"
+        return True
+
+    monkeypatch.setattr(ConnectDatabaseDialog, "exec", fake_exec)
+    dialog._on_import_database()
+
+    assert dialog._source_mode == "database"
+    assert _columns(dialog) == ["t", "v"]
+    assert dialog._df is not None and len(dialog._df) == 1
+
+    dialog._on_accept()
+
+    assert dialog.result is not None
+    link = dialog._repo.get_table_link(dialog.result.table_name)
+    assert link is not None
+    source = link["settings"]["source"]
+    assert source == {
+        "kind": "sqlite",
+        "path": str(other_db),
+        "query": "SELECT t, v FROM readings WHERE v > 2",
+    }
+
+
 def test_a_server_database_link_never_carries_a_password(
     dialog, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -395,6 +458,76 @@ def test_the_extension_falls_back_to_content_type_when_the_url_has_none() -> Non
     assert _extension_for_web_source("https://api.example.com/export", None) == ".csv"
 
 
+def test_certifis_bundle_is_used_when_it_is_installed() -> None:
+    """The context this app actually fetches with, not just that a context
+    of some kind exists - a None here silently falls back to urlopen's own
+    default trust store, which is the failure this exists to route around."""
+    import certifi
+
+    from app.utils.data_sources import _web_fetch_ssl_context
+
+    _web_fetch_ssl_context.cache_clear()
+    context = _web_fetch_ssl_context()
+    assert context is not None
+    assert context.get_ca_certs(), "certifi's bundle should have loaded some CAs"
+    del certifi  # imported only to prove it is actually installed here
+
+
+def test_a_certificate_verification_failure_gets_a_clear_message(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CERTIFICATE_VERIFY_FAILED reads exactly like a network problem; the
+    dialog's error message should not leave the user guessing which one it
+    is - see _web_fetch_ssl_context for why this happens on a fresh
+    python.org macOS install with no other network issue at all."""
+    import ssl
+    import urllib.error
+
+    import app.utils.data_sources as module
+
+    def _raise_wrapped(*_args: object, **_kwargs: object):
+        raise urllib.error.URLError(
+            ssl.SSLCertVerificationError("certificate verify failed")
+        )
+
+    monkeypatch.setattr(module.urllib.request, "urlopen", _raise_wrapped)
+
+    with pytest.raises(ValueError, match="certificate"):
+        module.read_web_url("https://example.com/data.csv")
+
+
+def test_a_bare_ssl_verification_error_gets_the_same_clear_message(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import ssl
+
+    import app.utils.data_sources as module
+
+    def _raise_bare(*_args: object, **_kwargs: object):
+        raise ssl.SSLCertVerificationError("certificate verify failed")
+
+    monkeypatch.setattr(module.urllib.request, "urlopen", _raise_bare)
+
+    with pytest.raises(ValueError, match="certificate"):
+        module.read_web_url("https://example.com/data.csv")
+
+
+def test_an_unrelated_url_error_is_not_mistaken_for_a_certificate_problem(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import urllib.error
+
+    import app.utils.data_sources as module
+
+    def _raise_other(*_args: object, **_kwargs: object):
+        raise urllib.error.URLError("Connection refused")
+
+    monkeypatch.setattr(module.urllib.request, "urlopen", _raise_other)
+
+    with pytest.raises(urllib.error.URLError, match="Connection refused"):
+        module.read_web_url("https://example.com/data.csv")
+
+
 def test_picking_a_url_fetches_and_parses_it(
     dialog, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -476,3 +609,109 @@ def test_opening_a_file_after_a_url_hides_the_table_picker(
 
     assert dialog._source_mode == "file"
     assert dialog._path == str(csv_file)
+
+
+# ----------------------------------------------------------------------
+# The left panel reads as sections, the same convention as the properties
+# panels (Figure/Axis/Series) and the connect-database dialog.
+# ----------------------------------------------------------------------
+def test_the_left_panel_is_grouped_into_labeled_sections(dialog) -> None:
+    from PySide6.QtWidgets import QLabel
+
+    titles = {
+        label.text()
+        for label in dialog.findChildren(QLabel)
+        if label.property("sectionTitle")
+    }
+    assert {"Source", "Read options", "Columns"} <= titles
+
+
+# ----------------------------------------------------------------------
+# Web sources: Add source / Delete source
+# ----------------------------------------------------------------------
+@pytest.fixture(autouse=True)
+def _isolated_user_web_sources(monkeypatch: pytest.MonkeyPatch) -> dict:
+    """A user_web_sources catalogue of its own, not the developer's own.
+
+    Without this, add_user_web_source/remove_user_web_source read and write
+    the real user.json - exactly the "test run rewrote a settings file"
+    problem app.utils.config's own docstring warns about.
+    """
+    import app.utils.config as config
+
+    stored: list[dict] = []
+    monkeypatch.setattr(config, "get_user_web_sources", lambda: list(stored))
+
+    def _set(entries: list[dict]) -> None:
+        stored.clear()
+        stored.extend(entries)
+
+    monkeypatch.setattr(config, "set_user_web_sources", _set)
+    return {"entries": stored}
+
+
+def _fill_add_web_source_dialog(
+    monkeypatch: pytest.MonkeyPatch, *, name: str, url: str, description: str = ""
+) -> None:
+    import app.dialogs.import_data_dialog as module
+
+    def fake_exec(self: module._AddWebSourceDialog) -> bool:
+        self.name = name
+        self.url = url
+        self.description = description
+        return True
+
+    monkeypatch.setattr(module._AddWebSourceDialog, "exec", fake_exec)
+
+
+def test_add_source_appends_it_and_selects_it(
+    dialog, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _fill_add_web_source_dialog(
+        monkeypatch, name="My CSV", url="https://example.com/my.csv", description="mine"
+    )
+
+    dialog._on_add_web_source()
+
+    assert dialog._url.text() == "https://example.com/my.csv"
+    assert dialog._picked_web_source is not None
+    assert dialog._picked_web_source.custom
+    assert dialog._btn_delete_web_source.isEnabled()
+
+
+def test_the_new_source_is_offered_again_after_reopening_the_menu(
+    dialog, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.dialogs.import_data_dialog as module
+
+    _fill_add_web_source_dialog(monkeypatch, name="My CSV", url="https://example.com/my.csv")
+    dialog._on_add_web_source()
+
+    names = [source.name for source in module.load_web_data_sources()]
+    assert "My CSV" in names
+
+
+def test_delete_source_removes_a_custom_entry(
+    dialog, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.dialogs.import_data_dialog as module
+
+    _fill_add_web_source_dialog(monkeypatch, name="My CSV", url="https://example.com/my.csv")
+    dialog._on_add_web_source()
+
+    dialog._on_delete_web_source()
+
+    assert "My CSV" not in [s.name for s in module.load_web_data_sources()]
+    assert not dialog._btn_delete_web_source.isEnabled()
+
+
+def test_a_bundled_source_cannot_be_deleted(dialog) -> None:
+    import app.dialogs.import_data_dialog as module
+
+    bundled = module.WEB_DATA_SOURCES[0]
+    dialog._on_web_source_picked(bundled)
+    assert not dialog._btn_delete_web_source.isEnabled()
+
+    dialog._on_delete_web_source()
+
+    assert bundled.name in [s.name for s in module.load_web_data_sources()]

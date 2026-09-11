@@ -18,6 +18,7 @@ from matplotlib import colormaps, rcParams
 from matplotlib.colors import to_rgba
 
 from app.charts import kwarg_spec
+from app.data.series_frame import SeriesFrame
 from app.charts.kwarg_spec import (
     ARTIST_ADVANCED_KWARGS,
     ARTIST_KWARGS,
@@ -61,6 +62,7 @@ __all__ = [
     "RCPARAM",
     "STYLE_DEFAULT",
     "SeriesData",
+    "SeriesFrame",
     "VIEW_OPTIONS",
     "merge",
     "pick",
@@ -71,15 +73,21 @@ __all__ = [
 class SeriesData:
     """One series as a renderer sees it: its name, its rows, and its styling.
 
+    ``df`` is a :class:`~app.data.series_frame.SeriesFrame` (todo.txt P2-17) -
+    columns of numpy arrays, not a ``pd.DataFrame`` - but every renderer keeps
+    reading it the same way: ``sd.df["x"]``, ``"x" in sd.df.columns``,
+    ``sd.df.loc[mask, "color"]``. See that module's docstring for why the
+    switch is safe to make without touching those call sites.
+
     ``roles`` is the series descriptor's own role map - role name to the
-    source column the SQL aliased to it.  The DataFrame carries the aliases,
-    so a renderer that needs the *original* column name (the Table renderer
-    labels its columns with them) has nowhere else to get it.  Defaulted, so
-    the many places that build a SeriesData with three arguments still do.
+    source column the SQL aliased to it.  ``df`` carries the aliases, so a
+    renderer that needs the *original* column name (the Table renderer labels
+    its columns with them) has nowhere else to get it.  Defaulted, so the
+    many places that build a SeriesData with three arguments still do.
     """
 
     name: str
-    df: pd.DataFrame
+    df: SeriesFrame
     style: dict
     roles: dict = field(default_factory=dict)
 
@@ -358,7 +366,7 @@ class BaseAxisRenderer(Protocol):
             )
         return valid[0]
 
-    def ensure_required_roles(self,df:pd.DataFrame) ->bool:
+    def ensure_required_roles(self, df: SeriesFrame) -> bool:
         """Return True when *df* carries every column this renderer needs.
 
         Checked before drawing so a mis-mapped series is skipped with a log
@@ -553,7 +561,7 @@ class BaseAxisRenderer(Protocol):
     ERROR_ROLES = ERROR_BAR_ROLES
     ERROR_KWARGS = ERROR_BAR_KWARGS
 
-    def has_error_roles(self, df: pd.DataFrame) -> bool:
+    def has_error_roles(self, df: SeriesFrame) -> bool:
         """True when the frame carries any error column this renderer reads."""
         return any(
             role in df.columns
@@ -563,7 +571,7 @@ class BaseAxisRenderer(Protocol):
 
     def error_values(
         self,
-        df: pd.DataFrame,
+        df: SeriesFrame,
         axis: str,
         mask: Any = None,
     ) -> Any:

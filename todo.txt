@@ -25,6 +25,15 @@ FATTO 2026-09-10 (N-5) sqlite_repo diviso per materia
       Nota: chart_panel (2.214), style (1.939), fit_dialog (1.760) e
       cluster_dialog (1.722) restano sopra le 1.500 righe.
 
+FATTO 2026-09-10 (N-8) linee verticali/orizzontali dal menu contestuale
+      Il click destro dentro un axes offre due voci che nominano il valore
+      ("Add vertical line at x = 12.5"), formattato dall'axis come il
+      readout della toolbar - su un asse a date legge la data. L'asse
+      arriva dal tag _dhub_axis_id che render_figure lascia su ogni axes,
+      quindi nessuna seconda mappa da tenere allineata. Scrive la stessa
+      chiave "lines" del pannello Overlay, ed e' annullabile come ogni
+      altra modifica ai descrittori.
+
 N-3   attribute control charts (p, np, c, u)
       The half of SPC N-1 does not cover. These plot a proportion or a count
       rather than a measurement, so the limits are binomial/Poisson rather
@@ -67,21 +76,125 @@ N-19  GUI: toward a more standard, easy, intuitive interface
         one-time label (or a "?" walkthrough) is worth the added chrome,
         given nav rail structure itself is being kept as-is per the
         Finder-sidebar discussion.
-      - Import dialog shows delimiter/encoding/skip-rows controls
-        regardless of the chosen source - irrelevant for Excel or a
-        database table, relevant only for delimited text. Progressive
-        disclosure (hide what the current source cannot use) would read as
-        less cluttered than always-visible-but-inert controls.
+      - FATTO 2026-09-11: Import dialog showed delimiter/encoding/skip-rows/
+        header/column-type controls regardless of the chosen source -
+        irrelevant for a database table, which has none of that to say.
+        Disabled (not hidden) once the source is a database:
+        _apply_source_dependent_enablement in import_data_dialog.py, run
+        after every _build_columns_table since that rebuilds the per-column
+        combos from scratch. Disabled rather than hidden - the row stays
+        where it was instead of the panel reflowing under the pointer mid-
+        preview. Left panel also grouped into labeled sections (Source /
+        Read options / Columns), the same create_compact_section_title
+        convention as the properties panels and the connect-database
+        dialog, instead of one flat form.
+        Also done in the same pass: ConnectDatabaseDialog gained "Use a
+        query" (a SQL box swapped in for the table list via a QStackedWidget,
+        validated with is_read_only_select so this cannot become a way to
+        DELETE against someone else's database), threaded through as
+        SERVER_DATABASE_QUERY_READERS / read_sqlite_query / read_from_link_
+        source's query branch so "Update link" also replays a query-sourced
+        import. And the web-source quick-pick gained its own "Web" row
+        label plus Add source/Delete source buttons - add_user_web_source/
+        remove_user_web_source in data_sources.py, backed by a
+        get_user_web_sources/set_user_web_sources section in user.json,
+        layered onto the bundled web_sources.json catalogue (WebDataSource.
+        custom marks which is which; only a custom entry can be deleted).
       - Manual spacing (Figure properties) asks for six raw 0..1 fractions
         with no visual feedback - a live-updating preview, or drag handles
         on the chart itself, is the more standard way this kind of control
         is usually presented, though it is a real redesign, not a quick
         pass.
 
+N-20  other rendering backends and richer ChartPanel interactivity - a
+      brainstorm, not yet scoped work
+      Matplotlib stays the renderer of record: every chart type, every
+      series operation and the whole descriptor model are built on it, and
+      duplicating that surface for a second backend is not worth it. Two
+      narrower integrations pull their weight instead:
+      - pyqtgraph as a second, *optional* renderer for one axis at a time,
+        picked when interaction matters more than chart variety: OpenGL
+        line/scatter that stays smooth at counts where Matplotlib redraw is
+        the bottleneck, a built-in crosshair, and mouse-driven ROI/region
+        select for free (this is the natural engine behind P2-4, not a
+        replacement for it). A closer fit than QtCharts here - QtCharts is
+        fast but its chart-type and annotation vocabulary is much narrower
+        than what this app's descriptors already express.
+      - QWebEngineView + plotly.js (or Bokeh) for one export action -
+        "Export as interactive HTML" - so a chart leaves the app as
+        something a reader can hover/zoom/pan in a browser without
+        installing anything. Not a render path inside the app: it is a
+        second, heavy dependency (Chromium) that only earns its place at
+        the export boundary.
+      - VisPy/OpenGL is the answer if downsampling (already in Figure
+        properties) still is not enough at true multi-million-point series
+        - hold until that turns out to be a real ceiling, not a guess.
+      - A figure-descriptor -> Vega-Lite spec exporter is a cheap idea
+        worth a look later: the descriptors are already a declarative
+        JSON-ish shape, which is most of what a Vega-Lite spec is.
+
+      ChartPanel interactivity, roughly in order of how directly they
+      build on what is already there (hover readout, pick, context menu):
+      - A ruler/measure mode: click two points, show dx/dy/slope as a
+        transient annotation - a couple of clicks past the existing hover
+        readout.
+      - A crosshair synced across every axis of a figure (shared x), and an
+        optional "link x zoom/pan across axes" toggle - the standard
+        multi-panel-dashboard expectation, and this app's figures are
+        already multi-axis.
+      - Draggable annotations: let a mouse drag on an annotation's artist
+        write its new x/y back to the axis options (the Overlay panel
+        already owns that key) instead of only editing it by numbers.
+      - Box/lasso multi-select feeding "hide selected" / "new series from
+        selection" - the selection half of P2-4, generalized past one
+        rectangular region.
+      - "Export the current view as data": the rows actually on screen
+        after zoom and downsampling, as CSV - a natural sibling of the
+        existing copy/save-chart actions.
+      - A live/streaming toggle: redraw a chart on a timer, or when its
+        source table changes, for a rig or a long-running import someone
+        is watching fill in.
+
+      Broader, beyond the chart itself - things a data scientist, an
+      engineer or a student doing coursework would reach for:
+      - Notebook/script export: a figure's series are already SQL queries
+        plus a style dict, which is most of a pandas+matplotlib script or a
+        .ipynb cell already written - export it for handoff/reproducibility
+        outside this app.
+      - Unit-aware axes (pint): an axis label carries a unit, and a
+        "convert units" action rescales the display without touching the
+        underlying SQL - useful wherever engineering data mixes unit
+        systems.
+      - Uncertainty propagation: a series operation combining two series
+        with error columns (A+-dA op B+-dB) via the standard propagation
+        formulas, output as a value + error series pair.
+      - A one-click "chart + operation reports -> PDF/HTML" bundle -
+        formalizing what results_published/set_notes_html already produce
+        per operation into one exportable document.
+      - A small scripting console (Python or SQL) against the current
+        project's repo, for the point where a power user iterates faster
+        typing than clicking through dialogs - the same repo the series
+        operations already use, just without a dialog in front of it.
+
 
 ================================================================
 P2 - VALUABLE
 ================================================================
+
+FATTO 2026-09-10 (P2-14) renderer: boilerplate sulla base
+      valid_series() e single_series() su BaseAxisRenderer, _merge_options
+      cancellato in favore di merge_style() che gia' esisteva. 12 file,
+      -85 righe nette. Due test in test_shared_helpers.py impediscono che
+      le copie tornino; scatter e timeline restano fuori perche' leggono
+      "visible" dentro il loro loop, non filtrando una lista.
+
+FATTO 2026-09-10 (P3-x) peaks dialog: "Mark peaks only" rimosso
+      Nessuna delle due letture sopravviveva a cio' che il dialog gia' fa:
+      la tabella dei risultati porta tutte le misure perche' il report si
+      costruisce da li', e la serie disegna marker perche' unire i picchi
+      traccerebbe una curva nel nulla. Non restava un terzo comportamento
+      da scegliere. Un test in test_statistics_selection.py cammina tutte
+      le operazioni e chiede chi legge ogni parametro dichiarato.
 
 P2-3  series operation: baseline correction (ALS or rubber-band)
       Pure numpy/scipy. Prerequisite for meaningful peak areas.
@@ -93,6 +206,167 @@ P2-4  ChartPanel: rubber-band region selection (RectangleSelector)
 P2-12 series operations: inline preview plot beside the numeric results
       publish_results emits text/HTML only; a fit or a peak-find is far more
       legible with a small plot next to it.
+
+FATTO 2026-09-11 (P2-13) series operation: Filtering (scipy.signal)
+      Nuovo filter_dialog.py. IIR (iirfilter -> sosfiltfilt, zero-fase:
+      Butterworth/Cheby1/Cheby2/Bessel/Ellittico, passa-basso/alto/banda,
+      elimina-banda) e FIR (firwin -> filtfilt, stessa scelta di risposte -
+      pass_zero accetta le stesse quattro stringhe di iirfilter's btype, un
+      numero di taps dispari forzato quando la risposta deve passare per
+      Nyquist). Segnale analitico (hilbert: inviluppo / fase istantanea /
+      frequenza istantanea, quest'ultima riallineata alla lunghezza
+      originale ripetendo l'ultimo campione). Detrend (lineare/costante).
+      fs dalla spaziatura mediana di x, stesso avviso di campionamento non
+      uniforme della Spectral Analysis. Numerica in funzioni pure, verificata
+      isolando un tono da un mix, un inviluppo AM e una frequenza istantanea
+      nota in test_filter_dialog.py. Resample (resample_poly/decimate)
+      resta un passo separato, successivo - cambia la griglia x, che
+      richiede la sua gestione del tempo (restore_temporal_x).
+
+P2-15 series operations: scikit-learn models
+      Five candidates, roughly in this order:
+      - Transform: PowerTransformer (Yeo-Johnson/Box-Cox), QuantileTransformer,
+        StandardScaler, RobustScaler. Small, and a prerequisite for anything
+        that assumes normality (the X-chart, curve fits) on skewed data.
+      - GP Regression: GaussianProcessRegressor, kernel = RBF / Matern-3/2 /
+        Matern-5/2 / RationalQuadratic (+ WhiteKernel noise). Output is the
+        mean series *and* a +/-2 sigma credible band as two more series - the
+        one smoother here that quantifies its own uncertainty.
+      - Robust / ML regression: RANSACRegressor, HuberRegressor,
+        IsotonicRegression (guaranteed monotone), RandomForestRegressor,
+        GradientBoostingRegressor. Could be new models on the existing Fit
+        dialog rather than a new one - it already has the model_combo/
+        params/preview shape this needs.
+      - Anomaly detection: extend the existing Outliers dialog with
+        IsolationForest, LocalOutlierFactor, OneClassSVM, EllipticEnvelope -
+        reuses its hide/preview plumbing, catches shape-aware outliers the
+        z-score/IQR models miss.
+      - Decomposition: PCA / FastICA / NMF across several selected series on
+        a shared x grid -> N component series + an explained-variance
+        report. The one new shape here: many series in, many out (blind
+        source separation, common-mode removal).
+
+FATTO 2026-09-11 (P2-16) SqliteRepo.query_arrays: query_df senza DataFrame
+      Misurato prima di scrivere: 42 file importano pandas, ma solo 2
+      (pareto.py, time_series.py) usano qualcosa che pandas fa e numpy no
+      (rolling/groupby); il resto - 76 punti di chiamata - era
+      query_df(...).to_numpy(): un DataFrame costruito e buttato via una
+      riga dopo. query_arrays() legge dal cursore DB-API direttamente
+      (fetchall/description), nessun DataFrame; QueryColumns e'
+      un dict[str, np.ndarray] con .columns/.empty/__getitem__.
+      coerce_numeric_array() replica pd.to_numeric(errors="coerce") a mano
+      (None/non parsabile -> NaN). control_chart_dialog._series_counts
+      migrato (le colonne conteggio/dimensione delle carte per attributi);
+      l'asse x resta su numeric_x/coerce_axis - vero riconoscimento di
+      date, non lo si riscrive qui, gli basta un pd.Series di una sola
+      colonna invece di un frame intero.
+      Non toccato, deliberatamente: l'intera pipeline di rendering
+      (app/charts/*.py, ~50 punti .to_numpy()) legge SeriesData.df come un
+      pd.DataFrame dappertutto - cambiare quella forma e' la portata di
+      "rimozione completa", non del percorso di lettura snello. Vedi
+      P2-17 se si vuole continuare in quella direzione.
+
+FATTO 2026-09-11 (P2-17) SeriesData.df: SeriesFrame invece di pd.DataFrame
+      Prima di scrivere: il percorso di rendering e' gia' cache-backed
+      (SqliteRepo._series_cache), quindi il valore reale era piu' piccolo di
+      quanto sembrasse da P2-16 - segnalato, l'utente ha scelto di procedere
+      comunque. app/data/series_frame.py: SeriesFrame e' un dict di
+      np.ndarray tipizzato direttamente dal cursore sqlite3 (from_rows -
+      int/float/None -> float64 con NaN, tutto il resto resta object, la
+      stessa distinzione che pd.read_sql_query avrebbe fatto, senza pandas
+      per scoprirla). sd.df["x"], "x" in sd.df.columns, sd.df.copy(),
+      sd.df.loc[mask, "color"], assegnazione di colonna: tutti supportati,
+      e ogni accesso a una colonna restituisce ancora un pd.Series - e'
+      quello che lascia funzionare pd.to_numeric()/.to_numpy()/.tolist() in
+      ogni punto di chiamata dei ~20 file di renderer senza toccarli.
+      SqliteRepo: series_frame()/downsampled_series_frame() sono il nuovo
+      percorso (via _read_series_frame, cursore diretto, no
+      pd.read_sql_query); series_df()/downsampled_series_df() restano,
+      ora un .to_pandas() sulla stessa cache condivisa - stesso contratto,
+      stessi test (test_series_cache.py, test_downsample.py) verdi
+      invariati. render_figure._load_series_df chiama series_frame() /
+      downsampled_series_frame(); i tre punti che ricostruiscono una
+      SeriesData nuova (ecdf.py, timeline.py) costruiscono SeriesFrame
+      direttamente, zero pandas coinvolto.
+      Le due eccezioni deliberate, non riscritte in numpy:
+      pareto.py._apply_category_limit (groupby) e table.py._columns_to_draw
+      (.iloc/.astype/.index - una tabella e' un problema a forma di
+      DataFrame) chiamano sd.df.to_pandas() - un'unica conversione, non un
+      fallback silenzioso su cui il resto del tipo si appoggia.
+      Suite intera verde: 2025 passed, 3 skipped, 0 failed.
+
+FATTO 2026-09-11 (bug) Fit: due serie selezionate, una sceglie in silenzio
+      Segnalato come "Spectral analysis chart data not shown", poi ristretto
+      a "Fit: Residuals / Measured vs. fit", poi al meccanismo vero:
+      riordinare le serie lo faceva "funzionare". Non era un bug di
+      rendering - verificato a fondo (ChartPanel reale, apply()+reload(),
+      screenshot del canvas, sia su questo branch che su main: dati e
+      pixel corretti in ogni scenario provato). Il vero meccanismo e'
+      dialog_base._selected_series_row(): con piu' serie selezionate sceglie
+      sempre la prima e ignora le altre - corretto per Fit (un solo modello,
+      un solo set di parametri, non ha senso su due serie scorrelate), ma
+      lo diceva solo con applogger.warning(...) senza dettagli utili (ne'
+      quante serie ne' quale ha vinto). Riordinare le serie e' l'unico modo
+      per cambiare quale sia "la prima", il che spiegava esattamente il
+      sintomo osservato.
+      Primo fix (sbagliato, ritirato subito): show_dialog=True sulla stessa
+      riga. Verde in tutta la suite qui - e per questo e' passato - ma
+      AppLogger._show_message_box salta la finestra solo quando non esiste
+      proprio una QApplication: con una QApplication presente (come nei
+      test, via la fixture qapp) chiama comunque QMessageBox.exec(), che
+      sotto la piattaforma QPA offscreen su cui gira pytest ritorna subito
+      senza bloccare, ma su un desktop vero blocca per davvero - e questo
+      warning viene emesso a ogni compute_results(), cioe' ad ogni Preview e
+      ad ogni modifica di un parametro con due o piu' serie spuntate: non un
+      hang occasionale ma una finestra modale ad ogni tick. Cosi' e' arrivato
+      il report "pytest hangs at 85%" da EB, non riproducibile qui per lo
+      stesso motivo per cui il bug non lo era.
+      Fix vero: show_dialog resta al default (silenzioso), il messaggio dice
+      solo quante serie sono selezionate e quale nome ha vinto - la status
+      bar mostra gia' da sola ogni WARNING (AppLogger._log_with_policy),
+      senza bisogno di una finestra da chiudere. Non e' stata cambiata la
+      scelta di fondo (una sola serie per fit resta corretta) - solo resa
+      leggibile. Nuovi test in test_fit_accessory_charts.py, incluso un
+      assert che il messaggio NON usi show_dialog=True.
+
+FATTO 2026-09-11 (docs+i18n) revisione, localizzazione, manuale
+      Localizzazione: i 29 renderer non erano tradotti affatto - nome,
+      descrizione e categoria arrivavano allo schermo in inglese dal chart
+      picker e dal pannello assi, perche' sono dati dichiarati sulla classe
+      e nessuno sweep di _() letterali li poteva vedere. Ora passano da
+      tr() al punto di visualizzazione (il valore grezzo resta in UserRole
+      e nel segnale: e' il chart_type salvato nel database), 59 voci nuove
+      nel .po, e test_the_italian_locale_covers_every_renderer impedisce
+      che il prossimo renderer torni a essere inglese. La ricerca del
+      picker ora accetta sia il nome inglese sia quello tradotto.
+      Rinomina: restavano "Data Hub" nel nome del file di default
+      (Data Hub.dhub), nel filtro dei dialoghi File - scritto a mano in tre
+      punti, tutti e tre ancora col vecchio nome - e in vari docstring.
+      Ora derivano tutti da APP_NAME; startup.PROJECT_FILE_FILTER e' l'unica
+      definizione. LEGACY_DEFAULT_DATABASE_NAME resta e vince quando e' lui
+      il file che esiste davvero, cosi' la rinomina non lascia indietro il
+      lavoro di chi aveva gia' un Data Hub.dhub.
+      Documentazione: DEVELOPMENT.md aveva 306 righe duplicate (le sezioni
+      7.2-8 comparivano due volte, la seconda copia ferma a una revisione
+      precedente: "quattro backend di icone" e app/icons/ che non esiste
+      piu'). Rimosse; aggiunta la §4.1 su SeriesFrame, la tabella delle
+      operazioni aggiornata a 14, le quattro sweep di localizzazione, e la
+      nota su show_dialog=True che passa headless e blocca su un desktop
+      vero. Manuale utente: rinominato, 23 -> 29 tipi di grafico con le
+      categorie giuste, 10 -> 14 operazioni coi nomi veri, import dialog
+      (sezioni, riga Web, aggiungi/elimina fonte, "Use a query", controlli
+      disabilitati per una sorgente database) e SeriesFrame al posto di
+      DataFrame nel capitolo per sviluppatori. Il PDF va ricompilato con
+      typst (non installato qui). test_manual_is_current.py ora verifica
+      che ogni renderer e ogni operazione siano elencati, che il numero
+      citato nel testo sia giusto e che il nome dell'app sia quello.
+      Pulizia: import morti (json e app.data.descriptors in sqlite_repo,
+      QPushButton in axis_properties, Path in main, field in demo_project).
+      Trovato e corretto un test che dipendeva dall'ordine di esecuzione e
+      dal user.json dello sviluppatore: test_choosing_a_mode_persists_it_to_
+      the_descriptor passava solo se qualcun altro aveva gia' cambiato la
+      modalita' - partendo da FIXED, setCurrentIndex(FIXED) non emette
+      nulla e non c'era niente da persistere.
 
 ================================================================
 P3 - LATER

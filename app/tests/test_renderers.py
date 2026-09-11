@@ -87,11 +87,11 @@ def test_mapped_columns_keep_their_source_names_as_headers() -> None:
     """A role aliases its column in the SQL, so the frame arrives carrying
     column_1 where it carried region - and a table headed "column_1" is a
     table nobody can read."""
-    import pandas as pd
     from matplotlib.figure import Figure
 
     from app.charts.base import SeriesData
     from app.charts.table import TableAxisRenderer
+    from app.data.series_frame import SeriesFrame
 
     figure = Figure()
     ax = figure.add_subplot(111)
@@ -100,7 +100,7 @@ def test_mapped_columns_keep_their_source_names_as_headers() -> None:
         series=[
             SeriesData(
                 name="s",
-                df=pd.DataFrame({"column_1": ["north"], "column_2": [10]}),
+                df=SeriesFrame({"column_1": ["north"], "column_2": [10]}),
                 style={},
                 roles={"column_1": "region", "column_2": "units"},
             )
@@ -115,11 +115,11 @@ def test_mapped_columns_keep_their_source_names_as_headers() -> None:
 def test_no_roles_mapped_still_draws_every_column() -> None:
     """SELECT * is what a Table did before the slots existed, and what every
     figure already saved with one still carries."""
-    import pandas as pd
     from matplotlib.figure import Figure
 
     from app.charts.base import SeriesData
     from app.charts.table import TableAxisRenderer
+    from app.data.series_frame import SeriesFrame
 
     figure = Figure()
     ax = figure.add_subplot(111)
@@ -128,7 +128,7 @@ def test_no_roles_mapped_still_draws_every_column() -> None:
         series=[
             SeriesData(
                 name="s",
-                df=pd.DataFrame({"region": ["north"], "units": [10], "note": ["ok"]}),
+                df=SeriesFrame({"region": ["north"], "units": [10], "note": ["ok"]}),
                 style={},
             )
         ],
@@ -142,11 +142,11 @@ def test_no_roles_mapped_still_draws_every_column() -> None:
 def test_a_slot_naming_a_column_the_query_lost_is_skipped() -> None:
     """A blank column under a real heading looks like missing data; a mapping
     that has gone stale should simply not be drawn."""
-    import pandas as pd
     from matplotlib.figure import Figure
 
     from app.charts.base import SeriesData
     from app.charts.table import TableAxisRenderer
+    from app.data.series_frame import SeriesFrame
 
     figure = Figure()
     ax = figure.add_subplot(111)
@@ -155,7 +155,7 @@ def test_a_slot_naming_a_column_the_query_lost_is_skipped() -> None:
         series=[
             SeriesData(
                 name="s",
-                df=pd.DataFrame({"column_1": ["north"]}),
+                df=SeriesFrame({"column_1": ["north"]}),
                 style={},
                 roles={"column_1": "region", "column_3": "gone"},
             )
@@ -169,22 +169,21 @@ def test_a_slot_naming_a_column_the_query_lost_is_skipped() -> None:
 
 def test_series_data_carries_the_role_map_the_headers_come_from() -> None:
     """Defaulted, so the many three-argument constructions still work."""
-    import pandas as pd
-
     from app.charts.base import SeriesData
+    from app.data.series_frame import SeriesFrame
 
-    assert SeriesData(name="s", df=pd.DataFrame(), style={}).roles == {}
+    assert SeriesData(name="s", df=SeriesFrame(), style={}).roles == {}
 
 
 # ----------------------------------------------------------------------
 # The Table renderer's row cap
 # ----------------------------------------------------------------------
 def _table_axes(rows: int, options: dict | None = None):
-    import pandas as pd
     from matplotlib.figure import Figure
 
     from app.charts.base import SeriesData
     from app.charts.table import TableAxisRenderer
+    from app.data.series_frame import SeriesFrame
 
     figure = Figure()
     ax = figure.add_subplot(111)
@@ -193,7 +192,7 @@ def _table_axes(rows: int, options: dict | None = None):
         series=[
             SeriesData(
                 name="s",
-                df=pd.DataFrame({"a": range(rows), "b": ["x"] * rows}),
+                df=SeriesFrame({"a": list(range(rows)), "b": ["x"] * rows}),
                 style={},
             )
         ],
@@ -255,11 +254,10 @@ def test_the_cap_is_not_forwarded_to_matplotlib(qapp) -> None:
 # The shared filter (todo.txt P2-14)
 # ----------------------------------------------------------------------
 def _series(name, columns=("x", "y"), rows=1, **style):
-    import pandas as pd
-
     from app.charts.base import SeriesData
+    from app.data.series_frame import SeriesFrame
 
-    frame = pd.DataFrame({column: [1.0] * rows for column in columns})
+    frame = SeriesFrame({column: [1.0] * rows for column in columns})
     return SeriesData(name=name, df=frame, style=dict(style))
 
 

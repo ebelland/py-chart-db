@@ -23,6 +23,7 @@ import pandas as pd
 from app.charts.base import merge
 from app.charts.bar import BarAxisRenderer
 from app.charts.base import BaseAxisRenderer, SeriesData
+from app.data.series_frame import SeriesFrame
 from app.logs.logger import applogger
 
 #: Label used for the bar that absorbs everything past ``max_categories``.
@@ -217,7 +218,10 @@ class ParetoAxisRenderer(BarAxisRenderer, BaseAxisRenderer):
         kept = set(ordered[:limit])
         folded: list[SeriesData] = []
         for sd in series:
-            frame = sd.df.copy()
+            # A groupby, so the escape hatch: pandas is the right tool for
+            # collapsing rows into "Other", not something worth reimplementing
+            # in numpy for this one call.
+            frame = sd.df.to_pandas()
             if "X" not in frame.columns:
                 frame["X"] = list(range(len(frame)))
             frame["X"] = [
@@ -227,7 +231,9 @@ class ParetoAxisRenderer(BarAxisRenderer, BaseAxisRenderer):
                 frame.groupby("X", as_index=False, sort=False)
                 .agg({column: "sum" for column in frame.columns if column != "X"})
             )
-            folded.append(SeriesData(name=sd.name, df=frame, style=sd.style))
+            folded.append(
+                SeriesData(name=sd.name, df=SeriesFrame.from_pandas(frame), style=sd.style)
+            )
 
         applogger.info(
             "Pareto chart: %d categories folded into '%s'.",

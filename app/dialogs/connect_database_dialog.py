@@ -34,6 +34,7 @@ from typing import Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QFileDialog,
@@ -41,19 +42,22 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLineEdit,
     QListWidget,
+    QPlainTextEdit,
     QSizePolicy,
     QSpinBox,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
 
+from app.data.repo._common import is_read_only_select
 from app.logs.logger import applogger
 from app.styles.style import (
     apply_dialog_shell,
     configure_combo_width,
     create_action_button,
     create_card_widget,
-    create_section_title,
+    create_compact_section_title,
     load_icon,
     mark_editor_panel,
     stdSizeAndlayout,
@@ -75,16 +79,34 @@ from app.utils.i18n import _
 from app.utils.messages import show_message
 
 ENGINE_SQLITE = "sqlite"
+ENGINE_DHUB = "dhub"
 ENGINE_POSTGRES = "postgres"
 ENGINE_MYSQL = "mysql"
 
+#: A .dhub file *is* a SQLite file - this app's own format, nothing more -
+#: so ENGINE_DHUB shares every connect/list-tables code path ENGINE_SQLITE
+#: does (see _current_connection, _on_engine_changed). It exists as its own
+#: choice, not a variant someone has to know to pick "SQLite file" for,
+#: because "connect to another one of this app's own projects" is a
+#: different question in a user's head than "connect to a SQLite file", even
+#: though the two are the same thing underneath - and the file dialog it
+#: opens defaults to *.dhub first rather than leaving it to guess among four
+#: extensions.
+#:
 #: (kind, display label). The label goes through tr() at the call site, not
 #: here, so it is a plain literal that xgettext's sweep can still find.
 _ENGINE_CHOICES: tuple[tuple[str, str], ...] = (
     (ENGINE_SQLITE, "SQLite file"),
+    (ENGINE_DHUB, "Another ChartLibre project (.dhub)"),
     (ENGINE_POSTGRES, "PostgreSQL"),
     (ENGINE_MYSQL, "MySQL"),
 )
+_SQLITE_LIKE_ENGINES: frozenset[str] = frozenset({ENGINE_SQLITE, ENGINE_DHUB})
+
+#: The file dialog filter for ENGINE_DHUB - narrower than data_sources.
+#: DATABASE_FILE_FILTER's four-extension SQLite filter, because picking this
+#: engine already said the file being looked for is a ChartLibre project.
+_DHUB_FILE_FILTER: str = "ChartLibre project (*.dhub);;All files (*.*)"
 
 #: How wide the connection column is allowed to get. The form is fixed-length
 #: content - a host, a port, a name - so anything past this is width the
@@ -107,6 +129,10 @@ class ConnectDatabaseDialog(QDialog):
         self.setWindowIcon(load_icon("import_database"))
         self.connection: DatabaseConnection | None = None
         self.table: str | None = None
+        #: Set instead of ``table`` when "Use a query" is checked - mutually
+        #: exclusive with it, and the caller tells them apart by which one
+        #: is not None.
+        self.query: str | None = None
 
         #: The table named by the remembered connection, selected once a
         #: listing actually contains it. Kept as a field rather than applied
@@ -147,7 +173,7 @@ class ConnectDatabaseDialog(QDialog):
         card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         card_layout = QVBoxLayout(card)
         stdSizeAndlayout(card_layout)
-        card_layout.addWidget(create_section_title(_("Connection"), card))
+        card_layout.addWidget(create_compact_section_title(_("Connection"), card))
 
         form = QFormLayout()
         stdSizeAndlayout(form)
@@ -224,26 +250,58 @@ class ConnectDatabaseDialog(QDialog):
         return card
 
     def _build_table_card(self) -> QWidget:
-        """The right column: the tables, given the room to be read in."""
+        """The right column: the tables, given the room to be read in.
+
+        "Use a query" swaps the list for a SQL box rather than showing both
+        at once: the two answer the same question - which rows come back -
+        so a table picked while a query sits typed under it would leave
+        Accept looking at a state neither field alone explains.
+        """
         card = create_card_widget(self, "connectTablesCard")
         card_layout = QVBoxLayout(card)
         stdSizeAndlayout(card_layout)
-        card_layout.addWidget(create_section_title(_("Table"), card))
+
+        header_row = QHBoxLayout()
+        stdSizeAndlayout(header_row)
+        header_row.addWidget(create_compact_section_title(_("Tables"), card))
+        header_row.addStretch(1)
+        self._use_query = QCheckBox(_("Use a query"), card)
+        self._use_query.toggled.connect(self._on_use_query_toggled)
+        header_row.addWidget(self._use_query)
+        card_layout.addLayout(header_row)
 
         self._tables = QListWidget(card)
         mark_editor_panel(self._tables)
+        # A tighter row height than QListWidget's default: what a user does
+        # here is scan a lot of names, not read one at a time, and a server
+        # with two hundred tables in six-row-tall entries defeats the whole
+        # point of giving this list the entire right column.
+        self._tables.setUniformItemSizes(True)
+        self._tables.setSpacing(0)
+        self._tables.setStyleSheet("QListWidget::item { padding: 2px 4px; }")
         # Double-click is the same answer as picking and pressing OK, and it
         # is the one a file-list gesture reaches for first.
         self._tables.itemDoubleClicked.connect(lambda _item: self._confirm())
-        card_layout.addWidget(self._tables, 1)
+
+        self._query_edit = QPlainTextEdit(card)
+        self._query_edit.setPlaceholderText(_("SELECT ... FROM ..."))
+        mark_editor_panel(self._query_edit)
+
+        self._table_stack = QStackedWidget(card)
+        self._table_stack.addWidget(self._tables)
+        self._table_stack.addWidget(self._query_edit)
+        card_layout.addWidget(self._table_stack, 1)
         return card
+
+    def _on_use_query_toggled(self, checked: bool) -> None:
+        self._table_stack.setCurrentWidget(self._query_edit if checked else self._tables)
 
     # ------------------------------------------------------------------
     # Engine switch
     # ------------------------------------------------------------------
     def _on_engine_changed(self) -> None:
         engine = self._engine.currentData()
-        is_sqlite = engine == ENGINE_SQLITE
+        is_sqlite = engine in _SQLITE_LIKE_ENGINES
         self._sqlite_row.setVisible(is_sqlite)
         if self._sqlite_label is not None:
             self._sqlite_label.setVisible(is_sqlite)
@@ -269,8 +327,12 @@ class ConnectDatabaseDialog(QDialog):
         self._tables.clear()
 
     def _on_browse_sqlite(self) -> None:
+        is_dhub = self._engine.currentData() == ENGINE_DHUB
         path, _unused = QFileDialog.getOpenFileName(
-            self, _("Select database"), str(Path.home()), DATABASE_FILE_FILTER
+            self,
+            _("Select project") if is_dhub else _("Select database"),
+            str(Path.home()),
+            _DHUB_FILE_FILTER if is_dhub else DATABASE_FILE_FILTER,
         )
         if path:
             self._sqlite_path.setText(path)
@@ -280,7 +342,7 @@ class ConnectDatabaseDialog(QDialog):
     # ------------------------------------------------------------------
     def _current_connection(self) -> DatabaseConnection:
         engine = str(self._engine.currentData())
-        if engine == ENGINE_SQLITE:
+        if engine in _SQLITE_LIKE_ENGINES:
             return DatabaseConnection(kind="sqlite", path=self._sqlite_path.text().strip())
         return DatabaseConnection(
             kind=engine,
@@ -465,11 +527,25 @@ class ConnectDatabaseDialog(QDialog):
     # Result
     # ------------------------------------------------------------------
     def _confirm(self) -> None:
+        if self._use_query.isChecked():
+            sql = self._query_edit.toPlainText().strip()
+            ok, reason = is_read_only_select(sql)
+            if not ok:
+                show_message(self, "import.database_query_invalid", reason=reason)
+                return
+            self.connection = self._current_connection()
+            self.query = sql
+            self.table = None
+            self._remember_connection(self.connection, "")
+            self.accept()
+            return
+
         item = self._tables.currentItem()
         if item is None:
             show_message(self, "import.database_no_table_selected")
             return
         self.connection = self._current_connection()
         self.table = item.text()
+        self.query = None
         self._remember_connection(self.connection, self.table)
         self.accept()

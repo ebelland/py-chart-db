@@ -15,6 +15,7 @@ import pandas as pd
 from matplotlib.dates import AutoDateLocator, ConciseDateFormatter
 
 from app.charts.base import ERROR_BAR_KWARGS, BaseAxisRenderer, SeriesData
+from app.data.series_frame import SeriesFrame
 from app.logs.logger import applogger
 from app.utils.coercion import coerce_axis
 
@@ -564,7 +565,7 @@ class TimeSeriesAxisRenderer(BaseAxisRenderer):
 
         return legend_handle_found
 
-    def _series_line_color(self, df: pd.DataFrame, style: dict[str, Any], layer_index: int) -> Any:
+    def _series_line_color(self, df: SeriesFrame, style: dict[str, Any], layer_index: int) -> Any:
         fallback_color = self.series_color(style, layer_index)
         if "color" in df.columns:
             return self.first_color_from_values(df["color"], fallback_color=fallback_color)

@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from app.dialogs.connect_database_dialog import (
+    ENGINE_DHUB,
     ENGINE_MYSQL,
     ENGINE_POSTGRES,
     ENGINE_SQLITE,
@@ -74,6 +75,55 @@ def test_sqlite_is_the_default_engine(dialog: ConnectDatabaseDialog) -> None:
     assert dialog._engine.currentData() == ENGINE_SQLITE
     assert not dialog._sqlite_row.isHidden()
     assert dialog._host.isHidden()
+
+
+def test_another_project_is_its_own_engine_choice_but_a_sqlite_file_underneath(
+    dialog: ConnectDatabaseDialog,
+) -> None:
+    """A .dhub file is this app's own SQLite format and nothing more, so
+    "connect to another project" has to reuse every bit of the plain SQLite
+    path - but a user asking that question should not have to first work
+    out that "SQLite file" is the answer."""
+    _select_engine(dialog, ENGINE_DHUB)
+
+    assert not dialog._sqlite_row.isHidden()
+    assert dialog._host.isHidden()
+
+    dialog._sqlite_path.setText("/tmp/other-project.dhub")
+    assert dialog._current_connection().kind == "sqlite"
+    assert dialog._current_connection().path == "/tmp/other-project.dhub"
+
+
+def test_connecting_to_another_project_lists_its_tables(
+    dialog: ConnectDatabaseDialog, sqlite_db: Path
+) -> None:
+    _select_engine(dialog, ENGINE_DHUB)
+    dialog._sqlite_path.setText(str(sqlite_db))
+
+    dialog._on_connect()
+
+    assert [dialog._tables.item(i).text() for i in range(dialog._tables.count())] == [
+        "readings"
+    ]
+
+
+def test_browsing_for_another_project_offers_dhub_first(
+    dialog: ConnectDatabaseDialog, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.dialogs.connect_database_dialog as module
+
+    seen: dict = {}
+
+    def _fake_open(_parent, _title, _dir, _filter):
+        seen["filter"] = _filter
+        return "", ""
+
+    monkeypatch.setattr(module.QFileDialog, "getOpenFileName", _fake_open)
+    _select_engine(dialog, ENGINE_DHUB)
+
+    dialog._on_browse_sqlite()
+
+    assert seen["filter"].startswith("ChartLibre project")
 
 
 def test_switching_to_a_server_engine_swaps_the_fields(
@@ -446,3 +496,72 @@ def test_a_remembered_table_that_is_gone_falls_back_to_the_first(
     reopened._on_connect()
 
     assert reopened._tables.currentItem().text() == "readings"
+
+
+# ----------------------------------------------------------------------
+# Use a query
+# ----------------------------------------------------------------------
+def test_checking_use_a_query_swaps_the_list_for_a_text_box(
+    dialog: ConnectDatabaseDialog,
+) -> None:
+    assert dialog._table_stack.currentWidget() is dialog._tables
+
+    dialog._use_query.setChecked(True)
+
+    assert dialog._table_stack.currentWidget() is dialog._query_edit
+
+
+def test_confirming_a_query_sets_query_not_table(
+    dialog: ConnectDatabaseDialog, sqlite_db: Path
+) -> None:
+    dialog._sqlite_path.setText(str(sqlite_db))
+    dialog._on_connect()
+    dialog._use_query.setChecked(True)
+    dialog._query_edit.setPlainText("SELECT * FROM readings WHERE v > 0")
+
+    dialog._confirm()
+
+    assert dialog.query == "SELECT * FROM readings WHERE v > 0"
+    assert dialog.table is None
+    assert dialog.connection is not None
+    assert dialog.result() == ConnectDatabaseDialog.DialogCode.Accepted
+
+
+def test_an_empty_query_is_rejected(
+    dialog: ConnectDatabaseDialog, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.dialogs.connect_database_dialog as module
+
+    shown: list[str] = []
+    monkeypatch.setattr(
+        module, "show_message", lambda _p, message_id, **_k: shown.append(message_id)
+    )
+    dialog._use_query.setChecked(True)
+
+    dialog._confirm()
+
+    assert shown == ["import.database_query_invalid"]
+    assert dialog.query is None
+    assert dialog.result() != ConnectDatabaseDialog.DialogCode.Accepted
+
+
+def test_a_write_statement_is_rejected_even_disguised_as_a_query(
+    dialog: ConnectDatabaseDialog, sqlite_db: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """"Use a query" reads into the current project - it must not be a way
+    to run a DELETE against someone else's database instead."""
+    import app.dialogs.connect_database_dialog as module
+
+    shown: list[str] = []
+    monkeypatch.setattr(
+        module, "show_message", lambda _p, message_id, **_k: shown.append(message_id)
+    )
+    dialog._sqlite_path.setText(str(sqlite_db))
+    dialog._on_connect()
+    dialog._use_query.setChecked(True)
+    dialog._query_edit.setPlainText("DELETE FROM readings")
+
+    dialog._confirm()
+
+    assert shown == ["import.database_query_invalid"]
+    assert dialog.query is None

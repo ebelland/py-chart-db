@@ -520,8 +520,25 @@ class SeriesOperationDialogBase(QDialog):
             raise ValueError(message)
 
         if len(rows) > 1:
+            # NOT show_dialog=True: this runs on every compute_results() -
+            # every Preview, every parameter tweak while two or more series
+            # are checked - and a modal QMessageBox.exec() on each of those
+            # would freeze the dialog until it was dismissed, again and
+            # again. It very nearly shipped that way: AppLogger._show_
+            # message_box only skips the dialog when there is no
+            # QApplication at all, so it exec()s quietly-returning under the
+            # offscreen QPA platform pytest runs on and genuinely blocks on
+            # a real desktop - green everywhere headless, and a hang at
+            # whichever test first exercises this path anywhere else.
+            # The status bar already shows every WARNING-or-louder message
+            # on its own (see AppLogger._log_with_policy) without asking to
+            # be dismissed, which is why this stays at the default.
+            name = row_value(rows[0], "name", default="first")
             applogger.warning(
-                "Multiple source series selected; using the first selected series."
+                "%d series are selected; using only '%s'. Uncheck the "
+                "others, or reorder them, to use a different one.",
+                len(rows),
+                name,
             )
 
         return rows[0]

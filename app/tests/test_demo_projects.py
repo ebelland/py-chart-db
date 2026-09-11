@@ -227,6 +227,75 @@ def test_the_employee_dataset_has_a_real_outlier(tmp_path: Path) -> None:
     assert salaries.max() > median * 4, "no salary far enough above the median"
 
 
+def test_the_attribute_counts_reproduce_montgomerys_p_chart(tmp_path: Path) -> None:
+    """The point of shipping this table: running a p-chart over it should
+    give the textbook's own numbers, not just some plausible-looking chart."""
+    from app.series_operations.control_chart_dialog import CHART_P, attribute_limits
+
+    path = build_demo_project(tmp_path / "attributes.dhub", ("attribute_counts",))
+    repo = SqliteRepo(db_path=path)
+    try:
+        frame = repo.query_df(
+            "SELECT defectives, inspected FROM attribute_chart_counts ORDER BY sample"
+        )
+    finally:
+        repo.close()
+
+    _stat, center, upper, lower, meta = attribute_limits(
+        CHART_P,
+        frame["defectives"].to_numpy(dtype=float),
+        frame["inspected"].to_numpy(dtype=float),
+        3.0,
+    )
+    assert meta["p-bar"] == pytest.approx(0.214, abs=1e-3)
+    assert center == pytest.approx(0.214, abs=1e-3)
+    assert upper[0] == pytest.approx(0.388, abs=1e-3)
+    assert lower[0] == pytest.approx(0.040, abs=1e-3)
+
+
+def test_the_attribute_chart_annotation_and_line_carry_an_explicit_colour(
+    tmp_path: Path,
+) -> None:
+    """The point of the annotation/line on this figure: opening Overlay
+    properties on it should show the colour (and the annotation's font and
+    size) combos already populated, not at "(none)"/"Default"."""
+    path = build_demo_project(tmp_path / "attributes.dhub", ("attribute_counts",))
+    descriptor = _load_axes(
+        path, "23 · Defectives per sample - ready for the Control Chart operation"
+    )
+    options = descriptor.axes[0].options
+    annotation = options["annotations"][0]
+    assert annotation["kwargs"]["color"]
+    assert annotation["kwargs"]["fontfamily"]
+    assert annotation["kwargs"]["fontsize"]
+    assert options["lines"][0]["kwargs"]["color"]
+
+
+def test_the_baseline_spectrum_has_a_wandering_background_under_real_peaks(
+    tmp_path: Path,
+) -> None:
+    """The point of shipping this table: AsLS should track the background
+    away from the peaks and stay well below the peaks themselves - a rubber
+    band, being convex-only, is not what this table is meant to challenge."""
+    from app.series_operations.baseline_dialog import asls_baseline
+
+    path = build_demo_project(tmp_path / "baseline.dhub", ("baseline_spectrum",))
+    repo = SqliteRepo(db_path=path)
+    try:
+        frame = repo.query_df("SELECT x, intensity FROM baseline_spectrum ORDER BY x")
+    finally:
+        repo.close()
+
+    x = frame["x"].to_numpy(dtype=float)
+    y = frame["intensity"].to_numpy(dtype=float)
+    baseline = asls_baseline(y, lam=1e5, p=0.01, iterations=10)
+    corrected = y - baseline
+
+    no_peak = (np.abs(x - 30.0) > 5.0) & (np.abs(x - 70.0) > 8.0)
+    assert corrected[no_peak] == pytest.approx(np.zeros(int(no_peak.sum())), abs=1.0)
+    assert corrected.max() > 5.0, "no peak survives the correction"
+
+
 # ----------------------------------------------------------------------
 # Multi-axis figures: one demo per layout preset
 # ----------------------------------------------------------------------

@@ -18,7 +18,9 @@ import pytest
 from app.utils.data_sources import (
     DatabaseConnection,
     MissingPasswordError,
+    USER_WEB_SOURCE_CATEGORY,
     _extension_for_web_source,
+    add_user_web_source,
     filename_from_url,
     is_valid_web_url,
     list_mysql_databases,
@@ -26,10 +28,15 @@ from app.utils.data_sources import (
     list_postgres_databases,
     list_postgres_tables,
     list_sqlite_tables,
+    load_web_data_sources,
     read_from_link_source,
+    read_mysql_query,
     read_mysql_table,
+    read_postgres_query,
     read_postgres_table,
+    read_sqlite_query,
     read_sqlite_table,
+    remove_user_web_source,
 )
 
 
@@ -105,6 +112,20 @@ def test_list_sqlite_tables_excludes_this_applications_own_bookkeeping(
 
 def test_read_sqlite_table_applies_skip_options(other_db: Path) -> None:
     df = read_sqlite_table(str(other_db), "readings", skiprows=1, skipfooter=1)
+
+    assert list(df["t"]) == [2.0]
+
+
+def test_read_sqlite_query_runs_arbitrary_sql(other_db: Path) -> None:
+    df = read_sqlite_query(str(other_db), "SELECT t, v FROM readings WHERE v > 2")
+
+    assert list(df["t"]) == [2.0, 3.0]
+
+
+def test_read_sqlite_query_applies_skip_options(other_db: Path) -> None:
+    df = read_sqlite_query(
+        str(other_db), "SELECT t FROM readings ORDER BY t", skiprows=1, skipfooter=1
+    )
 
     assert list(df["t"]) == [2.0]
 
@@ -236,6 +257,30 @@ def test_read_postgres_table_selects_the_named_table(
     assert conn.closed is True
 
 
+def test_read_postgres_query_runs_the_given_sql(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.utils.data_sources as module
+
+    conn = _postgres_connection(monkeypatch, [])
+    captured: dict[str, object] = {}
+
+    def fake_read_sql_query(sql: str, connection: object) -> pd.DataFrame:
+        captured["sql"] = sql
+        return pd.DataFrame({"id": [1, 2]})
+
+    monkeypatch.setattr(module.pd, "read_sql_query", fake_read_sql_query)
+    dbconn = DatabaseConnection(
+        kind="postgres", host="h", port=5432, database="d", username="u", password="p"
+    )
+
+    df = read_postgres_query(dbconn, "SELECT id FROM orders WHERE total > 100")
+
+    assert captured["sql"] == "SELECT id FROM orders WHERE total > 100"
+    assert list(df["id"]) == [1, 2]
+    assert conn.closed is True
+
+
 def test_list_mysql_tables_queries_show_tables(monkeypatch: pytest.MonkeyPatch) -> None:
     conn = _mysql_connection(monkeypatch, [("orders",)])
     dbconn = DatabaseConnection(
@@ -266,6 +311,27 @@ def test_read_mysql_table_uses_backtick_quoting(monkeypatch: pytest.MonkeyPatch)
     read_mysql_table(dbconn, "orders")
 
     assert captured["sql"] == "SELECT * FROM `orders`"
+    assert conn.closed is True
+
+
+def test_read_mysql_query_runs_the_given_sql(monkeypatch: pytest.MonkeyPatch) -> None:
+    import app.utils.data_sources as module
+
+    conn = _mysql_connection(monkeypatch, [])
+    captured: dict[str, object] = {}
+
+    def fake_read_sql_query(sql: str, connection: object) -> pd.DataFrame:
+        captured["sql"] = sql
+        return pd.DataFrame({"id": [1]})
+
+    monkeypatch.setattr(module.pd, "read_sql_query", fake_read_sql_query)
+    dbconn = DatabaseConnection(
+        kind="mysql", host="h", port=3306, database="d", username="u", password="p"
+    )
+
+    read_mysql_query(dbconn, "SELECT id FROM orders")
+
+    assert captured["sql"] == "SELECT id FROM orders"
     assert conn.closed is True
 
 
@@ -332,6 +398,24 @@ def test_a_server_source_with_a_password_reads(monkeypatch: pytest.MonkeyPatch) 
 def test_an_unknown_source_kind_raises() -> None:
     with pytest.raises(ValueError, match="Unknown source kind"):
         read_from_link_source({"kind": "ftp"}, {})
+
+
+def test_a_query_source_is_dispatched_to_the_query_reader_not_the_table_one(
+    other_db: Path,
+) -> None:
+    """A saved link with a query and no table must not fall back to
+    "Missing source table" - the query is the whole point of it."""
+    df = read_from_link_source(
+        {"kind": "sqlite", "path": str(other_db), "query": "SELECT t FROM readings WHERE v > 2"},
+        {},
+    )
+
+    assert list(df["t"]) == [2.0, 3.0]
+
+
+def test_a_source_with_neither_table_nor_query_raises(other_db: Path) -> None:
+    with pytest.raises(ValueError, match="Missing source table"):
+        read_from_link_source({"kind": "sqlite", "path": str(other_db)}, {})
 
 
 # ----------------------------------------------------------------------
@@ -441,3 +525,73 @@ def test_list_mysql_databases_names_no_database_to_connect_to(
     list_mysql_databases(dbconn)
 
     assert "database" not in conn.calls["kwargs"]  # type: ignore[attr-defined]
+
+
+# ----------------------------------------------------------------------
+# The user's own web-source catalogue
+# ----------------------------------------------------------------------
+@pytest.fixture(autouse=True)
+def _isolated_user_web_sources(monkeypatch: pytest.MonkeyPatch) -> list:
+    """A user_web_sources catalogue of its own, not the developer's own -
+    add_user_web_source/remove_user_web_source otherwise read and write the
+    real user.json."""
+    import app.utils.config as config
+
+    stored: list[dict] = []
+    monkeypatch.setattr(config, "get_user_web_sources", lambda: list(stored))
+
+    def _set(entries: list) -> None:
+        stored.clear()
+        stored.extend(entries)
+
+    monkeypatch.setattr(config, "set_user_web_sources", _set)
+    return stored
+
+
+def test_a_freshly_added_source_appears_in_the_full_catalogue() -> None:
+    add_user_web_source("My CSV", "https://example.com/my.csv", "a note")
+
+    names = [source.name for source in load_web_data_sources()]
+    assert "My CSV" in names
+
+
+def test_an_added_source_is_marked_custom_and_categorised_apart_from_bundled() -> None:
+    source = add_user_web_source("My CSV", "https://example.com/my.csv")
+
+    assert source.custom
+    assert source.category == USER_WEB_SOURCE_CATEGORY
+
+    bundled = [s for s in load_web_data_sources() if not s.custom]
+    assert bundled, "the bundled catalogue must still be there alongside it"
+    assert all(not s.custom for s in bundled)
+
+
+def test_adding_a_source_under_the_same_name_replaces_it_rather_than_duplicating() -> None:
+    add_user_web_source("My CSV", "https://example.com/v1.csv")
+    add_user_web_source("My CSV", "https://example.com/v2.csv")
+
+    matches = [s for s in load_web_data_sources() if s.name == "My CSV"]
+    assert len(matches) == 1
+    assert matches[0].url == "https://example.com/v2.csv"
+
+
+def test_removing_a_custom_source_takes_it_out_of_the_catalogue() -> None:
+    add_user_web_source("My CSV", "https://example.com/my.csv")
+
+    removed = remove_user_web_source("My CSV")
+
+    assert removed is True
+    assert "My CSV" not in [s.name for s in load_web_data_sources()]
+
+
+def test_removing_a_name_that_is_not_there_reports_it_was_not_removed() -> None:
+    assert remove_user_web_source("Never added") is False
+
+
+def test_removing_a_bundled_source_by_name_does_not_touch_the_bundle() -> None:
+    """remove_user_web_source only ever looks at the user's own list - a
+    bundled entry's name is simply not found there."""
+    bundled_name = load_web_data_sources()[0].name
+
+    assert remove_user_web_source(bundled_name) is False
+    assert bundled_name in [s.name for s in load_web_data_sources()]

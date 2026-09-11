@@ -386,3 +386,19 @@ def get_connect_database_config() -> dict[str, Any]:
 def set_connect_database_config(dialog_cfg: dict[str, Any]) -> None:
     """Remember the connection and table the user just picked."""
     set_section("connect_database_dialog", dialog_cfg)
+
+
+def get_user_web_sources() -> list[dict[str, Any]]:
+    """Return the web sources this user added themselves.
+
+    A list of {name, url, description}, layered onto the bundled catalogue
+    in web_sources.json by ``app.utils.data_sources.load_web_data_sources`` -
+    that file ships with the application and is never written here.
+    """
+    entries = get_section("web_sources").get("entries")
+    return [entry for entry in entries if isinstance(entry, dict)] if isinstance(entries, list) else []
+
+
+def set_user_web_sources(entries: list[dict[str, Any]]) -> None:
+    """Remember the web sources the user has added themselves."""
+    set_section("web_sources", {"entries": entries})

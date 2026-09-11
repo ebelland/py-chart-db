@@ -14,15 +14,29 @@ __pycache__/
 *.7z
 *.zip
 .DS_Store
-sample data/
 .vscode/
 app/test_results/
 *.dhub-wal
 *.dhub-shm
 .fuse_hidden*
 
-# Demo project is generated, not tracked
-sample data/Demo Project.dhub
+# "sample data/" itself IS tracked: demo_project.py reads all sixteen of its
+# files to build the demo set, so a clone without them cannot build a demo
+# and roughly twenty tests fail on a missing file. Two strays in that folder
+# are not read by any code and stay out (dataset_tbc.csv is a megabyte on its
+# own); the built .dhub next to them is generated, and *.dhub above covers it.
+sample data/dataset_tbc.csv
+sample data/penguins_raw.csv
+
+# The built demo set IS tracked, against the usual "no build output in git"
+# rule, and deliberately: "Load demo" copies a pre-built file and raises if
+# it is missing (demo_project.copy_demo_project), so a clone without demo/
+# has no working demo at all until somebody thinks to run the builder. The
+# .dhub files are the product here, not an intermediate. ~3 MB, rebuilt with
+# `python -m app.data.demo_project` whenever the figures change - re-run it
+# after editing demo_project.py or the set goes stale.
+!demo/
+!demo/*.dhub
 
 # "Load demo" drops its working copy here before opening it (demo_project.PROJECTS_DIR)
 projects/

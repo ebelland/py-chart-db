@@ -46,6 +46,7 @@ from app.charts.base import (
     pick,
 )
 from app.charts.grids import pivot_to_grid
+from app.data.series_frame import SeriesFrame
 from app.logs.logger import applogger
 
 #: The appearance keywords every field renderer here forwards. Deliberately
@@ -61,7 +62,7 @@ _FIELD_KWARGS: dict[str, Any] = pick(
 _EVEN_SPACING_TOLERANCE: float = 1e-6
 
 
-def _field_columns(df: pd.DataFrame) -> tuple[np.ndarray, ...]:
+def _field_columns(df: SeriesFrame) -> tuple[np.ndarray, ...]:
     """Return x, y, u, v as float arrays, unparseable entries as NaN."""
     return tuple(
         pd.to_numeric(df[role], errors="coerce").to_numpy(dtype=float)
@@ -69,7 +70,7 @@ def _field_columns(df: pd.DataFrame) -> tuple[np.ndarray, ...]:
     )
 
 
-def _finite_field(df: pd.DataFrame) -> tuple[np.ndarray, ...] | None:
+def _finite_field(df: SeriesFrame) -> tuple[np.ndarray, ...] | None:
     """Return the rows where all four of x, y, u and v are finite."""
     columns = _field_columns(df)
     mask = np.logical_and.reduce([np.isfinite(column) for column in columns])

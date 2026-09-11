@@ -169,17 +169,21 @@ class TableAxisRenderer(BaseAxisRenderer):
         blank column headed with a name is a column that looks like missing
         data instead of a mapping that has gone stale.
         """
+        # A table draws rows and columns, not named series - genuinely
+        # table-shaped work, so this is one of the few places SeriesFrame
+        # steps aside for a real DataFrame (.iloc, .astype, .index below).
+        frame = sd.df.to_pandas()
         roles = sd.roles if isinstance(sd.roles, dict) else {}
         selected = [
             (role, str(roles.get(role) or role))
             for role in COLUMN_ROLES
-            if role in sd.df.columns
+            if role in frame.columns
         ]
         if not selected:
-            return sd.df, [str(column) for column in sd.df.columns]
+            return frame, [str(column) for column in frame.columns]
 
         return (
-            sd.df[[role for role, _header in selected]],
+            frame[[role for role, _header in selected]],
             [header for _role, header in selected],
         )
 

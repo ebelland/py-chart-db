@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import sys
-from pathlib import Path
 
 from PySide6 import __file__ as PYSIDE6_FILE
 
@@ -85,7 +84,7 @@ def run_app() -> int:
 
     except Exception as exc:  # noqa: BLE001
         applogger.exception("Application startup failed: %s", exc)
-        QMessageBox.critical(None, "Data Hub", f"Application startup failed:\n{exc}")
+        QMessageBox.critical(None, APP_NAME, f"Application startup failed:\n{exc}")
         return 1
 
 

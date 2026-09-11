@@ -1434,6 +1434,31 @@ def create_section_title(text: str, parent: QWidget | None = None) -> QtWidgets.
     return label
 
 
+def create_compact_section_title(
+    text: str, parent: QWidget | None = None,
+) -> QtWidgets.QLabel:
+    """A section title one point smaller and demi-bold.
+
+    ``create_section_title`` alone (the QSS rule's own 11pt / weight 600) is
+    right for a dialog with one or two section headers. A panel that lists
+    several of them one after another - the Series Operations list's own
+    Analysis/Statistics/... headings - reads better with this shorter,
+    lighter version, which used to be a copy of this exact font math kept
+    inside ``SeriesOperationWidget``; other panels asking to match it is
+    what gave it this one home instead.
+    """
+    label = create_section_title(text, parent)
+    font = QFont(label.font())
+    point_size = font.pointSize()
+    if point_size > 0:
+        font.setPointSize(max(point_size - 1, 9))
+    else:
+        font.setPixelSize(12)
+    font.setWeight(QFont.Weight.DemiBold)
+    label.setFont(font)
+    return label
+
+
 def create_card_widget(parent: QWidget | None = None, object_name: str | None = None) -> QFrame:
     """Create a lightweight card/container frame styled through QSS."""
     card = QFrame(parent)

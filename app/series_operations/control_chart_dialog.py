@@ -1,29 +1,53 @@
-"""Shewhart control charts for a chart series.
+"""Shewhart control charts for a chart series - variables and attributes.
 
 A control chart asks one question: is this process varying the way a stable
-process varies, or has something changed?  It answers it by drawing limits at
-plus and minus three sigma of the process's *own* short-term variation and
-flagging the points that fall outside.
+process varies, or has something changed?  It answers it by drawing limits
+around the process's *own* variation and flagging the points that fall
+outside.
 
-The thing that makes it a control chart rather than a scatter plot with error
-bars is where that sigma comes from.  It is **never** the standard deviation
-of all the data.  A process that has drifted has a large overall standard
-deviation precisely *because* it drifted, so limits built from it are wide
-enough to contain the drift and the chart declares the process fine.  Sigma is
-estimated instead from variation *within* subgroups - the average moving range
-for individual measurements, the average range or standard deviation within
-subgroups otherwise - which is unaffected by shifts between them.  That is the
-whole idea, and it is the one thing easy to get wrong.
+Eight charts, in two families, because that is one decision a user should
+not have to make before they can find the tool:
 
-The estimators need the unbiasing constants d2, d3, c4, A2, D3, D4, B3 and B4.
-They are tabulated below rather than computed: c4 has a closed form in gamma
-functions, but d2 and d3 are integrals over the range distribution with no
-elementary form, and every SPC text ships the same table.  Using anything else
-would put this chart's limits at odds with every other tool's.
+**Variables** - the measurement charts.  What makes these control charts
+rather than a scatter plot with error bars is where sigma comes from.  It is
+**never** the standard deviation of all the data: a process that has drifted
+has a large overall standard deviation precisely *because* it drifted, so
+limits built from it are wide enough to contain the drift and the chart
+declares the process fine.  Sigma is estimated instead from variation
+*within* subgroups - the average moving range for individual measurements,
+the average range or standard deviation within subgroups otherwise - which
+is unaffected by shifts between them.  That is the whole idea, and it is the
+one thing easy to get wrong.
+
+**Attributes** - the count charts, the half the variables charts do not
+cover.  These plot a proportion or a count rather than a measurement, so the
+limits come from the distribution the count follows rather than from a
+within-subgroup spread:
+
+* **p** - fraction defective, ``d / n``.  Binomial.  Centre ``p̄ = Σd / Σn``,
+  limits ``p̄ ± L·√(p̄(1-p̄)/nᵢ)``: when the sample size varies, so does the
+  limit, and the chart draws a different band at every point.
+* **np** - number defective, ``d``, at a fixed ``n``.  Centre ``n·p̄``,
+  limits ``n·p̄ ± L·√(n·p̄(1-p̄))``.
+* **c** - defects in a unit of constant size.  Poisson.  ``c̄ ± L·√c̄``.
+* **u** - defects per unit, ``c / n``.  Poisson.  ``ū ± L·√(ū/nᵢ)`` - again
+  per point when ``n`` varies.
+
+The lower limit is clipped at zero on the count charts: a count cannot be
+negative, and an unclipped LCL below zero never signals.
+
+The variables estimators need the unbiasing constants d2, d3, c4, A2, D3,
+D4, B3 and B4.  They are tabulated below rather than computed: c4 has a
+closed form in gamma functions, but d2 and d3 are integrals over the range
+distribution with no elementary form, and every SPC text ships the same
+table.  Using anything else would put this chart's limits at odds with every
+other tool's.
 
 Violations are reported by the Nelson rules, which catch the patterns that
-stay inside the limits - a run on one side, a trend, a hug of the centre line -
-and are what a chart is for beyond spotting the obvious outlier.
+stay inside the limits - a run on one side, a trend, a hug of the centre
+line - and are what a chart is for beyond spotting the obvious outlier.
+Which rules are *legal* depends on the chart, and that is the one thing the
+two families have to disagree about: see :meth:`_find_violations`.
 """
 
 from __future__ import annotations
@@ -34,9 +58,10 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from PySide6.QtWidgets import QFormLayout, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QComboBox, QFormLayout, QVBoxLayout, QWidget
 
-from app.data.data_source import row_value
+from app.data.data_source import parse_roles, row_value
+from app.data.repo.tables import QueryColumns, coerce_numeric_array
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
 from app.series_operations.parameter_spec import BoolParam, FloatParam, IntParam
@@ -49,19 +74,35 @@ from app.styles.style import create_doc_link, set_doc_link
 from app.utils.i18n import _
 from app.utils import report_html
 
+# Variables charts - a measurement per point.
 CHART_INDIVIDUALS = "Individuals (I-MR)"
 CHART_MOVING_RANGE = "Moving range (MR)"
 CHART_XBAR_R = "X-bar and R"
 CHART_XBAR_S = "X-bar and S"
 
-CONTROL_CHARTS = (
+# Attribute charts - a count per point.
+CHART_P = "p (fraction defective)"
+CHART_NP = "np (count defective)"
+CHART_C = "c (defects per unit)"
+CHART_U = "u (defects per unit, variable size)"
+
+VARIABLES_CHARTS = (
     CHART_INDIVIDUALS,
     CHART_MOVING_RANGE,
     CHART_XBAR_R,
     CHART_XBAR_S,
 )
+ATTRIBUTE_CHARTS = (CHART_P, CHART_NP, CHART_C, CHART_U)
+CONTROL_CHARTS = VARIABLES_CHARTS + ATTRIBUTE_CHARTS
 
+#: Charts averaging several readings into each plotted point.
 SUBGROUPED = (CHART_XBAR_R, CHART_XBAR_S)
+#: Charts that read a sample-size column.  ``c`` is the exception among the
+#: attribute charts - it assumes a constant area of opportunity, so there is
+#: nothing to divide by.
+NEEDS_SIZE_COLUMN = frozenset({CHART_P, CHART_NP, CHART_U})
+#: Charts on the binomial (a proportion, bounded above by its sample size).
+BINOMIAL = frozenset({CHART_P, CHART_NP})
 
 CONTROL_DOCS = {
     CHART_INDIVIDUALS: (
@@ -80,6 +121,10 @@ CONTROL_DOCS = {
         "X-bar and s chart",
         "https://en.wikipedia.org/wiki/X%CC%84_and_s_chart",
     ),
+    CHART_P: ("p-chart", "https://en.wikipedia.org/wiki/P-chart"),
+    CHART_NP: ("np-chart", "https://en.wikipedia.org/wiki/Np-chart"),
+    CHART_C: ("c-chart", "https://en.wikipedia.org/wiki/C-chart"),
+    CHART_U: ("u-chart", "https://en.wikipedia.org/wiki/U-chart"),
 }
 
 #: Unbiasing constants by subgroup size, from the standard SPC tables.
@@ -112,6 +157,10 @@ SPC_CONSTANTS: dict[int, tuple[float, float, float, float, float, float, float, 
 #: better than refusing to draw the chart, but it is reported as approximate.
 LARGEST_TABULATED = max(SPC_CONSTANTS)
 
+#: Below this an attribute chart's limits are too soft to trust; the report
+#: says so rather than refusing to draw them.
+RECOMMENDED_SUBGROUPS = 20
+
 
 @dataclass(slots=True)
 class Violation:
@@ -138,7 +187,18 @@ class Violation:
 
 @dataclass(slots=True)
 class ControlChartResult:
-    """Control chart for one source series."""
+    """One control chart - of either family - for one source series.
+
+    ``upper``/``lower``/``sigma`` are scalars: the constant value on every
+    variables chart and on np/c, and the *mean* band on a p or u chart whose
+    limits genuinely move with the sample size - kept scalar rather than
+    dropped so the many existing checks against a variables chart's own
+    limits (``result.upper == ...``) still read the single number they
+    always meant. ``*_band`` are the same thing per point, always populated
+    (a repeated value where the chart has no reason to vary): ``to_frame``
+    and the violation pass need the real band, not its average, and only a
+    p/u chart's is not just that scalar broadcast.
+    """
 
     source_name: str
     result_name: str
@@ -149,9 +209,18 @@ class ControlChartResult:
     upper: float
     lower: float
     sigma: float
+    upper_band: np.ndarray
+    lower_band: np.ndarray
+    sigma_band: np.ndarray
     subgroup_size: int
     violations: list[Violation] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def limits_vary(self) -> bool:
+        """True when the band moves point to point (a p or u chart on an
+        uneven sample size), which is what makes the zone rules illegal."""
+        return bool(self.sigma_band.size and np.ptp(self.sigma_band) > 0.0)
 
     def to_frame(self) -> pd.DataFrame:
         """Every line the chart may draw, as columns of one table.
@@ -172,12 +241,12 @@ class ControlChartResult:
                 "x": self.x,
                 "y": self.y,
                 "center": np.full(size, self.center),
-                "ucl": np.full(size, self.upper),
-                "lcl": np.full(size, self.lower),
-                "zone_2_upper": np.full(size, self.center + 2.0 * self.sigma),
-                "zone_2_lower": np.full(size, self.center - 2.0 * self.sigma),
-                "zone_1_upper": np.full(size, self.center + self.sigma),
-                "zone_1_lower": np.full(size, self.center - self.sigma),
+                "ucl": self.upper_band,
+                "lcl": self.lower_band,
+                "zone_2_upper": self.center + 2.0 * self.sigma_band,
+                "zone_2_lower": self.center - 2.0 * self.sigma_band,
+                "zone_1_upper": self.center + self.sigma_band,
+                "zone_1_lower": self.center - self.sigma_band,
                 "violation": [int(i in flagged) for i in range(size)],
                 # The flagged points as their own column, NULL elsewhere, so a
                 # series can plot them alone. A WHERE clause would work for
@@ -191,11 +260,83 @@ class ControlChartResult:
         )
 
 
+# ----------------------------------------------------------------------
+# The attribute numerics - pure, no Qt, so a test can call them directly
+# ----------------------------------------------------------------------
+def attribute_limits(
+    chart: str,
+    counts: np.ndarray,
+    sizes: np.ndarray,
+    sigma_limit: float,
+) -> tuple[np.ndarray, float, np.ndarray, np.ndarray, dict[str, Any]]:
+    """Return ``(plotted_statistic, centre, upper, lower, metadata)``.
+
+    ``counts`` is the series' y (defectives for p/np, defects for c/u).
+    ``sizes`` is the sample size per point; the c chart ignores it.
+    """
+    counts = np.asarray(counts, dtype=float)
+    sizes = np.asarray(sizes, dtype=float)
+    point_count = counts.size
+    meta: dict[str, Any] = {}
+
+    if chart == CHART_P:
+        total_n = float(sizes.sum())
+        pbar = float(counts.sum() / total_n) if total_n else 0.0
+        statistic = np.divide(counts, sizes, out=np.zeros_like(counts), where=sizes > 0)
+        spread = sigma_limit * np.sqrt(
+            np.divide(pbar * (1.0 - pbar), sizes, out=np.zeros_like(sizes), where=sizes > 0)
+        )
+        center, upper, lower = pbar, pbar + spread, pbar - spread
+        meta["p-bar"] = pbar
+
+    elif chart == CHART_NP:
+        n = float(np.mean(sizes)) if sizes.size else 0.0
+        pbar = float(counts.sum() / (n * point_count)) if n and point_count else 0.0
+        statistic = counts
+        spread = sigma_limit * np.sqrt(max(n * pbar * (1.0 - pbar), 0.0))
+        center = n * pbar
+        upper = np.full(point_count, center + spread)
+        lower = np.full(point_count, center - spread)
+        meta["p-bar"] = pbar
+        meta["sample size"] = n
+
+    elif chart == CHART_C:
+        cbar = float(np.mean(counts)) if counts.size else 0.0
+        statistic = counts
+        spread = sigma_limit * np.sqrt(max(cbar, 0.0))
+        center = cbar
+        upper = np.full(point_count, cbar + spread)
+        lower = np.full(point_count, cbar - spread)
+        meta["c-bar"] = cbar
+
+    elif chart == CHART_U:
+        total_n = float(sizes.sum())
+        ubar = float(counts.sum() / total_n) if total_n else 0.0
+        statistic = np.divide(counts, sizes, out=np.zeros_like(counts), where=sizes > 0)
+        spread = sigma_limit * np.sqrt(
+            np.divide(ubar, sizes, out=np.zeros_like(sizes), where=sizes > 0)
+        )
+        center, upper, lower = ubar, ubar + spread, ubar - spread
+        meta["u-bar"] = ubar
+
+    else:  # pragma: no cover - the combo cannot hold anything else
+        raise ValueError(f"unknown attribute chart {chart!r}")
+
+    upper = np.broadcast_to(np.asarray(upper, dtype=float), (point_count,)).copy()
+    lower = np.broadcast_to(np.asarray(lower, dtype=float), (point_count,)).copy()
+    # A count is non-negative; an LCL below zero would never signal.
+    np.clip(lower, 0.0, None, out=lower)
+    # A proportion is bounded above by 1.
+    if chart == CHART_P:
+        np.clip(upper, None, 1.0, out=upper)
+    return np.asarray(statistic, dtype=float), float(center), upper, lower, meta
+
+
 class SeriesControlChartDialog(SeriesOperationDialogBase):
-    """Draw a Shewhart control chart for a chart series."""
+    """Draw a Shewhart control chart - variables or attributes - for a series."""
 
     Name: str = "Control Chart"
-    Description = "Monitor process stability"
+    Description = "Monitor process stability (I-MR, X-bar, p, np, c, u)"
 
     # The points are a time order, so they must be in x order: every estimator
     # here reads consecutive differences, and a shuffled series produces a
@@ -240,7 +381,8 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
             "Apply Nelson rules:",
             tooltip=(
                 "Flags runs, trends and other patterns that stay inside the "
-                "limits - the signals a limits-only chart misses."
+                "limits - the signals a limits-only chart misses. The zone "
+                "rules switch themselves off on a chart whose limits move."
             ),
             default_value=True,
         ),
@@ -278,9 +420,10 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
             "exclude_violations",
             "Exclude flagged points from the limits:",
             tooltip=(
-                "Recomputes the limits without the points they flagged. Use "
-                "only when the flagged points have an assigned cause you have "
-                "removed; otherwise it hides the problem."
+                "Recomputes the limits without the points they flagged - the "
+                "trial-limits-then-revised-limits pass every SPC text runs. "
+                "Use only when the flagged points have an assigned cause you "
+                "have removed; otherwise it hides the problem."
             ),
             default_value=False,
         ),
@@ -312,9 +455,10 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
             title="Control Chart",
             parent=parent,
             width=800,
-            height=660,
+            height=680,
         )
         self.series_selector.reload(select_all_series=True)
+        self._refresh_size_columns()
         self._refresh_visibility()
         self.refresh_results()
 
@@ -324,6 +468,7 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
 
     def init_operation_widgets(self) -> None:
         self._doc_link = create_doc_link(self)
+        self._size_column_combo = QComboBox(self)
         self._parameter_form = None
 
     def build_model_selector(self) -> QWidget:
@@ -337,24 +482,88 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
         form.setContentsMargins(0, 0, 0, 0)
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
 
-        self.model_combo.addItems(CONTROL_CHARTS)
-        self.model_combo.setToolTip(_("Choose the control chart."))
+        self.model_combo.addItems(VARIABLES_CHARTS)
+        # A separator, not two combos or a family radio above them: picking a
+        # chart is one decision, and a user who knows they have counts rather
+        # than measurements should not have to say so twice.
+        self.model_combo.insertSeparator(self.model_combo.count())
+        self.model_combo.addItems(ATTRIBUTE_CHARTS)
+        self.model_combo.setToolTip(
+            _("Measurements above the line, counts below it.")
+        )
         form.addRow(_("Chart:"), self.model_combo)
         form.addRow(_("Docs:"), self._doc_link)
 
         layout.addWidget(container)
         return panel
 
+    def build_parameter_selector(self) -> QWidget:
+        """The declared parameters, plus the one that cannot be declared.
+
+        Everything in ``PARAMS`` is built by the base class and shown or
+        hidden per chart by ``visible_for``.  The sample-size column is the
+        exception: its choices are the selected series' own columns, which
+        are not known until a series is picked, so it is an ordinary combo
+        appended to the same form and gated by hand in ``_refresh_visibility``.
+        """
+        widget = super().build_parameter_selector()
+
+        self._size_column_combo.setToolTip(
+            _("The column holding the sample size (units inspected) at each point.")
+        )
+        if self._parameter_form is not None:
+            self._parameter_form.addRow(
+                _("Sample size column:"), self._size_column_combo
+            )
+        return widget
+
+    def connect_common_signals(self) -> None:
+        # Not super(): the base connects selection_changed straight to
+        # refresh_results, but the size-column combo has to be repopulated
+        # from the new selection *before* the results are recomputed.
+        changed = getattr(self.series_selector, "selection_changed", None)
+        if changed is not None:
+            changed.connect(self._on_selection_changed)
+
+    def _on_selection_changed(self, *_args: Any) -> None:
+        self._refresh_size_columns()
+        self.refresh_results()
+
     def connect_operation_signals(self) -> None:
         self.model_combo.currentIndexChanged.connect(self._refresh_visibility)
         self.model_combo.currentIndexChanged.connect(self.refresh_results)
+        self._size_column_combo.currentIndexChanged.connect(self.refresh_results)
 
     def _refresh_visibility(self) -> None:
         form = getattr(self, "_parameter_form_spec", None)
         if form is not None:
             form.refresh_visibility()
-        title, url = CONTROL_DOCS[self._chart()]
+        self.set_row_visible(
+            self._size_column_combo, self._chart() in NEEDS_SIZE_COLUMN
+        )
+        title, url = CONTROL_DOCS.get(self._chart(), ("", ""))
         set_doc_link(self._doc_link, title, url)
+
+    def _refresh_size_columns(self) -> None:
+        """Fill the sample-size combo with the selected series' columns."""
+        wanted = self._size_column_combo.currentText()
+        columns: list[str] = []
+        for row in self.selected_series():
+            result = self._safe_columns(row)
+            if result is None:
+                continue
+            for column in result.columns:
+                if column not in columns:
+                    columns.append(column)
+
+        self._size_column_combo.blockSignals(True)
+        self._size_column_combo.clear()
+        self._size_column_combo.addItems(columns)
+        if wanted in columns:
+            self._size_column_combo.setCurrentText(wanted)
+        elif "n" in columns:
+            self._size_column_combo.setCurrentText("n")
+        self._size_column_combo.blockSignals(False)
 
     def _chart(self) -> str:
         return self.model_combo.currentText() or CHART_INDIVIDUALS
@@ -362,7 +571,7 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
     def refresh_results(self) -> None:
         try:
             results = self.compute_results()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - shown in the results pane
             self._last_results = []
             self.set_results_text(f"Error:\n{exc}")
             return
@@ -373,6 +582,92 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
             if results
             else _("Select one or more source series.")
         )
+
+    # ------------------------------------------------------------------
+    # Input
+    # ------------------------------------------------------------------
+    def _safe_columns(self, row: Any) -> QueryColumns | None:
+        query = str(row_value(row, "sql_query", "query", default="")).strip()
+        if not query:
+            return None
+        try:
+            return self._repo.query_arrays(query)
+        except Exception:  # noqa: BLE001 - a bad query is reported at compute time
+            return None
+
+    @staticmethod
+    def _looks_numeric(values: np.ndarray) -> bool:
+        """True when coercing *values* produces at least one real number.
+
+        The fallback-column heuristic below needs to tell "this column is
+        usable as counts" from "this column is text" without pandas' own
+        dtype introspection (there is no DataFrame here to introspect) - a
+        column that coerces to all-NaN is exactly the text case.
+        """
+        coerced = coerce_numeric_array(values)
+        return bool(coerced.size) and not bool(np.all(np.isnan(coerced)))
+
+    def _series_counts(
+        self, row: Any, name: str, chart: str,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Return ``(x, counts, sizes)`` for one series, aligned and finite.
+
+        Only the attribute charts come through here; the variables charts
+        read x/y through the shared ``series_xy``, which they can because
+        they need no third column. Read through query_arrays rather than
+        query_df: no DataFrame is built for a dialog that only ever wanted
+        two or three plain numeric columns out of it. The one column that
+        might be a timestamp - x - is still handed to numeric_x exactly as
+        it always was, wrapped in a single-column Series rather than a
+        whole frame, because that is real date-parsing logic this is not
+        trying to reimplement.
+        """
+        columns_result = self._safe_columns(row)
+        if columns_result is None or columns_result.empty:
+            raise ValueError("the series query returned no rows")
+
+        roles = parse_roles(row_value(row, "roles", default={}))
+        columns = list(columns_result.columns)
+
+        y_col = str(roles.get("y") or "y")
+        if y_col not in columns:
+            numeric = [c for c in columns if self._looks_numeric(columns_result[c])]
+            y_col = numeric[-1] if numeric else columns[-1]
+        counts = coerce_numeric_array(columns_result[y_col])
+
+        x_col = str(roles.get("x") or "x")
+        x_values = (
+            self.numeric_x(pd.Series(columns_result[x_col]), name)
+            if x_col in columns
+            else np.arange(counts.size, dtype=float)
+        )
+
+        if chart in NEEDS_SIZE_COLUMN:
+            size_col = self._size_column_combo.currentText().strip()
+            size_col = size_col or str(roles.get("n") or roles.get("sample_size") or "")
+            if size_col not in columns:
+                raise ValueError(
+                    "pick the column holding the sample size in the parameters pane"
+                )
+            sizes = coerce_numeric_array(columns_result[size_col])
+        else:
+            sizes = np.ones(counts.size, dtype=float)
+
+        finite = np.isfinite(x_values) & np.isfinite(counts) & np.isfinite(sizes)
+        finite &= sizes > 0
+        x_values, counts, sizes = x_values[finite], counts[finite], sizes[finite]
+        if x_values.size < self.INPUT_MINIMUM_POINTS:
+            raise ValueError(
+                f"only {x_values.size} usable point(s); at least "
+                f"{self.INPUT_MINIMUM_POINTS} are needed"
+            )
+        if np.any(counts < 0):
+            raise ValueError("the count column has negative values")
+        if chart in BINOMIAL and np.any(counts > sizes):
+            raise ValueError("a subgroup has more defectives than its sample size")
+
+        order = np.argsort(x_values, kind="stable")
+        return x_values[order], counts[order], sizes[order]
 
     # ------------------------------------------------------------------
     # Computation
@@ -388,9 +683,19 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
         for row in self.selected_series():
             name = str(row_value(row, "name", "series_name", default="Series"))
             try:
-                x_values, y_values = self.series_xy(row, name)
-                results.append(self._build_chart(name, x_values, y_values, chart, params))
-            except Exception as exc:
+                if chart in ATTRIBUTE_CHARTS:
+                    x_values, counts, sizes = self._series_counts(row, name, chart)
+                    results.append(
+                        self._build_attribute_chart(
+                            name, x_values, counts, sizes, chart, params
+                        )
+                    )
+                else:
+                    x_values, y_values = self.series_xy(row, name)
+                    results.append(
+                        self._build_chart(name, x_values, y_values, chart, params)
+                    )
+            except Exception as exc:  # noqa: BLE001 - collected, then reported
                 errors.append(f"{name}: {exc}")
 
         if errors and not results:
@@ -415,6 +720,134 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
         nearest = max(candidates) if candidates else min(SPC_CONSTANTS)
         return SPC_CONSTANTS[nearest], False
 
+    # -- Attribute family ----------------------------------------------
+
+    def _build_attribute_chart(
+        self,
+        name: str,
+        x_values: np.ndarray,
+        counts: np.ndarray,
+        sizes: np.ndarray,
+        chart: str,
+        params: Mapping[str, Any],
+    ) -> ControlChartResult:
+        sigma_limit = float(params.get("sigma_limit", 3.0))
+        use_nelson = bool(params.get("nelson", True))
+
+        statistic, center, upper_band, lower_band, meta = attribute_limits(
+            chart, counts, sizes, sigma_limit
+        )
+        sigma_band = self._sigma_from_limits(upper_band, center, sigma_limit)
+        violations = self._find_violations(
+            statistic, x_values, center, sigma_band, upper_band, lower_band, use_nelson
+        )
+
+        if bool(params.get("exclude_violations", False)) and violations:
+            keep = np.ones(statistic.size, dtype=bool)
+            keep[[violation.index for violation in violations]] = False
+            if int(keep.sum()) >= 3:
+                # Trial limits, then revised limits - the second pass every
+                # SPC text runs once an assignable cause has been removed.
+                _kept, center, upper_kept, lower_kept, meta = attribute_limits(
+                    chart, counts[keep], sizes[keep], sigma_limit
+                )
+                # The revised centre is recomputed from the kept points, but
+                # the band is still drawn against every point's own sample
+                # size, so it has to be rebuilt at full length rather than
+                # carried over from the shorter pass.
+                upper_band, lower_band = self._rebuild_attribute_band(
+                    chart, center, sizes, sigma_limit
+                )
+                del upper_kept, lower_kept
+                sigma_band = self._sigma_from_limits(upper_band, center, sigma_limit)
+                meta["excluded"] = int(statistic.size - keep.sum())
+                violations = self._find_violations(
+                    statistic, x_values, center, sigma_band, upper_band, lower_band,
+                    use_nelson,
+                )
+            else:
+                applogger.warning(
+                    f"{name}: too few points would remain after excluding the "
+                    f"flagged ones; the limits use every point.",
+                    show_dialog=False,
+                    raise_error=False,
+                )
+
+        if x_values.size < RECOMMENDED_SUBGROUPS:
+            meta["note"] = (
+                f"only {x_values.size} subgroups; "
+                f"{RECOMMENDED_SUBGROUPS}+ give trustworthy limits"
+            )
+        if chart in NEEDS_SIZE_COLUMN:
+            meta["mean sample size"] = float(np.mean(sizes))
+            if float(sizes.min()) != float(sizes.max()):
+                meta["limits"] = "vary with the sample size"
+
+        return ControlChartResult(
+            source_name=name,
+            result_name=f"{name} - {chart.split(' ')[0]}",
+            chart=chart,
+            x=x_values,
+            y=statistic,
+            center=center,
+            upper=float(np.mean(upper_band)),
+            lower=float(np.mean(lower_band)),
+            sigma=float(np.mean(sigma_band)),
+            upper_band=upper_band,
+            lower_band=lower_band,
+            sigma_band=sigma_band,
+            subgroup_size=1,
+            violations=violations,
+            metadata=meta,
+        )
+
+    @staticmethod
+    def _rebuild_attribute_band(
+        chart: str, center: float, sizes: np.ndarray, sigma_limit: float,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """The band around a revised centre, at every point's own sample size."""
+        if chart in (CHART_P,):
+            spread = sigma_limit * np.sqrt(
+                np.divide(
+                    center * (1.0 - center), sizes,
+                    out=np.zeros_like(sizes), where=sizes > 0,
+                )
+            )
+        elif chart == CHART_U:
+            spread = sigma_limit * np.sqrt(
+                np.divide(center, sizes, out=np.zeros_like(sizes), where=sizes > 0)
+            )
+        elif chart == CHART_NP:
+            n = float(np.mean(sizes)) if sizes.size else 0.0
+            p = center / n if n else 0.0
+            spread = np.full(
+                sizes.size, sigma_limit * np.sqrt(max(n * p * (1.0 - p), 0.0))
+            )
+        else:  # CHART_C
+            spread = np.full(sizes.size, sigma_limit * np.sqrt(max(center, 0.0)))
+
+        upper = center + spread
+        lower = np.clip(center - spread, 0.0, None)
+        if chart == CHART_P:
+            upper = np.clip(upper, None, 1.0)
+        return upper, lower
+
+    @staticmethod
+    def _sigma_from_limits(
+        upper: np.ndarray, center: float, sigma_limit: float,
+    ) -> np.ndarray:
+        """Back out the per-point sigma the band was drawn at.
+
+        The attribute formulas produce a band directly rather than a sigma,
+        but the zone lines and the zone rules are both phrased in sigma, so
+        it is recovered here rather than special-cased in four places.
+        """
+        if sigma_limit <= 0:
+            return np.zeros_like(upper)
+        return (np.asarray(upper, dtype=float) - center) / sigma_limit
+
+    # -- Variables family ----------------------------------------------
+
     def _build_chart(
         self,
         name: str,
@@ -434,9 +867,12 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
             built = self._individuals_chart(x_values, y_values, sigma_limit)
 
         plot_x, plot_y, center, upper, lower, sigma, subgroup, meta = built
+        upper_band = np.full(plot_y.size, upper)
+        lower_band = np.full(plot_y.size, lower)
+        sigma_band = np.full(plot_y.size, sigma)
 
         violations = self._find_violations(
-            plot_y, plot_x, center, sigma, upper, lower, use_nelson
+            plot_y, plot_x, center, sigma_band, upper_band, lower_band, use_nelson
         )
 
         if bool(params.get("exclude_violations", False)) and violations:
@@ -456,9 +892,12 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
                     center, upper, lower, sigma = self._limits_from_individuals(
                         sub_y, sigma_limit
                     )
+                upper_band = np.full(plot_y.size, upper)
+                lower_band = np.full(plot_y.size, lower)
+                sigma_band = np.full(plot_y.size, sigma)
                 meta["excluded"] = int(plot_y.size - keep.sum())
                 violations = self._find_violations(
-                    plot_y, plot_x, center, sigma, upper, lower, use_nelson
+                    plot_y, plot_x, center, sigma_band, upper_band, lower_band, use_nelson
                 )
             else:
                 applogger.warning(
@@ -478,6 +917,9 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
             upper=upper,
             lower=lower,
             sigma=sigma,
+            upper_band=upper_band,
+            lower_band=lower_band,
+            sigma_band=sigma_band,
             subgroup_size=subgroup,
             violations=violations,
             metadata=meta,
@@ -647,9 +1089,9 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
         values: np.ndarray,
         positions: np.ndarray,
         center: float,
-        sigma: float,
-        upper: float,
-        lower: float,
+        sigma: np.ndarray,
+        upper: np.ndarray,
+        lower: np.ndarray,
         use_nelson: bool,
     ) -> list[Violation]:
         """Return every rule broken, most fundamental first.
@@ -659,6 +1101,15 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
         chart more than an outlier test, and also why a chart of a stable
         process still shows the occasional flag: eight rules each with a
         false-alarm rate compound.
+
+        Which of them are *legal* depends on the chart. Rules 2-4 read only
+        the values and the centre line, so they hold on any chart. Rules 5-8
+        are phrased in equal-width one- and two-sigma zones, which a chart
+        whose sigma moves point to point - a p or u chart on an uneven sample
+        size - does not have; applying them there would invent a zone
+        boundary per point and flag patterns that mean nothing. So they are
+        skipped exactly when sigma is not constant, which is also why sigma
+        is carried as an array rather than a scalar.
         """
         found: list[Violation] = []
         size = values.size
@@ -678,7 +1129,7 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
         for index in np.flatnonzero((values > upper) | (values < lower)):
             flag(index, 1, "beyond the control limits")
 
-        if not use_nelson or sigma <= 0.0:
+        if not use_nelson or not sigma.size or float(np.max(sigma)) <= 0.0:
             return self._deduplicate(found)
 
         above = values > center
@@ -705,17 +1156,22 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
                 if window.size == 13 and np.all(window[:-1] * window[1:] < 0):
                     flag(start + 13, 4, "fourteen alternating up and down")
 
+        # Rules 5-8 need equal-width zones; see the docstring.
+        if float(np.ptp(sigma)) > 0.0:
+            return self._deduplicate(found)
+        constant_sigma = float(sigma[0])
+
         # Rule 5: two of three beyond two sigma, same side.
-        two_sigma_up = center + 2.0 * sigma
-        two_sigma_down = center - 2.0 * sigma
+        two_sigma_up = center + 2.0 * constant_sigma
+        two_sigma_down = center - 2.0 * constant_sigma
         for start in range(size - 2):
             window = values[start : start + 3]
             if (window > two_sigma_up).sum() >= 2 or (window < two_sigma_down).sum() >= 2:
                 flag(start + 2, 5, "two of three beyond two sigma on one side")
 
         # Rule 6: four of five beyond one sigma, same side.
-        one_sigma_up = center + sigma
-        one_sigma_down = center - sigma
+        one_sigma_up = center + constant_sigma
+        one_sigma_down = center - constant_sigma
         for start in range(size - 4):
             window = values[start : start + 5]
             if (window > one_sigma_up).sum() >= 4 or (window < one_sigma_down).sum() >= 4:
@@ -820,7 +1276,9 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
 
         Order matters to the drawing: the reference lines go first so the data
         is drawn over them, and the flagged points go last so they sit on top
-        of everything.
+        of everything. On a p or u chart the limit columns step from point to
+        point rather than being flat, which is the honest picture of a band
+        that really does move with the sample size.
         """
         params = self.parameter_values()
         specs: list[ResultSeriesSpec] = []
@@ -910,23 +1368,45 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
 
         sections: list[str] = []
         for result in results:
-            summary = report_html.summary_table(
-                (
-                    (_("Chart"), result.chart),
-                    (_("Points plotted"), result.y.size),
-                    (_("Subgroup size"), result.subgroup_size),
-                    (_("Centre line"), report_html.format_number(result.center)),
-                    (_("Upper control limit"), report_html.format_number(result.upper)),
-                    (_("Lower control limit"), report_html.format_number(result.lower)),
-                    (_("Sigma estimate"), report_html.format_number(result.sigma)),
-                    (_("Estimator"), result.metadata.get("estimator", "")),
-                )
-                + tuple(
-                    (key, value)
-                    for key, value in result.metadata.items()
-                    if key != "estimator"
-                )
+            varies = result.limits_vary
+            summary_rows: list[tuple[str, Any]] = [
+                (_("Chart"), result.chart),
+                (_("Points plotted"), result.y.size),
+            ]
+            if result.chart not in ATTRIBUTE_CHARTS:
+                summary_rows.append((_("Subgroup size"), result.subgroup_size))
+            summary_rows.append(
+                (_("Centre line"), report_html.format_number(result.center))
             )
+            summary_rows += [
+                (
+                    _("Mean upper limit") if varies else _("Upper control limit"),
+                    report_html.format_number(result.upper),
+                ),
+                (
+                    _("Mean lower limit") if varies else _("Lower control limit"),
+                    report_html.format_number(result.lower),
+                ),
+                (_("Sigma estimate"), report_html.format_number(result.sigma)),
+                (_("Estimator"), result.metadata.get("estimator", "")),
+            ]
+            summary_rows += [
+                (str(key), report_html.format_number(value)
+                 if isinstance(value, float) else value)
+                for key, value in result.metadata.items()
+                if key != "estimator"
+            ]
+            summary = report_html.summary_table(summary_rows)
+
+            if varies:
+                zones = report_html.note(
+                    _(
+                        "The limits move with the sample size, so the zone "
+                        "rules (Nelson 5-8) do not apply and were not run."
+                    )
+                )
+            else:
+                zones = ""
 
             if result.violations:
                 table = report_html.table(
@@ -960,7 +1440,7 @@ class SeriesControlChartDialog(SeriesOperationDialogBase):
                 )
 
             sections.append(
-                report_html.section(result.source_name, summary, verdict, table)
+                report_html.section(result.source_name, summary, zones, verdict, table)
             )
 
         return report_html.document(_("Control Chart"), self._chart(), *sections)

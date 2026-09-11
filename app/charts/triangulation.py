@@ -35,13 +35,14 @@ from app.charts.base import (
     pick,
 )
 from app.charts.grids import finite_xyz
+from app.data.series_frame import SeriesFrame
 from app.logs.logger import applogger
 
 #: The fewest points a triangulation can be built from.
 _MIN_TRIANGULATION_POINTS: int = 3
 
 
-def _finite_xy(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+def _finite_xy(df: SeriesFrame) -> tuple[np.ndarray, np.ndarray]:
     """Return x and y as float arrays with the non-finite rows removed.
 
     ``grids.finite_xyz`` without the z, for the one renderer here that has

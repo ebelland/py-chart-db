@@ -1,4 +1,4 @@
-"""Every way data reaches Data Hub, independent of any dialog.
+"""Every way data reaches ChartLibre, independent of any dialog.
 
 A source is read the same way whether it is being previewed live in the
 import dialog or replayed headlessly by a saved link's "Update link" - so the
@@ -28,7 +28,9 @@ import csv
 import json
 import os
 import sqlite3
+import ssl
 import tempfile
+import urllib.error
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -40,6 +42,7 @@ from urllib.parse import urlparse
 
 import pandas as pd
 
+from app import APP_NAME, APP_VERSION
 from app.logs.logger import applogger
 
 # -----------------------------------------------------------------------------
@@ -285,6 +288,34 @@ def read_sqlite_table(
     return df.reset_index(drop=True)
 
 
+def read_sqlite_query(
+    path: str,
+    sql: str,
+    *,
+    skiprows: int = 0,
+    skipfooter: int = 0,
+) -> pd.DataFrame:
+    """Read the result of *sql* against another SQLite database.
+
+    ``read_sqlite_table``'s counterpart for someone who wants a join, a
+    filter or an aggregate rather than a whole table - the connect dialog's
+    "Use a query" option. Whatever *sql* does is on the person who typed it,
+    same as any other SQL box in this application; nothing here restricts it
+    beyond running it read-only would already restrict a SELECT.
+    """
+    conn = sqlite3.connect(str(path))
+    try:
+        df = pd.read_sql_query(sql, conn)
+    finally:
+        conn.close()
+
+    if skiprows:
+        df = df.iloc[int(skiprows) :]
+    if skipfooter:
+        df = df.iloc[: max(0, len(df) - int(skipfooter))]
+    return df.reset_index(drop=True)
+
+
 # -----------------------------------------------------------------------------
 # A server database: PostgreSQL or MySQL
 # -----------------------------------------------------------------------------
@@ -486,6 +517,35 @@ def read_postgres_table(
     return df.reset_index(drop=True)
 
 
+def read_postgres_query(
+    conn: DatabaseConnection,
+    sql: str,
+    *,
+    skiprows: int = 0,
+    skipfooter: int = 0,
+) -> pd.DataFrame:
+    """Read the result of *sql* against a PostgreSQL database."""
+    import pg8000.dbapi
+
+    connection = pg8000.dbapi.connect(
+        host=conn.host,
+        port=int(conn.port),
+        database=conn.database,
+        user=conn.username,
+        password=conn.password,
+    )
+    try:
+        df = pd.read_sql_query(sql, connection)
+    finally:
+        connection.close()
+
+    if skiprows:
+        df = df.iloc[int(skiprows) :]
+    if skipfooter:
+        df = df.iloc[: max(0, len(df) - int(skipfooter))]
+    return df.reset_index(drop=True)
+
+
 def list_mysql_tables(conn: DatabaseConnection) -> list[str]:
     """Return the base tables in *conn*'s database."""
     import pymysql
@@ -534,6 +594,35 @@ def read_mysql_table(
     return df.reset_index(drop=True)
 
 
+def read_mysql_query(
+    conn: DatabaseConnection,
+    sql: str,
+    *,
+    skiprows: int = 0,
+    skipfooter: int = 0,
+) -> pd.DataFrame:
+    """Read the result of *sql* against a MySQL database."""
+    import pymysql
+
+    connection = pymysql.connect(
+        host=conn.host,
+        port=int(conn.port),
+        database=conn.database,
+        user=conn.username,
+        password=conn.password,
+    )
+    try:
+        df = pd.read_sql_query(sql, connection)
+    finally:
+        connection.close()
+
+    if skiprows:
+        df = df.iloc[int(skiprows) :]
+    if skipfooter:
+        df = df.iloc[: max(0, len(df) - int(skipfooter))]
+    return df.reset_index(drop=True)
+
+
 #: kind -> (list_tables(conn), read_table(conn, table, **kwargs)), one shape
 #: for every engine so a caller need not name sqlite/postgres/mysql one at a
 #: time - read_sqlite_table alone keeps the plain-path signature that
@@ -546,6 +635,18 @@ SERVER_DATABASE_READERS: dict[str, tuple] = {
     ),
     "postgres": (list_postgres_tables, read_postgres_table),
     "mysql": (list_mysql_tables, read_mysql_table),
+}
+
+#: kind -> read_query(conn, sql, **kwargs) - the connect dialog's "Use a
+#: query" option, one table read replaced with whatever SQL the user typed.
+#: Kept separate from SERVER_DATABASE_READERS rather than folded into it:
+#: that dict's second element already means "read *one named table*", and a
+#: third element nobody but this feature would read is a worse cost than a
+#: second small dict.
+SERVER_DATABASE_QUERY_READERS: dict[str, Callable[..., pd.DataFrame]] = {
+    "sqlite": lambda conn, sql, **kwargs: read_sqlite_query(conn.path, sql, **kwargs),
+    "postgres": read_postgres_query,
+    "mysql": read_mysql_query,
 }
 
 #: kind -> list_databases(conn), for the engines that have more than one.
@@ -589,9 +690,17 @@ _CONTENT_TYPE_EXTENSIONS: dict[str, str] = {
 
 #: The curated quick-pick catalogue, as a JSON array of {name, url, category,
 #: description} - a plain data file rather than Python so that adding or
-#: retiring an entry never touches code, and so a future settings screen
-#: could let a user edit it without shipping a new build.
+#: retiring an entry never touches code. A user's own entries (see
+#: add_user_web_source) go in user.json instead, alongside every other
+#: setting the application writes while it runs - this file is bundled,
+#: versioned and never touched at runtime.
 WEB_SOURCES_PATH: Path = Path(__file__).resolve().parents[1] / "data" / "web_sources.json"
+
+#: The category a user's own added sources are grouped under in the menu.
+#: Not translated, for the same reason a bundled entry's category is not
+#: (see the addSection() call in import_data_dialog.py): every category here
+#: is treated as data, not source text.
+USER_WEB_SOURCE_CATEGORY: str = "My sources"
 
 
 @dataclass(frozen=True, slots=True)
@@ -601,20 +710,27 @@ class WebDataSource:
     A name and a direct URL, nothing else is fetched or negotiated: every
     entry here is a plain file - CSV, JSON - the same read_web_url() any
     typed-in URL goes through handles once it has been downloaded.
+
+    ``custom`` marks a source the user added themselves through the import
+    dialog's "Add source" button, as opposed to one bundled in
+    web_sources.json - the distinction "Delete source" needs, since only a
+    user's own entry can be removed.
     """
 
     name: str
     url: str
     category: str
     description: str
+    custom: bool = False
 
 
 @lru_cache(maxsize=1)
-def load_web_data_sources() -> tuple[WebDataSource, ...]:
-    """Return the curated web-source catalogue, read from web_sources.json.
+def _bundled_web_data_sources() -> tuple[WebDataSource, ...]:
+    """The curated catalogue shipped in web_sources.json.
 
-    Cached: the catalogue is bundled, read-only data, not something that
-    changes while the process is running.
+    Cached: this half of the catalogue is bundled, read-only data, not
+    something that changes while the process is running - unlike
+    ``user_web_data_sources``, which has to read user.json fresh every call.
     """
     raw = json.loads(WEB_SOURCES_PATH.read_text(encoding="utf-8"))
     return tuple(
@@ -626,6 +742,82 @@ def load_web_data_sources() -> tuple[WebDataSource, ...]:
         )
         for entry in raw
     )
+
+
+def user_web_data_sources() -> tuple[WebDataSource, ...]:
+    """The sources this user added themselves, from user.json."""
+    from app.utils.config import get_user_web_sources
+
+    return tuple(
+        WebDataSource(
+            name=str(entry.get("name") or ""),
+            url=str(entry.get("url") or ""),
+            category=USER_WEB_SOURCE_CATEGORY,
+            description=str(entry.get("description") or ""),
+            custom=True,
+        )
+        for entry in get_user_web_sources()
+        if entry.get("name") and entry.get("url")
+    )
+
+
+def load_web_data_sources() -> tuple[WebDataSource, ...]:
+    """Return the full "Web source" catalogue: bundled, then the user's own.
+
+    Deliberately not cached as one tuple, unlike the old version of this
+    function: the bundled half never changes while the process runs, but the
+    user's own half does, every time Add or Delete Source is used, and a
+    stale cache here would mean the menu could only ever catch up after a
+    restart.
+    """
+    return _bundled_web_data_sources() + user_web_data_sources()
+
+
+def add_user_web_source(name: str, url: str, description: str = "") -> WebDataSource:
+    """Add one entry to the user's own web-source catalogue.
+
+    A name that already names one of the user's own entries is replaced
+    rather than duplicated - editing one is "add it again under the same
+    name", not a separate rename flow. A name that collides with a *bundled*
+    entry is still added: it shadows the bundled one in the menu (the same
+    name now points at the URL just typed), which is the more useful of the
+    two surprising outcomes for someone who typed a name without checking.
+    """
+    from app.utils.config import get_user_web_sources, set_user_web_sources
+
+    name = name.strip()
+    url = url.strip()
+    description = description.strip()
+    entries = [
+        entry for entry in get_user_web_sources() if str(entry.get("name") or "") != name
+    ]
+    entries.append({"name": name, "url": url, "description": description})
+    set_user_web_sources(entries)
+    return WebDataSource(
+        name=name,
+        url=url,
+        category=USER_WEB_SOURCE_CATEGORY,
+        description=description,
+        custom=True,
+    )
+
+
+def remove_user_web_source(name: str) -> bool:
+    """Remove *name* from the user's own catalogue. True if it was there.
+
+    Only ever looks at the user's own entries - a bundled source is not a
+    valid argument here, and silently doing nothing to one is the right
+    answer for a caller that already checked ``.custom`` before offering
+    Delete in the first place.
+    """
+    from app.utils.config import get_user_web_sources, set_user_web_sources
+
+    entries = get_user_web_sources()
+    kept = [entry for entry in entries if str(entry.get("name") or "") != name]
+    if len(kept) == len(entries):
+        return False
+    set_user_web_sources(kept)
+    return True
 
 
 def is_valid_web_url(url: str) -> bool:
@@ -652,6 +844,27 @@ def filename_from_url(url: str) -> str:
     return name or "web_data"
 
 
+@lru_cache(maxsize=1)
+def _web_fetch_ssl_context() -> ssl.SSLContext | None:
+    """An SSL context built from certifi's CA bundle, if it is installed.
+
+    ``ssl.create_default_context()`` with no ``cafile`` reads the
+    interpreter's *own* trust store - on a python.org macOS build that is
+    empty until "Install Certificates.command" has been run once, and every
+    fetch until then fails with ``CERTIFICATE_VERIFY_FAILED``, which reads
+    exactly like a network problem and is not one. certifi ships a CA
+    bundle that does not depend on the interpreter or the OS being wired up
+    to a trust store, so it is preferred when present. ``None`` (certifi
+    not installed) falls back to ``urlopen``'s own default context,
+    unchanged from before this existed.
+    """
+    try:
+        import certifi
+    except ImportError:
+        return None
+    return ssl.create_default_context(cafile=certifi.where())
+
+
 def read_web_url(
     url: str,
     *,
@@ -673,8 +886,35 @@ def read_web_url(
     if not is_valid_web_url(url):
         raise ValueError(f"Not an http(s) URL: {url}")
 
-    request = urllib.request.Request(url, headers={"User-Agent": "Data Hub/1.0"})
-    with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
+    request = urllib.request.Request(
+        url, headers={"User-Agent": f"{APP_NAME}/{APP_VERSION}"}
+    )
+    try:
+        response = urllib.request.urlopen(  # noqa: S310
+            request, timeout=timeout, context=_web_fetch_ssl_context()
+        )
+    except urllib.error.URLError as exc:
+        if isinstance(exc.reason, ssl.SSLCertVerificationError):
+            raise ValueError(
+                "The server's TLS certificate could not be verified. This "
+                "usually means a corporate proxy or firewall is inspecting "
+                "HTTPS traffic with its own certificate - ask whoever "
+                "manages that network for its CA certificate, or try a "
+                "different network; it is not something this fetch can "
+                "work around on its own."
+            ) from exc
+        raise
+    except ssl.SSLCertVerificationError as exc:
+        raise ValueError(
+            "The server's TLS certificate could not be verified. This "
+            "usually means a corporate proxy or firewall is inspecting "
+            "HTTPS traffic with its own certificate - ask whoever manages "
+            "that network for its CA certificate, or try a different "
+            "network; it is not something this fetch can work around on "
+            "its own."
+        ) from exc
+
+    with response:
         content_type = response.headers.get_content_type()
         data = response.read(WEB_FETCH_MAX_BYTES + 1)
 
@@ -773,7 +1013,8 @@ def read_from_link_source(
 
     if kind in SERVER_DATABASE_READERS:
         table = str(source.get("table") or "")
-        if not table:
+        query = str(source.get("query") or "")
+        if not table and not query:
             raise ValueError("Missing source table")
 
         if kind == "sqlite":
@@ -789,6 +1030,10 @@ def read_from_link_source(
                 username=str(source.get("username") or ""),
                 password=password,
             )
+
+        if query:
+            read_query = SERVER_DATABASE_QUERY_READERS[kind]
+            return read_query(conn, query, skiprows=skiprows, skipfooter=skip_last)
 
         _list_tables, read_table = SERVER_DATABASE_READERS[kind]
         return read_table(conn, table, skiprows=skiprows, skipfooter=skip_last)

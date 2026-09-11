@@ -29,6 +29,7 @@ import pandas as pd
 
 from app.charts.base import BaseAxisRenderer, SeriesData
 from app.charts.scatter import ScatterAxisRenderer
+from app.data.series_frame import SeriesFrame
 from app.logs.logger import applogger
 
 #: The options every renderer here understands, borrowed rather than retyped.
@@ -41,7 +42,7 @@ _SHARED_KWARGS: dict[str, object] = {
 }
 
 
-def _numeric(frame: pd.DataFrame, column: str) -> np.ndarray:
+def _numeric(frame: SeriesFrame, column: str) -> np.ndarray:
     """Return one column as floats, with unparseable entries as NaN."""
     return pd.to_numeric(frame[column], errors="coerce").to_numpy(dtype=float)
 

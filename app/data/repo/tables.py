@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+from dataclasses import dataclass, field
 from typing import Any, Literal, Mapping, Sequence
 
 import numpy as np
@@ -21,6 +22,7 @@ import pandas as pd
 from pandas._typing import DtypeArg
 
 import app.data.descriptors
+from app import APP_NAME
 from app.data.data_source import DataSource
 from app.data.repo._common import (
     _RETURNS_ROWS_RE,
@@ -32,6 +34,61 @@ from app.data.repo._common import (
     is_read_only_select,
 )
 from app.logs.logger import applogger
+
+
+def coerce_numeric_array(values: Sequence[Any]) -> np.ndarray:
+    """A float64 array, NaN for anything that will not parse.
+
+    The same rule ``pd.to_numeric(series, errors="coerce")`` applies, on the
+    raw Python values sqlite3 already returns (int/float/str/None/bytes) -
+    written by hand because pulling in a whole Series for one column is the
+    overhead :func:`SqliteRepo.query_arrays` exists to skip.
+    """
+    out = np.empty(len(values), dtype=np.float64)
+    for index, value in enumerate(values):
+        if value is None:
+            out[index] = np.nan
+            continue
+        try:
+            out[index] = float(value)
+        except (TypeError, ValueError):
+            out[index] = np.nan
+    return out
+
+
+@dataclass(slots=True)
+class QueryColumns:
+    """A query's columns as plain arrays - no ``pandas.DataFrame`` involved.
+
+    Built by :func:`SqliteRepo.query_arrays`. Deliberately minimal: a column
+    name list plus a name -> array mapping, because the callers this exists
+    for (an operation reading two or three numeric columns, a combo listing
+    a query's column names) never wanted a DataFrame's Index, block manager
+    or per-column dtype boxing - they wanted ``.to_numpy()``, which is what
+    ``query_df(...).to_numpy()`` cost a full DataFrame to produce and throw
+    away again a line later.
+    """
+
+    columns: tuple[str, ...]
+    _data: dict[str, np.ndarray] = field(default_factory=dict)
+
+    @property
+    def empty(self) -> bool:
+        return len(self) == 0
+
+    def __len__(self) -> int:
+        if not self._data:
+            return 0
+        return len(next(iter(self._data.values())))
+
+    def __contains__(self, column: object) -> bool:
+        return column in self._data
+
+    def __getitem__(self, column: str) -> np.ndarray:
+        return self._data[column]
+
+    def get(self, column: str, default: np.ndarray | None = None) -> np.ndarray | None:
+        return self._data.get(column, default)
 
 
 class TablesMixin:
@@ -378,6 +435,63 @@ class TablesMixin:
         else:
             self._con.execute(sql_text, params or ())
             return pd.DataFrame()
+
+    @ensure_connection_wrapper
+    def query_arrays(
+        self,
+        sql: str,
+        params: tuple[Any, ...] | None = None,
+        *,
+        numeric: Sequence[str] = (),
+    ) -> QueryColumns:
+        """Like :meth:`query_df`, but never builds a ``pandas.DataFrame``.
+
+        For a caller that only ever wanted ``.to_numpy()`` from what
+        ``query_df`` gave it - a series operation reading two or three plain
+        numeric columns, a column-name picker that does not touch the data
+        at all - this reads straight from the DB-API cursor's
+        ``fetchall()``/``description`` instead.
+
+        ``numeric`` names the columns to coerce to float64 (NaN where a
+        value will not parse, matching ``pd.to_numeric(errors="coerce")``);
+        every other column keeps sqlite3's own returned values, boxed in an
+        object array exactly as a raw fetch already holds them. Nothing
+        here understands dates the way :func:`app.utils.coercion.coerce_axis`
+        does - an x role that might be a timestamp still belongs on
+        ``query_df``, not here.
+        """
+        sql_text = (sql or "").strip()
+        if not sql_text or self._con is None:
+            return QueryColumns((), {})
+
+        if not _RETURNS_ROWS_RE.match(sql_text):
+            # A DDL/DML statement: query_df runs it for its effect and
+            # returns empty rather than skipping it, and this has to match -
+            # an early return here before execute() would silently drop
+            # every DELETE/UPDATE/CREATE a caller sent through this method.
+            self._con.execute(sql_text, params or ())
+            return QueryColumns((), {})
+
+        cursor = self._con.execute(sql_text, params or ())
+        names = tuple(str(d[0]) for d in cursor.description or ())
+        rows = cursor.fetchall()
+
+        numeric_set = set(numeric)
+        if not rows:
+            empty_dtype = lambda name: np.float64 if name in numeric_set else object  # noqa: E731
+            return QueryColumns(
+                names, {name: np.array([], dtype=empty_dtype(name)) for name in names}
+            )
+
+        by_column = list(zip(*rows))  # transpose: rows of tuples -> one tuple per column
+        data: dict[str, np.ndarray] = {}
+        for name, values in zip(names, by_column):
+            data[name] = (
+                coerce_numeric_array(values)
+                if name in numeric_set
+                else np.array(values, dtype=object)
+            )
+        return QueryColumns(names, data)
 
     # =====================================================================
     # DataFrame import
@@ -1180,7 +1294,9 @@ class TablesMixin:
         if column_name.lower() == "rowid":
             applogger.error("Cannot delete rowid.")
         if column_name == "Hide":
-            applogger.error("Column 'Hide' is managed by Data Hub and cannot be deleted.")
+            applogger.error(
+                "Column 'Hide' is managed by %s and cannot be deleted.", APP_NAME
+            )
 
         # A dropped column takes its data with it and SQLite has no way back,
         # which is what makes this worth a snapshot of the whole table.

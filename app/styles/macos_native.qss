@@ -1,5 +1,5 @@
 /* ==========================================================
-   macOS Native – Data Hub
+   macOS Native – ChartLibre
    Patched: pt-based typography (was mixing px with the Windows
    file), subtle native-style row hover, explicit selection
    color via palette tokens, message box width, ChartPanel
@@ -779,117 +779,46 @@ HtmlResultsView#chartNotesView {
    SeriesOperationWidget
    ========================================================== */
 
-/* Command rows */
+/* ----------------------------------------------------------
+   Operation tile (sectioned grid)
+   Every operation - Plot included - is one of these: a bordered
+   square with hover and keyboard-focus states, not a border-left
+   accent stripe, since a tile has no long edge for a stripe to
+   read as "this one" against.
+   ---------------------------------------------------------- */
 
-QFrame#operationRow {
-    background: transparent;
-    border: none;
+QFrame#operationTile {
+    background: rgba(@SHADOW_RGB@, 0.02);
+    border: 1px solid rgba(@SHADOW_RGB@, 0.08);
     border-radius: 8px;
 }
 
-/* Fluent hover */
-
-QFrame#operationRow:hover {
-    background: rgba(@SHADOW_RGB@, 0.045);
+QFrame#operationTile:hover {
+    background: rgba(@SHADOW_RGB@, 0.06);
+    border-color: rgba(@ACCENT_RGB@, 0.35);
 }
 
-/* Pressed */
-
-QFrame#operationRow:pressed {
-    background: rgba(@SHADOW_RGB@, 0.08);
-}
-
-/* Keyboard focus */
-
-QFrame#operationRow:focus {
-    background: rgba(@ACCENT_RGB@, 0.05);
-    border-left: 3px solid palette(highlight);
-}
-
-/* ----------------------------------------------------------
-   Section headers
-   Styled once already, up in "Typography roles" (11pt,
-   palette(mid), same uppercase/letter-spacing treatment). This
-   block used to redeclare the selector at 9pt with a hardcoded
-   rgba() grey copied straight from fluent_win11.qss - a size no
-   other caption in this file uses, and a colour that doesn't
-   track the palette the way palette(mid) does. Removed rather
-   than "converted": the earlier rule already renders this label
-   correctly, so a second definition only risked drifting out of
-   sync with it again.
-   ---------------------------------------------------------- */
-
-/* ----------------------------------------------------------
-   Command title
-   HIG list rows keep the primary label at body size in the
-   normal text colour; only the selection state (below) gets an
-   accent tint. palette(highlight) here was copied from the
-   Windows sheet's identical block without updating it - Windows
-   uses palette(window-text) - so every row title rendered in the
-   accent blue, permanently, like a hyperlink. That is the "not
-   very macOS" look: fixed to plain text colour at the file's
-   13pt body size instead of the Fluent list's denser 10pt.
-   ---------------------------------------------------------- */
-
-QLabel[operationTitle="true"] {
-
-    font-size: 13pt;
-
-    font-weight: 600;
-
-    color: palette(text);
-
-    background: transparent;
-}
-
-/* ----------------------------------------------------------
-   Description
-   Same copy-paste issue as the title: a hardcoded rgba() grey
-   and a 9pt size, instead of the palette(mid) + 11pt caption
-   convention every other secondary label in this file uses.
-   ---------------------------------------------------------- */
-
-QLabel[operationDescription="true"] {
-
-    background: transparent;
-
-    color: palette(mid);
-
-    font-size: 11pt;
-}
-
-/* ----------------------------------------------------------
-   Operation Icon
-   ---------------------------------------------------------- */
-
-QLabel#operationIcon {
-
-    min-width: 20px;
-    max-width: 20px;
-
-    min-height: 20px;
-    max-height: 20px;
-
-    background: transparent;
-}
-
-/* ----------------------------------------------------------
-   Compact row variant
-   ---------------------------------------------------------- */
-
-QFrame#operationRow[compact="true"] {
-
-    border-radius: 6px;
-}
-
-/* ----------------------------------------------------------
-   Selected operation
-   ---------------------------------------------------------- */
-
-QFrame#operationRow[selected="true"] {
-
+QFrame#operationTile:focus {
     background: rgba(@ACCENT_RGB@, 0.08);
+    border-color: palette(highlight);
+}
 
-    border-left: 3px solid palette(highlight);
+QLabel[operationTileTitle="true"] {
+    font-size: 10.5pt;
+    font-weight: 600;
+    color: palette(text);
+    background: transparent;
+}
+
+/* ----------------------------------------------------------
+   Operation hint bar
+   Fixed at the panel's bottom, outside the scroll area - see
+   SeriesOperationWidget. A hairline top border marks it as its
+   own strip rather than the last section bleeding into it.
+   ---------------------------------------------------------- */
+
+QLabel#operationHint {
+    border-top: 1px solid rgba(@SHADOW_RGB@, 0.08);
+    padding: 8px 10px;
 }
 `

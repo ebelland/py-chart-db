@@ -119,6 +119,42 @@ def test_a_first_run_keeps_a_database_that_is_already_there(
         reopened.close()
 
 
+def test_a_first_run_finds_the_database_left_by_the_old_name(
+    no_dialogs, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The application was renamed; the file in someone's home was not.
+
+    Same promise as the test above - a reset config.json returns the user to
+    their work - which the rename would otherwise have broken quietly, by
+    creating an empty ChartLibre.dhub beside a Data Hub.dhub full of tables.
+    """
+    legacy = tmp_path / startup.LEGACY_DEFAULT_DATABASE_NAME
+    repo = SqliteRepo(db_path=legacy)
+    repo.import_dataframe(
+        __import__("pandas").DataFrame({"a": [1, 2, 3]}), table_name="kept"
+    )
+    repo.close()
+
+    monkeypatch.setattr(startup, "get_last_database", lambda: "")
+    monkeypatch.setattr(startup.Path, "home", staticmethod(lambda: tmp_path))
+
+    assert startup.select_database() == legacy
+    assert not (tmp_path / startup.DEFAULT_DATABASE_NAME).exists()
+
+
+def test_the_new_name_wins_once_it_exists(
+    no_dialogs, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The fallback is for the rename, not a permanent preference."""
+    for name in (startup.DEFAULT_DATABASE_NAME, startup.LEGACY_DEFAULT_DATABASE_NAME):
+        SqliteRepo(db_path=tmp_path / name).close()
+
+    monkeypatch.setattr(startup, "get_last_database", lambda: "")
+    monkeypatch.setattr(startup.Path, "home", staticmethod(lambda: tmp_path))
+
+    assert startup.select_database() == tmp_path / startup.DEFAULT_DATABASE_NAME
+
+
 def test_an_unwritable_home_says_so_and_falls_back_to_the_open_dialog(
     no_dialogs, monkeypatch: pytest.MonkeyPatch
 ) -> None:
