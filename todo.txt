@@ -206,15 +206,21 @@ P2-12 series operations: inline preview plot beside the numeric results
       publish_results emits text/HTML only; a fit or a peak-find is far more
       legible with a small plot next to it.
 
-P2-13 series operation: Filtering (scipy.signal)
-      IIR (iirfilter -> sosfiltfilt: Butterworth/Cheby1/Cheby2/Bessel/
-      Elliptic, low/high/band/bandstop) and FIR (firwin -> filtfilt) filters,
-      an analytic-signal model (hilbert: envelope / instantaneous phase /
-      instantaneous frequency), and detrend (linear/constant). fs inferred
-      from median dx, same non-uniform-sampling warning as the Spectral
-      Analysis dialog. Resample (resample_poly/decimate) is a separate,
-      later step - it changes the x grid, which needs its own temporal-x
-      handling.
+FATTO 2026-09-11 (P2-13) series operation: Filtering (scipy.signal)
+      Nuovo filter_dialog.py. IIR (iirfilter -> sosfiltfilt, zero-fase:
+      Butterworth/Cheby1/Cheby2/Bessel/Ellittico, passa-basso/alto/banda,
+      elimina-banda) e FIR (firwin -> filtfilt, stessa scelta di risposte -
+      pass_zero accetta le stesse quattro stringhe di iirfilter's btype, un
+      numero di taps dispari forzato quando la risposta deve passare per
+      Nyquist). Segnale analitico (hilbert: inviluppo / fase istantanea /
+      frequenza istantanea, quest'ultima riallineata alla lunghezza
+      originale ripetendo l'ultimo campione). Detrend (lineare/costante).
+      fs dalla spaziatura mediana di x, stesso avviso di campionamento non
+      uniforme della Spectral Analysis. Numerica in funzioni pure, verificata
+      isolando un tono da un mix, un inviluppo AM e una frequenza istantanea
+      nota in test_filter_dialog.py. Resample (resample_poly/decimate)
+      resta un passo separato, successivo - cambia la griglia x, che
+      richiede la sua gestione del tempo (restore_temporal_x).
 
 P2-15 series operations: scikit-learn models
       Five candidates, roughly in this order:

@@ -4656,3 +4656,147 @@ msgstr "sequenza"
 
 msgid "Control chart for counts (p, np, c, u)"
 msgstr "Carta di controllo per conteggi (p, np, c, u)"
+
+
+msgid "Lowpass"
+msgstr "Passa-basso"
+
+
+msgid "Highpass"
+msgstr "Passa-alto"
+
+
+msgid "Bandpass"
+msgstr "Passa-banda"
+
+
+msgid "Bandstop"
+msgstr "Elimina-banda"
+
+
+msgid "Butterworth"
+msgstr "Butterworth"
+
+
+msgid "Chebyshev I"
+msgstr "Chebyshev I"
+
+
+msgid "Chebyshev II"
+msgstr "Chebyshev II"
+
+
+msgid "Bessel"
+msgstr "Bessel"
+
+
+msgid "Elliptic"
+msgstr "Ellittico"
+
+
+msgid "Amplitude envelope"
+msgstr "Inviluppo di ampiezza"
+
+
+msgid "Instantaneous phase"
+msgstr "Fase istantanea"
+
+
+msgid "Instantaneous frequency"
+msgstr "Frequenza istantanea"
+
+
+msgid "Choose the operation."
+msgstr "Scegli l'operazione."
+
+
+msgid "Operation:"
+msgstr "Operazione:"
+
+
+msgid "The filter family. Butterworth is maximally flat; Chebyshev/Elliptic trade ripple for a sharper roll-off."
+msgstr "La famiglia del filtro. Butterworth è massimamente piatto; Chebyshev/Ellittico scambiano ripple per una pendenza più ripida."
+
+
+msgid "Which band the filter keeps."
+msgstr "Quale banda mantiene il filtro."
+
+
+msgid "Response:"
+msgstr "Risposta:"
+
+
+msgid "Filter order. Higher is a sharper roll-off and more phase distortion before sosfiltfilt cancels it."
+msgstr "Ordine del filtro. Più alto significa una pendenza più ripida e più distorsione di fase, prima che sosfiltfilt la annulli."
+
+
+msgid "Order:"
+msgstr "Ordine:"
+
+
+msgid "Number of FIR coefficients. More taps sharpen the transition band at the cost of needing more samples."
+msgstr "Numero di coefficienti FIR. Più taps rendono più netta la banda di transizione, a costo di richiedere più campioni."
+
+
+msgid "Taps:"
+msgstr "Taps:"
+
+
+msgid "Taper applied to the FIR coefficients."
+msgstr "Finestra applicata ai coefficienti FIR."
+
+
+msgid "Cutoff frequency (same units as fs)."
+msgstr "Frequenza di taglio (stesse unità di fs)."
+
+
+msgid "Cutoff:"
+msgstr "Taglio:"
+
+
+msgid "Second cutoff, for a bandpass/bandstop response."
+msgstr "Secondo taglio, per una risposta passa-banda/elimina-banda."
+
+
+msgid "Second cutoff:"
+msgstr "Secondo taglio:"
+
+
+msgid "Passband ripple, in dB (Chebyshev I / Elliptic)."
+msgstr "Ripple in banda passante, in dB (Chebyshev I / Ellittico)."
+
+
+msgid "Ripple (dB):"
+msgstr "Ripple (dB):"
+
+
+msgid "Minimum stopband attenuation, in dB (Chebyshev II / Elliptic)."
+msgstr "Attenuazione minima in banda oscura, in dB (Chebyshev II / Ellittico)."
+
+
+msgid "Attenuation (dB):"
+msgstr "Attenuazione (dB):"
+
+
+msgid "What to derive from the analytic signal."
+msgstr "Cosa ricavare dal segnale analitico."
+
+
+msgid "Output:"
+msgstr "Uscita:"
+
+
+msgid "Linear removes a best-fit line; constant removes only the mean."
+msgstr "Lineare rimuove una retta di regressione; costante rimuove solo la media."
+
+
+msgid "Trend:"
+msgstr "Tendenza:"
+
+
+msgid "Filtering"
+msgstr "Filtraggio"
+
+
+msgid "Filter, detrend or demodulate a series (scipy.signal)"
+msgstr "Filtra, detrenda o demodula una serie (scipy.signal)"
