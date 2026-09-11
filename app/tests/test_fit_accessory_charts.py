@@ -270,12 +270,22 @@ def test_the_accessory_charts_read_the_fit_output_table(
 # Fit optimises one parametric model against one series; there is no sense
 # in which two unrelated series share one set of parameters, so
 # _selected_series_row (dialog_base.py) picks the first selected series and
-# ignores the rest. That choice used to be a debug-log line only - visible
-# with applogger's own "silent by default" policy nowhere a user would see
-# it - so the accessory charts silently described whichever series happened
-# to be first in the list, with nothing on screen explaining why reordering
-# the series changed what a residual chart showed.
-def test_selecting_two_series_warns_which_one_is_used(
+# ignores the rest. That used to be a debug-log line that named neither how
+# many series nor which one won, so the accessory charts silently described
+# whichever series happened to be first, with nothing on screen explaining
+# why reordering the series changed what a residual chart showed.
+#
+# The warning is deliberately NOT show_dialog=True (a nearby, tempting fix):
+# this runs on every compute_results() - every Preview, every parameter
+# tweak - and a modal QMessageBox.exec() on each of those would freeze the
+# dialog until dismissed, again and again; worse, AppLogger._show_message_box
+# only skips the dialog when there is no QApplication at all, so it
+# exec()s and quietly returns under the offscreen QPA platform pytest runs
+# on, passing green there while genuinely hanging the first real desktop
+# run that reaches this path. The status bar already surfaces every
+# WARNING-or-louder message on its own (AppLogger._log_with_policy), which
+# is why naming the series and the count is the whole fix.
+def test_selecting_two_series_names_which_one_is_used(
     dialog: SeriesFitDialog, repo: SqliteRepo, figure_id: int, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import app.series_operations.dialog_base as module
@@ -290,21 +300,22 @@ def test_selecting_two_series_warns_which_one_is_used(
     )
     dialog.series_selector.reload(select_all_series=True)
 
-    seen: list[tuple[str, bool]] = []
-    original = module.applogger.warning
-
-    def spy(msg, *args, show_dialog=None, **kwargs):
-        seen.append((str(msg) % args if args else str(msg), bool(show_dialog)))
-        return original(msg, *args, show_dialog=show_dialog, **kwargs)
-
-    monkeypatch.setattr(module.applogger, "warning", spy)
+    seen: list[tuple[str, bool | None]] = []
+    monkeypatch.setattr(
+        module.applogger,
+        "warning",
+        lambda msg, *args, show_dialog=None, **kwargs: seen.append(
+            (str(msg) % args if args else str(msg), show_dialog)
+        ),
+    )
 
     dialog._selected_series_row()
 
     assert seen, "selecting two series raised no warning at all"
-    message, shown = seen[-1]
-    assert shown, "the warning must be shown, not just logged - see applogger's own policy"
+    message, show_dialog = seen[-1]
+    assert show_dialog is None, "must stay at the default - see the note above"
     assert "DATA" in message or "SECOND" in message
+    assert "2" in message
 
 
 def test_only_the_first_selected_series_gets_a_residual_chart(

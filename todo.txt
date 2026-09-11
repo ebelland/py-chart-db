@@ -334,14 +334,29 @@ FATTO 2026-09-11 (bug) Fit: due serie selezionate, una sceglie in silenzio
       dialog_base._selected_series_row(): con piu' serie selezionate sceglie
       sempre la prima e ignora le altre - corretto per Fit (un solo modello,
       un solo set di parametri, non ha senso su due serie scorrelate), ma
-      lo diceva solo con applogger.warning(...) senza show_dialog=True,
-      quindi mai visto - "silent by default" e' la policy di default del
-      logger. Riordinare le serie e' l'unico modo per cambiare quale sia
-      "la prima", il che spiegava esattamente il sintomo osservato.
-      Fix minimo: show_dialog=True sulla stessa riga, con il nome della
-      serie usata in chiaro nel messaggio. Non e' stata cambiata la scelta
-      di fondo (una sola serie per fit resta corretta) - solo resa visibile.
-      Nuovi test in test_fit_accessory_charts.py.
+      lo diceva solo con applogger.warning(...) senza dettagli utili (ne'
+      quante serie ne' quale ha vinto). Riordinare le serie e' l'unico modo
+      per cambiare quale sia "la prima", il che spiegava esattamente il
+      sintomo osservato.
+      Primo fix (sbagliato, ritirato subito): show_dialog=True sulla stessa
+      riga. Verde in tutta la suite qui - e per questo e' passato - ma
+      AppLogger._show_message_box salta la finestra solo quando non esiste
+      proprio una QApplication: con una QApplication presente (come nei
+      test, via la fixture qapp) chiama comunque QMessageBox.exec(), che
+      sotto la piattaforma QPA offscreen su cui gira pytest ritorna subito
+      senza bloccare, ma su un desktop vero blocca per davvero - e questo
+      warning viene emesso a ogni compute_results(), cioe' ad ogni Preview e
+      ad ogni modifica di un parametro con due o piu' serie spuntate: non un
+      hang occasionale ma una finestra modale ad ogni tick. Cosi' e' arrivato
+      il report "pytest hangs at 85%" da EB, non riproducibile qui per lo
+      stesso motivo per cui il bug non lo era.
+      Fix vero: show_dialog resta al default (silenzioso), il messaggio dice
+      solo quante serie sono selezionate e quale nome ha vinto - la status
+      bar mostra gia' da sola ogni WARNING (AppLogger._log_with_policy),
+      senza bisogno di una finestra da chiudere. Non e' stata cambiata la
+      scelta di fondo (una sola serie per fit resta corretta) - solo resa
+      leggibile. Nuovi test in test_fit_accessory_charts.py, incluso un
+      assert che il messaggio NON usi show_dialog=True.
 
 ================================================================
 P3 - LATER

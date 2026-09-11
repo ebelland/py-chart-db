@@ -520,19 +520,25 @@ class SeriesOperationDialogBase(QDialog):
             raise ValueError(message)
 
         if len(rows) > 1:
-            # Silent by default (applogger.warning's own policy) was exactly
-            # the trap here: an operation that reads one series at a time -
-            # Fit chief among them - would quietly act on whichever series
-            # happened to be first, and the only way to find out was to
-            # notice the chart it produced was not the one you meant. Shown,
-            # so the choice this makes is not a debugging exercise.
+            # NOT show_dialog=True: this runs on every compute_results() -
+            # every Preview, every parameter tweak while two or more series
+            # are checked - and a modal QMessageBox.exec() on each of those
+            # would freeze the dialog until it was dismissed, again and
+            # again. It very nearly shipped that way: AppLogger._show_
+            # message_box only skips the dialog when there is no
+            # QApplication at all, so it exec()s quietly-returning under the
+            # offscreen QPA platform pytest runs on and genuinely blocks on
+            # a real desktop - green everywhere headless, and a hang at
+            # whichever test first exercises this path anywhere else.
+            # The status bar already shows every WARNING-or-louder message
+            # on its own (see AppLogger._log_with_policy) without asking to
+            # be dismissed, which is why this stays at the default.
             name = row_value(rows[0], "name", default="first")
             applogger.warning(
                 "%d series are selected; using only '%s'. Uncheck the "
                 "others, or reorder them, to use a different one.",
                 len(rows),
                 name,
-                show_dialog=True,
             )
 
         return rows[0]
