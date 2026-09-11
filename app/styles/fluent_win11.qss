@@ -1141,4 +1141,47 @@ QFrame#operationRow[selected="true"] {
 
     border-left: 3px solid palette(highlight);
 }
+
+/* ----------------------------------------------------------
+   Operation tile (sectioned grid)
+   Same states as #operationRow above - hover, keyboard focus -
+   drawn as a bordered square instead of a border-left accent
+   stripe, since a tile has no long edge for a stripe to read as
+   "this one" against.
+   ---------------------------------------------------------- */
+
+QFrame#operationTile {
+    background: rgba(@SHADOW_RGB@, 0.02);
+    border: 1px solid rgba(@SHADOW_RGB@, 0.08);
+    border-radius: 8px;
+}
+
+QFrame#operationTile:hover {
+    background: rgba(@SHADOW_RGB@, 0.06);
+    border-color: rgba(@ACCENT_RGB@, 0.35);
+}
+
+QFrame#operationTile:focus {
+    background: rgba(@ACCENT_RGB@, 0.08);
+    border-color: palette(highlight);
+}
+
+QLabel[operationTileTitle="true"] {
+    font-size: 9pt;
+    font-weight: 600;
+    color: palette(window-text);
+    background: transparent;
+}
+
+/* ----------------------------------------------------------
+   Operation hint bar
+   Fixed at the panel's bottom, outside the scroll area - see
+   SeriesOperationWidget. A hairline top border marks it as its
+   own strip rather than the last section bleeding into it.
+   ---------------------------------------------------------- */
+
+QLabel#operationHint {
+    border-top: 1px solid rgba(@SHADOW_RGB@, 0.08);
+    padding: 8px 10px;
+}
 `

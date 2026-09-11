@@ -4900,3 +4900,23 @@ msgstr "Seleziona progetto"
 
 msgid "Another ChartLibre project (.dhub)"
 msgstr "Un altro progetto ChartLibre (.dhub)"
+
+
+msgid "Analysis"
+msgstr "Analisi"
+
+
+msgid "Modeling"
+msgstr "Modellazione"
+
+
+msgid "Other"
+msgstr "Altro"
+
+
+msgid "Point at an operation for details"
+msgstr "Punta un'operazione per i dettagli"
+
+
+msgid "Signal Processing"
+msgstr "Elaborazione del segnale"
