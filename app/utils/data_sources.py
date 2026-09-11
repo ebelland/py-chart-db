@@ -40,6 +40,7 @@ from urllib.parse import urlparse
 
 import pandas as pd
 
+from app import APP_NAME, APP_VERSION
 from app.logs.logger import applogger
 
 # -----------------------------------------------------------------------------
@@ -673,7 +674,9 @@ def read_web_url(
     if not is_valid_web_url(url):
         raise ValueError(f"Not an http(s) URL: {url}")
 
-    request = urllib.request.Request(url, headers={"User-Agent": "Data Hub/1.0"})
+    request = urllib.request.Request(
+        url, headers={"User-Agent": f"{APP_NAME}/{APP_VERSION}"}
+    )
     with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
         content_type = response.headers.get_content_type()
         data = response.read(WEB_FETCH_MAX_BYTES + 1)

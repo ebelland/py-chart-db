@@ -1,5 +1,5 @@
 /* ==========================================================
-   macOS Native – Data Hub
+   macOS Native – ChartLibre
    Patched: pt-based typography (was mixing px with the Windows
    file), subtle native-style row hover, explicit selection
    color via palette tokens, message box width, ChartPanel

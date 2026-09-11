@@ -23,6 +23,7 @@ from PySide6.QtGui import (
     QDesktopServices,
     QIcon,
 )
+from app import APP_ICON, APP_NAME
 from app.charts import layout_presets
 from app.dialogs.log_viewer_dialog import LogViewerDialog
 from app.data.sqlite_repo import SqliteRepo
@@ -51,7 +52,7 @@ from app.styles.style import (
     create_card_widget,
     create_menu,
     create_menu_item,
-    load_icon,
+    icon_from_svg_source,
     relax_minimum_width,
     stdSizeAndlayout,
     _pyobjc_core_is_safe_to_import,
@@ -123,8 +124,8 @@ class MainWindow(QMainWindow):
         applogger.set_status_bar(self.statusBar())
         applogger.debug(f"Initializing main window for database: {db_path}")
 
-        self.setWindowTitle(_("Data Hub"))
-        self.setWindowIcon(load_icon("new_plot"))
+        self.setWindowTitle(_("ChartLibre"))
+        self.setWindowIcon(icon_from_svg_source(APP_ICON, size=32))
         self.resize(1200, 800)
 
         # Debounce for property-driven chart reloads (see _redraw_properties_chart).
@@ -1010,7 +1011,7 @@ class MainWindow(QMainWindow):
             self._repo = SqliteRepo(db_path=db_path)
             self._db_path = db_path
             self._table_panel.set_repo(self._repo)
-            self.setWindowTitle(f"Data hub: {self._db_path}")
+            self.setWindowTitle(f"{APP_NAME}: {self._db_path}")
             set_last_database(db_path)
 
             self._table_panel.reload()
@@ -1587,7 +1588,7 @@ class MainWindow(QMainWindow):
             self._repo = SqliteRepo(db_path=db_path)
             self._db_path = db_path
             self._table_panel.set_repo(self._repo)
-            self.setWindowTitle(f"Data hub: {self._db_path}")
+            self.setWindowTitle(f"{APP_NAME}: {self._db_path}")
             set_last_database(db_path)
             self._table_panel.reload()
             self._reload_tabs()

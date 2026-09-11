@@ -4860,3 +4860,7 @@ msgstr "Qualità e spettroscopia - due nuove operazioni sulle serie"
 
 msgid "Textbook defective-unit counts for the Attribute Chart operation (p/np/c/u), and a synthetic spectrum with a drifting, wandering background for Baseline Correction (AsLS or rubber band) - both figures already carry an annotation and a reference line with an explicit colour, so opening Overlay properties shows its colour/line/font/size editors populated rather than empty."
 msgstr "Conteggi di unità difettose da manuale per l'operazione Carta per attributi (p/np/c/u), e uno spettro sintetico con uno sfondo che deriva e ondeggia per la Correzione della linea di base (AsLS o rubber band) - entrambe le figure portano già un'annotazione e una linea di riferimento con un colore esplicito, cosi' aprendo le proprietà delle sovrapposizioni si vedono gli editor di colore/linea/carattere/dimensione già popolati invece che vuoti."
+
+
+msgid "ChartLibre"
+msgstr "ChartLibre"
