@@ -28,7 +28,9 @@ import csv
 import json
 import os
 import sqlite3
+import ssl
 import tempfile
+import urllib.error
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -653,6 +655,27 @@ def filename_from_url(url: str) -> str:
     return name or "web_data"
 
 
+@lru_cache(maxsize=1)
+def _web_fetch_ssl_context() -> ssl.SSLContext | None:
+    """An SSL context built from certifi's CA bundle, if it is installed.
+
+    ``ssl.create_default_context()`` with no ``cafile`` reads the
+    interpreter's *own* trust store - on a python.org macOS build that is
+    empty until "Install Certificates.command" has been run once, and every
+    fetch until then fails with ``CERTIFICATE_VERIFY_FAILED``, which reads
+    exactly like a network problem and is not one. certifi ships a CA
+    bundle that does not depend on the interpreter or the OS being wired up
+    to a trust store, so it is preferred when present. ``None`` (certifi
+    not installed) falls back to ``urlopen``'s own default context,
+    unchanged from before this existed.
+    """
+    try:
+        import certifi
+    except ImportError:
+        return None
+    return ssl.create_default_context(cafile=certifi.where())
+
+
 def read_web_url(
     url: str,
     *,
@@ -677,7 +700,32 @@ def read_web_url(
     request = urllib.request.Request(
         url, headers={"User-Agent": f"{APP_NAME}/{APP_VERSION}"}
     )
-    with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
+    try:
+        response = urllib.request.urlopen(  # noqa: S310
+            request, timeout=timeout, context=_web_fetch_ssl_context()
+        )
+    except urllib.error.URLError as exc:
+        if isinstance(exc.reason, ssl.SSLCertVerificationError):
+            raise ValueError(
+                "The server's TLS certificate could not be verified. This "
+                "usually means a corporate proxy or firewall is inspecting "
+                "HTTPS traffic with its own certificate - ask whoever "
+                "manages that network for its CA certificate, or try a "
+                "different network; it is not something this fetch can "
+                "work around on its own."
+            ) from exc
+        raise
+    except ssl.SSLCertVerificationError as exc:
+        raise ValueError(
+            "The server's TLS certificate could not be verified. This "
+            "usually means a corporate proxy or firewall is inspecting "
+            "HTTPS traffic with its own certificate - ask whoever manages "
+            "that network for its CA certificate, or try a different "
+            "network; it is not something this fetch can work around on "
+            "its own."
+        ) from exc
+
+    with response:
         content_type = response.headers.get_content_type()
         data = response.read(WEB_FETCH_MAX_BYTES + 1)
 

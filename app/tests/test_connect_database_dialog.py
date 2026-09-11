@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from app.dialogs.connect_database_dialog import (
+    ENGINE_DHUB,
     ENGINE_MYSQL,
     ENGINE_POSTGRES,
     ENGINE_SQLITE,
@@ -74,6 +75,55 @@ def test_sqlite_is_the_default_engine(dialog: ConnectDatabaseDialog) -> None:
     assert dialog._engine.currentData() == ENGINE_SQLITE
     assert not dialog._sqlite_row.isHidden()
     assert dialog._host.isHidden()
+
+
+def test_another_project_is_its_own_engine_choice_but_a_sqlite_file_underneath(
+    dialog: ConnectDatabaseDialog,
+) -> None:
+    """A .dhub file is this app's own SQLite format and nothing more, so
+    "connect to another project" has to reuse every bit of the plain SQLite
+    path - but a user asking that question should not have to first work
+    out that "SQLite file" is the answer."""
+    _select_engine(dialog, ENGINE_DHUB)
+
+    assert not dialog._sqlite_row.isHidden()
+    assert dialog._host.isHidden()
+
+    dialog._sqlite_path.setText("/tmp/other-project.dhub")
+    assert dialog._current_connection().kind == "sqlite"
+    assert dialog._current_connection().path == "/tmp/other-project.dhub"
+
+
+def test_connecting_to_another_project_lists_its_tables(
+    dialog: ConnectDatabaseDialog, sqlite_db: Path
+) -> None:
+    _select_engine(dialog, ENGINE_DHUB)
+    dialog._sqlite_path.setText(str(sqlite_db))
+
+    dialog._on_connect()
+
+    assert [dialog._tables.item(i).text() for i in range(dialog._tables.count())] == [
+        "readings"
+    ]
+
+
+def test_browsing_for_another_project_offers_dhub_first(
+    dialog: ConnectDatabaseDialog, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.dialogs.connect_database_dialog as module
+
+    seen: dict = {}
+
+    def _fake_open(_parent, _title, _dir, _filter):
+        seen["filter"] = _filter
+        return "", ""
+
+    monkeypatch.setattr(module.QFileDialog, "getOpenFileName", _fake_open)
+    _select_engine(dialog, ENGINE_DHUB)
+
+    dialog._on_browse_sqlite()
+
+    assert seen["filter"].startswith("ChartLibre project")
 
 
 def test_switching_to_a_server_engine_swaps_the_fields(

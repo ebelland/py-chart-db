@@ -16,7 +16,12 @@ from PySide6.QtWidgets import (
 
 from app.dialogs.create_chart_dialog import NewPlotTabDialog
 from app.scanners.series_operation_scanner import series_operations
-from app.styles.style import create_card_widget, icon_from_svg_source, stdSizeAndlayout
+from app.styles.style import (
+    create_card_widget,
+    create_compact_section_title,
+    icon_from_svg_source,
+    stdSizeAndlayout,
+)
 from app.utils.i18n import _, tr
 
 _ACCENT = "#2563EB"
@@ -160,17 +165,7 @@ class SeriesOperationWidget(QWidget):
         return icon_from_svg_source(svg_source, color=_ACCENT)
 
     def _add_section_title(self, layout: QVBoxLayout, title: str) -> None:
-        label = QLabel(title, self)
-        label.setProperty("sectionTitle", True)
-        section_font = QFont(label.font())
-        section_point_size = section_font.pointSize()
-        if section_point_size > 0:
-            section_font.setPointSize(max(section_point_size - 1, 9))
-        else:
-            section_font.setPixelSize(12)
-        section_font.setWeight(QFont.Weight.DemiBold)
-        label.setFont(section_font)
-        layout.addWidget(label)
+        layout.addWidget(create_compact_section_title(title, self))
 
     def _add_operation_item(self, *, layout: QVBoxLayout, operation: dict) -> None:
         action_id = str(operation.get("value") or operation.get("name") or "")

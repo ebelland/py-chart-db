@@ -395,6 +395,76 @@ def test_the_extension_falls_back_to_content_type_when_the_url_has_none() -> Non
     assert _extension_for_web_source("https://api.example.com/export", None) == ".csv"
 
 
+def test_certifis_bundle_is_used_when_it_is_installed() -> None:
+    """The context this app actually fetches with, not just that a context
+    of some kind exists - a None here silently falls back to urlopen's own
+    default trust store, which is the failure this exists to route around."""
+    import certifi
+
+    from app.utils.data_sources import _web_fetch_ssl_context
+
+    _web_fetch_ssl_context.cache_clear()
+    context = _web_fetch_ssl_context()
+    assert context is not None
+    assert context.get_ca_certs(), "certifi's bundle should have loaded some CAs"
+    del certifi  # imported only to prove it is actually installed here
+
+
+def test_a_certificate_verification_failure_gets_a_clear_message(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CERTIFICATE_VERIFY_FAILED reads exactly like a network problem; the
+    dialog's error message should not leave the user guessing which one it
+    is - see _web_fetch_ssl_context for why this happens on a fresh
+    python.org macOS install with no other network issue at all."""
+    import ssl
+    import urllib.error
+
+    import app.utils.data_sources as module
+
+    def _raise_wrapped(*_args: object, **_kwargs: object):
+        raise urllib.error.URLError(
+            ssl.SSLCertVerificationError("certificate verify failed")
+        )
+
+    monkeypatch.setattr(module.urllib.request, "urlopen", _raise_wrapped)
+
+    with pytest.raises(ValueError, match="certificate"):
+        module.read_web_url("https://example.com/data.csv")
+
+
+def test_a_bare_ssl_verification_error_gets_the_same_clear_message(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import ssl
+
+    import app.utils.data_sources as module
+
+    def _raise_bare(*_args: object, **_kwargs: object):
+        raise ssl.SSLCertVerificationError("certificate verify failed")
+
+    monkeypatch.setattr(module.urllib.request, "urlopen", _raise_bare)
+
+    with pytest.raises(ValueError, match="certificate"):
+        module.read_web_url("https://example.com/data.csv")
+
+
+def test_an_unrelated_url_error_is_not_mistaken_for_a_certificate_problem(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import urllib.error
+
+    import app.utils.data_sources as module
+
+    def _raise_other(*_args: object, **_kwargs: object):
+        raise urllib.error.URLError("Connection refused")
+
+    monkeypatch.setattr(module.urllib.request, "urlopen", _raise_other)
+
+    with pytest.raises(urllib.error.URLError, match="Connection refused"):
+        module.read_web_url("https://example.com/data.csv")
+
+
 def test_picking_a_url_fetches_and_parses_it(
     dialog, monkeypatch: pytest.MonkeyPatch
 ) -> None:
