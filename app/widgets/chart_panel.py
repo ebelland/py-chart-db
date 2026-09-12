@@ -1098,7 +1098,7 @@ class ChartPanel(QFrame):
         create_menu_item(
             parent=self,
             menu=menu,
-            icon="add",
+            icon="add.vertical",
             checkable=False,
             text=_("Add vertical line at x = {value}").format(
                 value=axis_text(axes.xaxis, x_value)
@@ -1110,7 +1110,7 @@ class ChartPanel(QFrame):
         create_menu_item(
             parent=self,
             menu=menu,
-            icon="add",
+            icon="add.horizontal",
             checkable=False,
             text=_("Add horizontal line at y = {value}").format(
                 value=axis_text(axes.yaxis, y_value)
@@ -1122,7 +1122,7 @@ class ChartPanel(QFrame):
         create_menu_item(
             parent=self,
             menu=menu,
-            icon="add",
+            icon="add.annotation",
             checkable=False,
             text=_("Add annotation here…"),
             tooltip=_("A text note pinned to this point: x = {x}, y = {y}.").format(

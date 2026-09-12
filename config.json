@@ -7,6 +7,27 @@
       "SegoeFluent": "E710",
       "ThemeIcon": "list-add"
     },
+    "add.vertical": {
+      "text": "Add vertical line",
+      "description": "Add a vertical line to the selected axis",
+      "SFSymbol": "guidepoint.vertical",
+      "SegoeFluent": "U+007C",
+      "ThemeIcon": "list-add"
+    },
+    "add.horizontal": {
+      "text": "Add horizontal line",
+      "description": "Add a horizontal line to the selected axis",
+      "SFSymbol": "guidepoint.horizontal",
+      "SegoeFluent": "E949",
+      "ThemeIcon": "list-add"
+    },
+    "add.annotation": {
+      "text": "Add annotation",
+      "description": "Add an annotation to the selected axis",
+      "SFSymbol": "text.bubble",
+      "SegoeFluent": "E932",
+      "ThemeIcon": "list-add"
+    },
     "add_series": {
       "text": "Add series",
       "description": "Add a series to the selected axis",

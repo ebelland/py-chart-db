@@ -240,13 +240,36 @@ class SettingsDialog(QDialog):
             combo.addItem(label, value)
 
         index = combo.findData(current)
-        combo.setCurrentIndex(index if index >= 0 else 0)
+        combo.blockSignals(True)
+        try:
+            combo.setCurrentIndex(index if index >= 0 else 0)
+        finally:
+            combo.blockSignals(False)
         configure_combo_width(combo)
         return combo
 
     @staticmethod
     def _value(combo: QComboBox) -> str:
         return str(combo.currentData() or "")
+
+    @staticmethod
+    def insertItem(combo: QComboBox, index: int, text: str, data: str) -> int:
+        """Insert a combo entry before the trailing Browse… sentinel.
+
+        The sentinel row is always last, so custom user-provided styles must be
+        inserted immediately before it rather than at the absolute index passed
+        in from other code paths. Returning the actual index keeps callers in
+        sync with the combo's state.
+        """
+        sentinel_index = combo.count() - 1
+        if sentinel_index >= 0 and index >= sentinel_index:
+            index = sentinel_index
+        combo.blockSignals(True)
+        try:
+            combo.insertItem(index, text, data)
+        finally:
+            combo.blockSignals(False)
+        return index
 
     # ------------------------------------------------------------------
     # A stylesheet of the user's own
@@ -278,9 +301,12 @@ class SettingsDialog(QDialog):
         key = qss_file_style_key(Path(path_str))
         index = self._style_combo.findData(key)
         if index < 0:
-            # Before the Browse… row, which stays last.
-            index = self._style_combo.count() - 1
-            self._style_combo.insertItem(index, qss_file_style_label(key), key)
+            index = self.insertItem(
+                self._style_combo,
+                self._style_combo.count() - 1,
+                qss_file_style_label(key),
+                key,
+            )
         self._select_style_index(index)
 
     def _select_style_index(self, index: int) -> None:

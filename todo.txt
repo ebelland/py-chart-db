@@ -25,15 +25,6 @@ FATTO 2026-09-10 (N-5) sqlite_repo diviso per materia
       Nota: chart_panel (2.214), style (1.939), fit_dialog (1.760) e
       cluster_dialog (1.722) restano sopra le 1.500 righe.
 
-FATTO 2026-09-10 (N-8) linee verticali/orizzontali dal menu contestuale
-      Il click destro dentro un axes offre due voci che nominano il valore
-      ("Add vertical line at x = 12.5"), formattato dall'axis come il
-      readout della toolbar - su un asse a date legge la data. L'asse
-      arriva dal tag _dhub_axis_id che render_figure lascia su ogni axes,
-      quindi nessuna seconda mappa da tenere allineata. Scrive la stessa
-      chiave "lines" del pannello Overlay, ed e' annullabile come ogni
-      altra modifica ai descrittori.
-
 N-3   attribute control charts (p, np, c, u)
       The half of SPC N-1 does not cover. These plot a proportion or a count
       rather than a measurement, so the limits are binomial/Poisson rather

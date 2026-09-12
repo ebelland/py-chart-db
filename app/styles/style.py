@@ -43,7 +43,7 @@ from PySide6.QtGui import (
     QPixmap,
     QTextOption,
 )
-from PySide6.QtWidgets import QApplication, QBoxLayout, QCheckBox, QComboBox, QFormLayout, QFrame, QLineEdit, QMenu, QPlainTextEdit, QScrollArea, QSizePolicy, QToolButton, QWidget, QPushButton
+from PySide6.QtWidgets import QAbstractScrollArea, QApplication, QBoxLayout, QCheckBox, QComboBox, QFormLayout, QFrame, QLineEdit, QMenu, QPlainTextEdit, QScrollArea, QSizePolicy, QToolButton, QWidget, QPushButton
 from app.logs.logger import applogger
 from app.styles.palettes import themed_qss
 from app.utils.config import get_section, get_value
@@ -1408,7 +1408,7 @@ def apply_fusion_for_item_view_styling(view: QWidget) -> None:
         # area has these. Nothing else needs putting back.
         scrollbar = getattr(view, reader, None)
         bar = scrollbar() if callable(scrollbar) else None
-        if bar is not None:
+        if bar is not None and isinstance(bar, QAbstractScrollArea): 
             bar.setStyle(application_style)
 
 
