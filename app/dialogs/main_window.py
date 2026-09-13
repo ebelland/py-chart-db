@@ -61,6 +61,7 @@ from app.widgets.table_list import  TableListPanel
 from app.widgets.table_preview import TablePreviewPanel
 from app.utils.config import (
     clear_recent_databases,
+    get_constant,
     get_recent_databases,
     get_section,
     set_last_database,
@@ -75,14 +76,14 @@ from PySide6.QtWidgets import QApplication, QButtonGroup, QFileDialog, QFrame, Q
 
 # Coalescing window for property-driven chart reloads, in milliseconds.
 # Long enough to swallow a spinbox drag, short enough to feel immediate.
-PROPERTIES_REDRAW_DEBOUNCE_MS: int = 120
+PROPERTIES_REDRAW_DEBOUNCE_MS: int = get_constant("properties_redraw_debounce_ms", 120)
 
 # A run of same-label descriptor snapshots inside this many seconds is
 # treated as one edit and recorded once. The auto-applying property panels
 # fire _snapshot_descriptors on every debounced change; without this a
 # single slider drag would leave a stack of identical "Figure properties"
 # undo entries in front of the state worth going back to.
-SNAPSHOT_COALESCE_SECONDS: float = 2.0
+SNAPSHOT_COALESCE_SECONDS: float = get_constant("snapshot_coalesce_seconds", 2.0)
 
 # config.json keys for the remembered window layout.
 STATE_KEY: str = "main_window"
@@ -96,12 +97,12 @@ USER_MANUAL_PATH: Path = Path(__file__).resolve().parents[2] / "docs" / "manual"
 # Narrowest useful chart pane.  Explicit, because the alternative is whatever
 # the chart toolbar happens to add up to - and that number silently wins the
 # splitter negotiation against the left panel.
-CHART_PANE_MIN_WIDTH: int = 260
+CHART_PANE_MIN_WIDTH: int = get_constant("chart_pane_min_width", 260)
 
 # How long a picked-point readout stays in the status bar, in milliseconds.
 # Long enough to read and write down, short enough that it is gone before it
 # can be mistaken for a description of some later chart.
-CHART_SELECTION_TIMEOUT_MS: int = 15_000
+CHART_SELECTION_TIMEOUT_MS: int = get_constant("chart_selection_timeout_ms", 15_000)
 
 class MainWindow(QMainWindow):
     """Main window with custom activity rail and chart tabs.
@@ -116,7 +117,7 @@ class MainWindow(QMainWindow):
     #: that the usual report is complete on sight, few enough that a database
     #: with hundreds of dangling references does not make a box taller than
     #: the screen.
-    MAX_PROBLEMS_SHOWN: int = 20
+    MAX_PROBLEMS_SHOWN: int = get_constant("max_problems_shown", 20)
 
     def __init__(self, repo: SqliteRepo, db_path: Path) -> None:
         super().__init__()

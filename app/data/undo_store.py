@@ -46,11 +46,12 @@ from typing import Any, Iterable, Iterator, Sequence
 
 from app.data.data_source import quote_identifier as _quote
 from app.logs.logger import applogger
+from app.utils.config import get_constant
 
 #: How many actions can be taken back. Ten is more than anyone reaches for
 #: and small enough that the snapshots of ten changes to a big table do not
 #: quietly become the largest file in the folder.
-MAX_UNDO_ENTRIES: int = 10
+MAX_UNDO_ENTRIES: int = get_constant("max_undo_entries", 10)
 
 #: The schema alias the project's own database is attached under while a
 #: snapshot or a restore runs.

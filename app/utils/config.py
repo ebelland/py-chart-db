@@ -4,8 +4,11 @@ Two files, and the difference between them is who writes them:
 
 ``config.json``
     Ships with the application.  The action catalogue and the message
-    catalogue: every button's label, icon and tooltip, every message box's
-    wording.  Versioned, reviewed, translated, and never written at runtime.
+    catalogue - every button's label, icon and tooltip, every message box's
+    wording - plus the constants catalogue, the numeric knobs (a timeout, a
+    row limit, a minimum size) read one at a time through
+    :func:`get_constant`.  Versioned, reviewed, translated where applicable,
+    and never written at runtime.
 
 ``user.json``
     Written by the application as it runs, and by nothing else.  The last
@@ -23,7 +26,7 @@ committed by whoever happened to run the application before committing.
 Which file a key belongs to is deliberately *not* decided by a list of user
 keys.  Such a list needs extending every time a feature remembers something
 new, and forgetting to extend it loses the setting silently.  It is the other
-way round: :data:`APPLICATION_SECTIONS` is a closed set of two, and anything
+way round: :data:`APPLICATION_SECTIONS` is a closed set of three, and anything
 written while the application runs is a user setting by definition.
 
 Everything goes through :func:`get_section` / :func:`set_section` rather than
@@ -55,7 +58,7 @@ MPLSTYLES_DIR = _repo_root().parent / "mplstyles"
 #: The only top-level keys ``config.json`` owns.  Closed on purpose: a key
 #: that is not in here and is found in config.json is a setting left over from
 #: before the split, and is moved out on the next load.
-APPLICATION_SECTIONS: frozenset[str] = frozenset({"actions", "messages"})
+APPLICATION_SECTIONS: frozenset[str] = frozenset({"actions", "messages", "constants"})
 
 
 # Each file parsed once, with the signature it was parsed from, plus the
@@ -234,6 +237,24 @@ def get_section(name: str, default: dict[str, Any] | None = None) -> dict[str, A
     return dict(default or {})
 
 
+def get_constant(name: str, default: Any = None) -> Any:
+    """Return one tunable from the ``constants`` catalogue in config.json.
+
+    A thin wrapper over :func:`get_section`, for modules that want a single
+    named value rather than the whole section - a numeric knob (a timeout, a
+    row limit, a minimum size) that a person can retune by editing
+    config.json without touching the code that uses it.
+    """
+    return get_section("constants").get(name, default)
+
+
+#: How many databases the Open recent menu keeps. Ten is what a file menu
+#: can show without becoming a list to search rather than a shortcut.
+MAX_RECENT_DATABASES: int = get_constant("max_recent_databases", 10)
+
+CONFIG_RECENT_DATABASES: str = "recent_databases"
+
+
 def set_section(name: str, value: dict[str, Any]) -> None:
     """Replace one top-level object in user.json, leaving the rest untouched.
 
@@ -287,13 +308,6 @@ def get_last_database() -> Path | None:
         return None
     path = Path(str(raw)).expanduser()
     return path if path.exists() else None
-
-
-#: How many databases the Open recent menu keeps. Ten is what a file menu
-#: can show without becoming a list to search rather than a shortcut.
-MAX_RECENT_DATABASES: int = 10
-
-CONFIG_RECENT_DATABASES: str = "recent_databases"
 
 
 def set_last_database(db_path: Path) -> None:

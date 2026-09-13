@@ -45,6 +45,7 @@ from app.styles.style import (
     mark_editor_panel,
     stdSizeAndlayout,
 )
+from app.utils.config import get_constant
 from app.utils.dialog_state import (
     restore_dialog_state,
     restore_window_geometry,
@@ -57,7 +58,7 @@ from app.utils.i18n import _
 
 # Rows fetched by Run.  Enough to see whether the query is right, few enough
 # that pressing Run on a full-table select is not a mistake.
-PREVIEW_ROW_LIMIT: int = 500
+PREVIEW_ROW_LIMIT: int = get_constant("query_builder_preview_row_limit", 500)
 
 # config.json key for the remembered entries and geometry of this dialog.
 STATE_KEY: str = "query_builder_dialog"

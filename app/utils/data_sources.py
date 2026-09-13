@@ -44,6 +44,7 @@ import pandas as pd
 
 from app import APP_NAME, APP_VERSION
 from app.logs.logger import applogger
+from app.utils.config import get_constant
 
 # -----------------------------------------------------------------------------
 # Plain files
@@ -671,7 +672,7 @@ _ALLOWED_WEB_SCHEMES: tuple[str, ...] = ("http", "https")
 #: Bytes read from a URL before this gives up. This is a dataset importer,
 #: not a general-purpose downloader: refusing a multi-gigabyte reply is
 #: safer than filling the machine's memory with one.
-WEB_FETCH_MAX_BYTES: int = 200 * 1024 * 1024
+WEB_FETCH_MAX_BYTES: int = get_constant("web_fetch_max_bytes", 200 * 1024 * 1024)
 
 #: Content-Type -> the extension read_any_file dispatches on, for a response
 #: whose URL has no recognisable suffix of its own (an API endpoint, a

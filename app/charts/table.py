@@ -26,6 +26,7 @@ from typing import Any
 from app.charts import kwarg_spec
 from app.charts.base import BaseAxisRenderer, SeriesData
 from app.logs.logger import applogger
+from app.utils.config import get_constant
 
 
 #: How many rows a table draws before it stops and says so.
@@ -36,7 +37,7 @@ from app.logs.logger import applogger
 #: again. A table of a whole imported file would not be slow, it would be a
 #: hung window - and it would be unreadable long before that, since 200 rows
 #: at figure size is already a grey smear.
-MAX_TABLE_ROWS: int = 200
+MAX_TABLE_ROWS: int = get_constant("max_table_rows", 200)
 
 #: The column slots the picker offers.  Eight because a table wider than
 #: that is unreadable at figure size long before it runs out of slots, and a

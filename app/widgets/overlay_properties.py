@@ -46,6 +46,7 @@ from app.styles.style import (
     create_section_title,
     stdSizeAndlayout,
 )
+from app.utils.config import get_constant
 from app.utils.i18n import _
 from app.widgets.base_properties import BaseProperties
 from app.widgets.color_combo import MatplotlibColorCombo
@@ -60,10 +61,10 @@ LINE_ORIENTATIONS: Final[tuple[tuple[str, str], ...]] = (
     ("Horizontal", "horizontal"),
 )
 
-TABLE_MIN_HEIGHT: Final[int] = 120
+TABLE_MIN_HEIGHT: Final[int] = get_constant("overlay_table_min_height", 120)
 #: Fixed width for the combo/spin columns - a colour combo sized to its
 #: content is either far too wide or, capped, too narrow to read.
-WIDGET_COLUMN_WIDTH: Final[int] = 122
+WIDGET_COLUMN_WIDTH: Final[int] = get_constant("overlay_widget_column_width", 122)
 #: Above this an annotation is a title, not a label.
 _MAX_FONT_SIZE: Final[int] = 200
 

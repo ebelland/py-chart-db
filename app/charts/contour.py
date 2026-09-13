@@ -29,6 +29,7 @@ import numpy as np
 from app.charts.base import BaseAxisRenderer, SeriesData
 from app.charts.grids import finite_xyz, pivot_to_grid
 from app.logs.logger import applogger
+from app.utils.config import get_constant
 
 #: Options the renderer consumes itself.  Everything else in ``Kwargs`` is
 #: forwarded to the Matplotlib contour call, so anything read here has to be
@@ -65,7 +66,7 @@ _OVERLAY_LINE_COLOR = "black"
 #: which is the only reason to turn them on.  Same principle as
 #: grids.MAX_GRID_CELLS: refuse with a message naming the way out rather than
 #: eventually draw something useless.
-MAX_POINT_MARKERS: int = 20_000
+MAX_POINT_MARKERS: int = get_constant("max_point_markers", 20_000)
 
 
 class ContourAxisRenderer(BaseAxisRenderer):

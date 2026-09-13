@@ -24,11 +24,13 @@ from typing import Any, Callable, Iterator
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
+from app.utils.config import get_constant
+
 #: How long the editor waits after the last control change before it applies
 #: the edit on its own. Long enough that a slider drag or a burst of
 #: keystrokes lands as one apply (and one undo entry); short enough that the
 #: chart still feels like it is following the control.
-AUTO_APPLY_DELAY_MS: int = 400
+AUTO_APPLY_DELAY_MS: int = get_constant("auto_apply_delay_ms", 400)
 
 
 class BaseProperties(QWidget):

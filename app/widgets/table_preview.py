@@ -14,6 +14,7 @@ from PySide6.QtWidgets import QWidget, QFrame, QTableView, QHeaderView, QInputDi
 from app.data.data_source import quote_identifier as _quote_table
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
+from app.utils.config import get_constant
 from app.styles.style import (
     MenuItem,
     apply_fusion_for_item_view_styling,
@@ -26,7 +27,7 @@ from app.utils.i18n import _
 
 # Rows loaded when previewing a saved query.  A preview is for judging shape
 # and content, not for scrolling a whole result set.
-QUERY_PREVIEW_ROW_LIMIT: int = 1000
+QUERY_PREVIEW_ROW_LIMIT: int = get_constant("query_preview_row_limit", 1000)
 
 
 def _type_code(decl_type: str | None) -> str:

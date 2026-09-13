@@ -24,6 +24,7 @@ from typing import Any, Callable
 
 import numpy as np
 
+from app.utils.config import get_constant
 
 # ----------------------------------------------------------------------
 # Monte Carlo search
@@ -33,7 +34,7 @@ import numpy as np
 #: the multiple of the current value used as a range, and the absolute range
 #: used when that value is zero. Wide enough to escape a bad guess, narrow
 #: enough that the samples are not all useless.
-UNBOUNDED_SPAN: float = 10.0
+UNBOUNDED_SPAN: float = get_constant("unbounded_span", 10.0)
 
 
 def _sampling_bounds(

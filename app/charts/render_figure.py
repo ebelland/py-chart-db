@@ -33,6 +33,7 @@ from app.data.descriptors import AxisDescriptor, FigureDescriptor, SeriesDescrip
 from app.data.series_frame import SeriesFrame
 from app.data.sqlite_repo import SqliteRepo
 from app.logs.logger import applogger
+from app.utils.config import get_constant
 from app.utils.mpl_latex import filter_latex_style_text
 
 
@@ -628,7 +629,7 @@ OPT_DOWNSAMPLE_THRESHOLD = "downsample_threshold"
 #: Applied when a figure descriptor carries no downsample_threshold of its
 #: own. Keeps a redraw quick on a large series while leaving the shape of
 #: any ordinary curve untouched (it only decimates *past* this many points).
-DEFAULT_DOWNSAMPLE_THRESHOLD = 1_000
+DEFAULT_DOWNSAMPLE_THRESHOLD = get_constant("default_downsample_threshold", 1_000)
 
 
 def _figure_downsample_threshold(descriptor: FigureDescriptor) -> int:

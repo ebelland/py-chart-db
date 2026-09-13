@@ -46,7 +46,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import QAbstractScrollArea, QApplication, QBoxLayout, QCheckBox, QComboBox, QFormLayout, QFrame, QLineEdit, QMenu, QPlainTextEdit, QScrollArea, QSizePolicy, QToolButton, QWidget, QPushButton
 from app.logs.logger import applogger
 from app.styles.palettes import themed_qss
-from app.utils.config import get_section, get_value
+from app.utils.config import get_constant, get_section, get_value
 from app.utils.i18n import tr
 
 _UI_DIR = Path(__file__).resolve().parent
@@ -82,9 +82,9 @@ MARGIN_PANEL: tuple[int, int, int, int] = (6, 6, 6, 6)
 
 # Canonical dialog sizes, keyed by the role a dialog plays.  Anything that needs
 # a size picks one of these instead of inventing another number.
-DIALOG_SIZE_SMALL: QSize = QSize(560, 360)
-DIALOG_SIZE_MEDIUM: QSize = QSize(900, 640)
-DIALOG_SIZE_LARGE: QSize = QSize(1020, 700)
+DIALOG_SIZE_SMALL: QSize = QSize(*get_constant("dialog_size_small", [560, 360]))
+DIALOG_SIZE_MEDIUM: QSize = QSize(*get_constant("dialog_size_medium", [900, 640]))
+DIALOG_SIZE_LARGE: QSize = QSize(*get_constant("dialog_size_large", [1020, 700]))
 
 DIALOG_SIZES: dict[str, QSize] = {
     "small": DIALOG_SIZE_SMALL,
@@ -98,18 +98,18 @@ DIALOG_SIZES: dict[str, QSize] = {
 # is what used to pin the main window's left panel at about 300 px however the
 # splitter was dragged.  Six characters plus elision keeps the panel free to
 # shrink; the full value stays readable through the combo's tooltip.
-COMBO_MIN_CONTENTS_LENGTH: int = 6
+COMBO_MIN_CONTENTS_LENGTH: int = get_constant("combo_min_contents_length", 6)
 
 # Room for the drop-down arrow and the frame, on top of the text itself.
 _COMBO_CHROME_WIDTH: int = 34
 
 # Splitter handle: wide enough to grab without aiming, narrow enough not to
 # read as a divider.
-SPLITTER_HANDLE_WIDTH: int = 6
+SPLITTER_HANDLE_WIDTH: int = get_constant("splitter_handle_width", 6)
 
 # Floor for the resizable side panels.  Not zero: a panel dragged to nothing
 # looks like a bug and cannot be grabbed again.
-PANEL_MIN_WIDTH: int = 140
+PANEL_MIN_WIDTH: int = get_constant("panel_min_width", 140)
 
 
 @dataclass(frozen=True, slots=True)

@@ -29,11 +29,12 @@ from typing import Any, Callable
 import numpy as np
 
 from app.functions.monte_carlo import monte_carlo_p0, sum_of_squares
+from app.utils.config import get_constant
 
 #: Samples drawn when no estimator is available.  Enough to find the right
 #: valley for the shapes this library holds, few enough to stay under a
 #: second - it runs while the user watches a dialog.
-DEFAULT_ITERATIONS: int = 20_000
+DEFAULT_ITERATIONS: int = get_constant("default_iterations", 20_000)
 
 #: How the values were arrived at.  Stored in English; the report translates.
 FROM_FUNCTION: str = "initial_guess"

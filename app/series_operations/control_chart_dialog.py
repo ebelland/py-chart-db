@@ -71,6 +71,7 @@ from app.series_operations.dialog_base import (
     generated_table_name,
 )
 from app.styles.style import create_doc_link, set_doc_link
+from app.utils.config import get_constant
 from app.utils.i18n import _
 from app.utils import report_html
 
@@ -159,7 +160,7 @@ LARGEST_TABULATED = max(SPC_CONSTANTS)
 
 #: Below this an attribute chart's limits are too soft to trust; the report
 #: says so rather than refusing to draw them.
-RECOMMENDED_SUBGROUPS = 20
+RECOMMENDED_SUBGROUPS = get_constant("control_chart_recommended_subgroups", 20)
 
 
 @dataclass(slots=True)

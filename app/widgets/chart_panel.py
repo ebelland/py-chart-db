@@ -35,7 +35,7 @@ from app.styles.style import (
     create_menu_item,
     create_toolbar_button,
 )
-from app.utils.config import get_section, get_value, update_section
+from app.utils.config import get_constant, get_section, get_value, update_section
 from app.utils.figure_metrics import (
     CM_PER_INCH,
     DEFAULT_FIGURE_DPI,
@@ -52,9 +52,9 @@ from app.widgets.html_results import HtmlResultsView
 from app.utils.i18n import _
 
 
-TOOLBAR_ICON_SIZE: Final[QSize] = QSize(24, 24)
+TOOLBAR_ICON_SIZE: Final[QSize] = QSize(*get_constant("toolbar_icon_size", [24, 24]))
 TOOLBAR_ACTIONS_TO_REMOVE: Final[set[str]] = {"Save","Subplots", "Customize", "Configure subplots", "Edit axis", "Edit colors"}
-DEFAULT_ASPECT_RATIO: Final[float] = 16.0 / 9.0
+DEFAULT_ASPECT_RATIO: Final[float] = get_constant("default_aspect_ratio", 16.0 / 9.0)
 CONFIG_SECTION: Final[str] = "chart_panel"
 CONFIG_RESIZE_MODE: Final[str] = "resize_mode"
 CONFIG_MIN_ZOOM: Final[str] = "min_zoom_percent"
@@ -73,15 +73,15 @@ RESIZE_MODE_CHOICES: Final[tuple[tuple[str, str, str], ...]] = (
     ("FIT", "Fit", "Fit chart without keeping proportions"),
     ("FIXED", "Fixed", "Fixed size with zoom and scrollbars"),
 )
-CHART_AREA_MIN_HEIGHT: Final[int] = 160
-NOTES_MIN_HEIGHT: Final[int] = 0
-NOTES_FIRST_OPEN_MIN_HEIGHT: Final[int] = 80
-NOTES_INITIAL_FRACTION: Final[float] = 0.3
+CHART_AREA_MIN_HEIGHT: Final[int] = get_constant("chart_area_min_height", 160)
+NOTES_MIN_HEIGHT: Final[int] = get_constant("notes_min_height", 0)
+NOTES_FIRST_OPEN_MIN_HEIGHT: Final[int] = get_constant("notes_first_open_min_height", 80)
+NOTES_INITIAL_FRACTION: Final[float] = get_constant("notes_initial_fraction", 0.3)
 
 #: How near the cursor has to be, in points, for a marker to count as picked.
 #: Five is about a default marker's own radius: close enough that a click has
 #: to be deliberate, wide enough that it does not have to be exact.
-PICK_TOLERANCE_POINTS: Final[float] = 5.0
+PICK_TOLERANCE_POINTS: Final[float] = get_constant("pick_tolerance_points", 5.0)
 
 #: FIXED mode's on-screen reference: the dpi used to turn a figure's physical
 #: size in inches into logical widget pixels, at 100% zoom.  Deliberately not
@@ -91,7 +91,7 @@ PICK_TOLERANCE_POINTS: Final[float] = 5.0
 #: although Width and Height never changed.  100 matches Matplotlib's own
 #: default figure.dpi, so a figure saved before per-figure dpi existed keeps
 #: the on-screen size it always had.
-FIXED_MODE_SCREEN_DPI: Final[float] = 100.0
+FIXED_MODE_SCREEN_DPI: Final[float] = get_constant("fixed_mode_screen_dpi", 100.0)
 
 
 def axis_text(axis: Any, value: float) -> str:

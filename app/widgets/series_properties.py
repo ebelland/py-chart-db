@@ -36,6 +36,7 @@ from app.widgets.color_combo import DEFAULT_COLOR_LABEL, MatplotlibColorCombo
 from app.widgets.line_combo import LineStyleCombo
 from app.widgets.marker_combo import MarkerStyleCombo
 from app.logs.logger import applogger
+from app.utils.config import get_constant
 from app.utils.i18n import _
 from app.utils.messages import ask
 
@@ -43,7 +44,7 @@ from app.utils.messages import ask
 AxisDescriptorLike = Any
 SeriesDescriptorLike = Any
 
-SQL_QUERY_VISIBLE_LINES = 6
+SQL_QUERY_VISIBLE_LINES = get_constant("sql_query_visible_lines", 6)
 
 
 class SeriesPropertiesWidget(BaseProperties):

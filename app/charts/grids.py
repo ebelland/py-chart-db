@@ -19,6 +19,7 @@ import pandas as pd
 from app.data.series_frame import SeriesFrame
 
 from app.logs.logger import applogger
+from app.utils.config import get_constant
 
 #: The largest grid this will pivot, in cells.
 #:
@@ -26,7 +27,7 @@ from app.logs.logger import applogger
 #: Past that the cost is in Matplotlib rather than here, and a chart nobody
 #: can wait for is not a chart - so the frame is refused with a message
 #: naming the way out rather than drawn eventually.
-MAX_GRID_CELLS: int = 4_000_000
+MAX_GRID_CELLS: int = get_constant("max_grid_cells", 4_000_000)
 
 
 def pivot_to_grid(
