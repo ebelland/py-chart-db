@@ -11,25 +11,8 @@ P0 - BUGS: wrong output, or work that cannot proceed
 NEW - requested after the review
 ================================================================
 
-FATTO 2026-09-10 (N-5) sqlite_repo diviso per materia
-      3.303 -> 749 righe. In app/data/repo/: tables 1.282, descriptors 645,
-      queries 331, maintenance 211, _common 263 (decoratore, helper SQL,
-      SavedQuery, DatabaseReport). Mixin con __slots__ = (), quindi la
-      dataclass concreta conserva i suoi slot e un typo su un attributo
-      continua a sollevare. Nessun call site cambiato: SqliteRepo e
-      DatabaseReport si importano da app.data.sqlite_repo come prima.
-      Restano con la connessione, come chiedeva l'item: campi, pragma,
-      cache delle serie, savepoint di preview, transazioni, undo.
-      Guardie in test_repo_parts.py, inclusa una sulla dimensione dei
-      moduli: era quello il punto.
       Nota: chart_panel (2.214), style (1.939), fit_dialog (1.760) e
       cluster_dialog (1.722) restano sopra le 1.500 righe.
-
-N-3   attribute control charts (p, np, c, u)
-      The half of SPC N-1 does not cover. These plot a proportion or a count
-      rather than a measurement, so the limits are binomial/Poisson rather
-      than normal, and the limits vary per point when the sample size does.
-      Needs a "sample size" role alongside x and y, which is the real work.
 
 ================================================================
 UI - reported while testing (2026-09)
@@ -50,12 +33,6 @@ N-19  GUI: toward a more standard, easy, intuitive interface
       these are the concrete points actually observed hands-on this round,
       not a generic UX checklist - each names a specific place, not a
       principle.
-      - Properties panels (Figure/Axis/Series) are Apply-then-look: nothing
-        shows what a change will do before it is applied and the chart
-        redraws. Even a lightweight inline preview (a small thumbnail, or
-        highlighting which control touches which part of the chart) would
-        close that loop faster than switching eyes between the form and
-        the tab.
       - The Series properties selector is a plain-text combo; each entry's
         series already has an actual plotted colour. A small colour swatch
         per row (matching MatplotlibColorCombo's own approach elsewhere)
@@ -67,10 +44,7 @@ N-19  GUI: toward a more standard, easy, intuitive interface
         one-time label (or a "?" walkthrough) is worth the added chrome,
         given nav rail structure itself is being kept as-is per the
         Finder-sidebar discussion.
-      - FATTO 2026-09-11: Import dialog showed delimiter/encoding/skip-rows/
-        header/column-type controls regardless of the chosen source -
-        irrelevant for a database table, which has none of that to say.
-        Disabled (not hidden) once the source is a database:
+
         _apply_source_dependent_enablement in import_data_dialog.py, run
         after every _build_columns_table since that rebuilds the per-column
         combos from scratch. Disabled rather than hidden - the row stays
@@ -236,6 +210,80 @@ P2-15 series operations: scikit-learn models
         a shared x grid -> N component series + an explained-variance
         report. The one new shape here: many series in, many out (blind
         source separation, common-mode removal).
+      - Manifold learning: t-SNE / Isomap / LocallyLinearEmbedding, same
+        many-in shape as Decomposition above but for the nonlinear
+        structure PCA misses - exploratory, so frame the result as "a 2D
+        layout", not as a measurement, in whatever report it gets.
+
+P2-18 renderer coverage: chart types Matplotlib supports that this app does
+      not yet draw. 29 chart types exist today (app/charts/*.py); checked
+      against Matplotlib's own Axes/Axes3D API for what nothing here wraps.
+      Candidates worth a renderer, roughly in order of how many requests a
+      gap like this tends to generate:
+      - Heatmap (imshow/pcolormesh over a regular x/y grid, no
+        interpolation): distinct from Contour Plot, which always
+        interpolates between levels - a correlation matrix or a raw
+        measurement grid wants to show the actual cell values, not a
+        smoothed field between them.
+      - tricontour / tricontourf: the smooth, level-interpolated sibling of
+        the existing Triangular Color Mesh (tripcolor draws flat patches,
+        no interpolation) - same relationship Heatmap above has to Contour
+        Plot, for scattered rather than gridded data.
+      - hexbin: 2D density for a scatter with too many points to read
+        individually - the 2D counterpart to Histogram, and a common ask
+        wherever ECDF/Histogram already are.
+      - eventplot: spike/event raster (parallel tick marks per row) - time-
+        stamped events (a raw pass/fail log, a channel of digital signal
+        edges) that a line or scatter chart draws as noise.
+      - 3D Line Plot (Axes3D.plot): a parametric curve or trajectory in
+        three dimensions. Scatter Plot (3D) exists but never connects its
+        points in order, which is the one thing a trajectory needs.
+      - 3D Bar Chart (Axes3D.bar3d): categorical data in three dimensions -
+        the 3D counterpart Bar Chart already has in 2D.
+      Not candidates: specgram/psd/csd/cohere/*_spectrum/xcorr/acorr are
+      already covered as series operations (spectral_dialog.py) that draw
+      their output through the existing Scatter Plot/Time Series renderers
+      - a transform belongs there, not as a new axis renderer. polar
+      projections and voxels are real gaps too but a bigger architectural
+      question (a polar axes changes what "x/y role" even means; voxels are
+      heavy and rarely load-bearing) rather than a renderer to drop in.
+
+P2-19 pysym: user-authored Python/symbolic series - a suggested design, not
+      yet scoped or agreed
+      The ask: a series operation where the user writes Python/symbolic
+      (sympy-style) code instead of picking one of the built-in transforms,
+      previews it against a chosen series, and applies it to both a chart
+      series and a real table under a name the user gives it.
+      Sketch:
+      - Storage: an internal __pysym__ table (name, code, description,
+        created/modified timestamps), the same pattern __import_links__ and
+        __table_descriptors__ already use - one row per named snippet, so
+        it can be reused across series/figures without retyping it.
+      - Editing: a series_operations/pysym_dialog.py following the existing
+        SeriesOperationDialogBase shape (source series picker, code editor,
+        preview plot, Apply) - reuses P2-12's inline-preview plumbing once
+        that lands, rather than a second copy of it.
+      - Dual output: Apply both draws the result as a new series (the
+        existing ResultSeriesSpec/generated_table_name path every operation
+        already uses) and materializes it into a table under the name the
+        user typed - the second half is new; nothing today lets a series
+        operation name and create a persistent table of its own rather than
+        an auto-named "_generated" one.
+      - Security, the part this cannot skip: a .dhub file is explicitly
+        documented elsewhere in this codebase as something that gets
+        emailed and committed without a second thought (see why credentials
+        never go in one, app/utils/data_sources.py). Embedding arbitrary
+        executable Python in that same file is a materially bigger risk
+        than the saved SQL queries it already carries - SQL against one's
+        own tables is bounded, Python is not. Do not let __pysym__ code run
+        on file open, ever, only on an explicit Apply/Run the user clicks
+        for that specific snippet - the same trust model a saved query
+        already has - and execute it against a restricted globals dict
+        (numpy/pandas/math exposed, no import/open/os/subprocess) rather
+        than a bare exec(). A one-time warning the first time a project
+        with a non-empty __pysym__ table is opened, naming what that means,
+        is worth doing even so - this is closer to a spreadsheet macro than
+        to a saved filter.
 
 FATTO 2026-09-11 (P2-16) SqliteRepo.query_arrays: query_df senza DataFrame
       Misurato prima di scrivere: 42 file importano pandas, ma solo 2

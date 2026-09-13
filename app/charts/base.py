@@ -531,10 +531,16 @@ class BaseAxisRenderer(Protocol):
             kwargs = {}
         kwargs = dict(kwargs)
 
+        # Arrow-only placement kwargs. Popped unconditionally, not just in
+        # the "arrow" branch below: the Overlay panel edits one kwargs dict
+        # per annotation, so switching an annotation from arrow to text/boxed
+        # text leaves these behind in it - and Axes.text() has no such
+        # properties and raises AttributeError if one is still there.
+        xytext = kwargs.pop("xytext", (10, 10))
+        textcoords = kwargs.pop("textcoords", "offset points")
+        arrowprops = kwargs.pop("arrowprops", None)
+
         if annotation_type == "arrow":
-            xytext = kwargs.pop("xytext", (10, 10))
-            textcoords = kwargs.pop("textcoords", "offset points")
-            arrowprops = kwargs.pop("arrowprops", None)
             if not isinstance(arrowprops, dict):
                 arrowprops = {"arrowstyle": "->"}
             ax.annotate(

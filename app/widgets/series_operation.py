@@ -70,16 +70,23 @@ _TILE_HEIGHT = 84
 #: - a new plugin dropped in without this being updated - lands in
 #: _FALLBACK_SECTION rather than disappearing, so being forgotten here costs
 #: it a good home, not a listing at all.
+#:
+#: Titles are left untranslated here and passed through _() in
+#: _group_by_section instead: this tuple is built once, at module import, so
+#: a _() call made here would freeze the section headers in whatever
+#: language was active at first import - English, since that runs before
+#: the saved language preference is applied - and the app-wide language
+#: switch would never reach them again.
 _SECTIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    (_("Analysis"), ("Peaks", "Roots", "Calculus")),
-    (_("Statistics"), ("Statistics", "Outliers", "Clustering", "Control Chart")),
+    ("Analysis", ("Peaks", "Roots", "Calculus")),
+    ("Statistics", ("Statistics", "Outliers", "Clustering", "Control Chart")),
     (
-        _("Signal Processing"),
+        "Signal Processing",
         ("Smoothing", "Spectral Analysis", "Filtering", "Baseline Correction"),
     ),
-    (_("Modeling"), ("Fit", "Interpolation", "Function")),
+    ("Modeling", ("Fit", "Interpolation", "Function")),
 )
-_FALLBACK_SECTION = _("Other")
+_FALLBACK_SECTION = "Other"
 
 
 def _operation_action_id(operation: dict) -> str:
@@ -101,11 +108,11 @@ def _group_by_section(operations: list[dict]) -> list[tuple[str, list[dict]]]:
         items = [by_name[name] for name in names if name in by_name]
         placed.update(names)
         if items:
-            grouped.append((title, items))
+            grouped.append((_(title), items))
 
     leftover = [op for op in operations if _operation_action_id(op) not in placed]
     if leftover:
-        grouped.append((_FALLBACK_SECTION, leftover))
+        grouped.append((_(_FALLBACK_SECTION), leftover))
     return grouped
 
 
@@ -131,8 +138,8 @@ class OperationTile(QFrame):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
-        self.setFixedHeight(_TILE_HEIGHT)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setFixedSize(_TILE_HEIGHT, _TILE_HEIGHT)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self._title = title
         self._description = description
 
@@ -229,6 +236,13 @@ class OperationSection(QWidget):
         self._relayout(2)
 
     def _relayout(self, columns: int) -> None:
+        """Re-pack the fixed-size square tiles into *columns* columns.
+
+        No column stretch: tiles are a fixed square size (see
+        OperationTile), so stretching a column would only open a growing
+        gap after each tile as the panel widens rather than resizing it -
+        the grid packs tiles left instead, like an icon view.
+        """
         columns = max(1, columns)
         if columns == self._columns:
             return
@@ -237,9 +251,7 @@ class OperationSection(QWidget):
             self._grid.takeAt(0)
         for index, tile in enumerate(self._tiles):
             row, col = divmod(index, columns)
-            self._grid.addWidget(tile, row, col)
-        for col in range(columns):
-            self._grid.setColumnStretch(col, 1)
+            self._grid.addWidget(tile, row, col, Qt.AlignmentFlag.AlignLeft)
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)

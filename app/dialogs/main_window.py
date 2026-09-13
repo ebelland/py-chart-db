@@ -33,6 +33,7 @@ from app.dialogs.import_data_dialog import ImportDataDialog, is_importable
 from app.data.demo_project import PROJECTS_DIR, copy_demo_project
 from app.dialogs.load_demo_dialog import LoadDemoDialog
 from app.dialogs.credits_dialog import CreditsDialog
+from app.dialogs.database_info_dialog import DatabaseInfoDialog
 from app.dialogs.query_builder_dialog import QueryBuilderDialog
 from app.widgets.axis_properties import AxisPropertiesWidget
 from app.widgets.overlay_properties import OverlayPropertiesWidget
@@ -72,7 +73,7 @@ from app.utils.startup import PROJECT_FILE_FILTER
 from app.utils.messages import show_message
 from app.logs.logger import applogger
 from app.utils.i18n import _
-from PySide6.QtWidgets import QApplication, QButtonGroup, QFileDialog, QFrame, QHBoxLayout, QMainWindow, QMenu, QScrollArea, QSizePolicy, QSplitter, QStackedWidget, QTabWidget, QToolBox, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QButtonGroup, QFileDialog, QFrame, QHBoxLayout, QMainWindow, QMenu, QMenuBar, QScrollArea, QSizePolicy, QSplitter, QStackedWidget, QTabWidget, QToolBox, QToolButton, QVBoxLayout, QWidget
 
 # Coalescing window for property-driven chart reloads, in milliseconds.
 # Long enough to swallow a spinbox drag, short enough to feel immediate.
@@ -451,30 +452,73 @@ class MainWindow(QMainWindow):
         "credits": QAction.MenuRole.AboutRole,
     }
 
-    def _app_menu_items(self) -> list:
-        """Return the app menu's contents, shared by both places it appears.
+    def _app_menu_items(self) -> list[tuple[str, list[MenuItem | None]]]:
+        """Return the app menu's contents, grouped the way macOS expects.
 
-        The activity rail's popup on every platform, and - on macOS - the
-        real menu bar as well.  One list means the two cannot drift apart the
-        way a hand-kept second copy would.
+        One list of (title, items) groups, shared by both places the menu
+        appears: flattened into one popup for the activity rail's "Menu"
+        button and every non-Mac platform (see _flatten_menu_groups), or
+        built into one QMenu per group for the real macOS menu bar (see
+        _build_macos_menu_bar). One source means the two cannot drift apart
+        the way a hand-kept second copy would.
         """
         return [
-            action_menu_item("new", self._on_new_file),
-            action_menu_item("open", self._on_open_database),
-            self._recent_databases_item(),
-            action_menu_item("save_as", self._on_save_as),
-            action_menu_item("import", self._on_import_data),
-            action_menu_item("query_builder", self._on_query_builder),
-            action_menu_item("load_demo", self._on_load_demo),
-            None,
-            self._undo_item(),
-            action_menu_item("optimize_db", self._on_optimize_db),
-            None,
-            action_menu_item("settings", self._on_settings),
-            action_menu_item("log_viewer", self._show_log_viewer),
-            action_menu_item("user_manual", self._on_user_manual),
-            action_menu_item("credits", self._on_credits),
+            (
+                _("File"),
+                [
+                    action_menu_item("new", self._on_new_file),
+                    action_menu_item("open", self._on_open_database),
+                    self._recent_databases_item(),
+                    action_menu_item("import", self._on_import_data),
+                    None,
+                    action_menu_item("save", self._on_save, shortcut="Ctrl+S"),
+                    action_menu_item("save_as", self._on_save_as),
+                ],
+            ),
+            (
+                _("Edit"),
+                [
+                    self._undo_item(),
+                    None,
+                    action_menu_item("copy", self._on_copy_chart),
+                ],
+            ),
+            (
+                _("Database"),
+                [
+                    action_menu_item("query_builder", self._on_query_builder),
+                    action_menu_item("optimize_db", self._on_optimize_db),
+                    None,
+                    action_menu_item("database_info", self._on_database_info),
+                ],
+            ),
+            (
+                _("Help"),
+                [
+                    action_menu_item("settings", self._on_settings),
+                    action_menu_item("log_viewer", self._show_log_viewer),
+                    None,
+                    action_menu_item("user_manual", self._on_user_manual),
+                    action_menu_item("load_demo", self._on_load_demo),
+                    None,
+                    action_menu_item("credits", self._on_credits),
+                ],
+            ),
         ]
+
+    @staticmethod
+    def _flatten_menu_groups(
+        groups: list[tuple[str, list[MenuItem | None]]]
+    ) -> list[MenuItem | None]:
+        """One flat list for the popup: every group's items, a separator
+        between groups - the shape the popup already had before the real
+        macOS menu bar split it into File/Edit/Database/Help."""
+        flat: list[MenuItem | None] = []
+        for index, (_title, items) in enumerate(groups):
+            if index:
+                flat.append(None)
+            flat.extend(items)
+        return flat
 
     def _undo_item(self) -> MenuItem:
         """The Undo entry, naming the change it will take back.
@@ -694,8 +738,8 @@ class MainWindow(QMainWindow):
         exactly what already happened when this was only ever the popup.
         """
         previous = getattr(self, "_app_menu", None)
-        items = self._app_menu_items()
-        self._app_menu = create_menu(self, items)
+        groups = self._app_menu_items()
+        self._app_menu = create_menu(self, self._flatten_menu_groups(groups))
         if previous is not None and IS_MACOS:
             # It is parented to this window, so replacing the attribute is not
             # enough to free it - and on macOS this runs on every undo-stack
@@ -707,7 +751,7 @@ class MainWindow(QMainWindow):
         self._app_menu.aboutToShow.connect(self._sync_undo_item)
 
         if IS_MACOS:
-            self._build_macos_menu_bar(items)
+            self._build_macos_menu_bar(groups)
             # Cocoa rebuilds its own native menu items - overwriting any
             # rename - at least once more after this call returns, somewhere
             # between menu construction and the window's first activation.
@@ -718,57 +762,95 @@ class MainWindow(QMainWindow):
             for delay_ms in (0, 150, 400, 800, 1500, 2500):
                 QTimer.singleShot(delay_ms, self._rename_macos_native_app_menu_items)
 
-    def _build_macos_menu_bar(self, items: list) -> None:
-        """Populate the real menu bar from the same items as the popup.
+    def _build_macos_menu_bar(
+        self, groups: list[tuple[str, list[MenuItem | None]]]
+    ) -> None:
+        """Populate the real menu bar with one QMenu per group.
 
-        Settings and Credits do not stay in the menu this builds: Cocoa pulls
-        any action carrying MenuRole.PreferencesRole/AboutRole out into the
-        native application menu - the one already showing next to the apple -
-        wherever in the menu bar it was declared. Nothing else has a role a
-        Mac user would expect, so the rest stay together in one ordinary
-        top-level menu, named "File".
+        Settings and Credits do not stay wherever this puts them: Cocoa
+        pulls any action carrying MenuRole.PreferencesRole/AboutRole out
+        into the native application menu - the one already showing next to
+        the apple - wherever in the menu bar it was declared. Window is not
+        one of the groups: it holds no reusable MenuItem, only two Cocoa
+        window operations nothing else needs, so it is built directly here
+        instead, between the app's own menus and Help - the usual place on
+        a Mac.
         """
         menu_bar = self.menuBar()
         menu_bar.clear()
 
-        menu = menu_bar.addMenu(_("File"))
-        # Cocoa rarely delivers this for a menu-bar menu, and rebuilding the
-        # bar from inside a show handler would clear the menu mid-display -
-        # so _sync (a plain property poke), never _refresh.
-        menu.aboutToShow.connect(self._sync_undo_item)
-        for item in items:
-            if item is None:
-                menu.addSeparator()
-                continue
+        for index, (title, items) in enumerate(groups):
+            if index == len(groups) - 1:
+                self._build_macos_window_menu(menu_bar)
 
-            if item.submenu is not None:
-                # The same helper the popup uses, so Open recent is one
-                # list of files rendered twice rather than two lists that
-                # can disagree.
-                child = create_menu(self, item.submenu)
-                child.setTitle(item.text)
-                child.setEnabled(item.enabled)
-                menu.addMenu(child)
-                continue
+            menu = menu_bar.addMenu(title)
+            # Cocoa rarely delivers this for a menu-bar menu, and rebuilding
+            # the bar from inside a show handler would clear the menu
+            # mid-display - so _sync (a plain property poke), never _refresh.
+            menu.aboutToShow.connect(self._sync_undo_item)
+            for item in items:
+                if item is None:
+                    menu.addSeparator()
+                    continue
 
-            create_menu_item(
-                parent=self,
-                menu=menu,
-                icon=item.icon,
-                checkable=item.checkable,
-                text=item.text,
-                tooltip=item.tooltip,
-                key=item.shortcut,
-                action=item.callback,
-                action_id=item.action_id,
-                checked=item.checked,
-                enabled=item.enabled,
-            )
+                if item.submenu is not None:
+                    # The same helper the popup uses, so Open recent is one
+                    # list of files rendered twice rather than two lists that
+                    # can disagree.
+                    child = create_menu(self, item.submenu)
+                    child.setTitle(item.text)
+                    child.setEnabled(item.enabled)
+                    menu.addMenu(child)
+                    continue
 
-        for action in menu.actions():
-            role = self._MACOS_MENU_ROLES.get(str(action.data() or ""))
-            if role is not None:
-                action.setMenuRole(role)
+                create_menu_item(
+                    parent=self,
+                    menu=menu,
+                    icon=item.icon,
+                    checkable=item.checkable,
+                    text=item.text,
+                    tooltip=item.tooltip,
+                    key=item.shortcut,
+                    action=item.callback,
+                    action_id=item.action_id,
+                    checked=item.checked,
+                    enabled=item.enabled,
+                )
+
+            for action in menu.actions():
+                role = self._MACOS_MENU_ROLES.get(str(action.data() or ""))
+                if role is not None:
+                    action.setMenuRole(role)
+
+    def _build_macos_window_menu(self, menu_bar: QMenuBar) -> None:
+        """Build the Window menu: Minimize and Zoom.
+
+        Neither is a reusable MenuItem - nothing else in the app ever needs
+        "minimize this window" - so, unlike every other menu, this one is
+        built directly against the QMenuBar rather than through
+        _app_menu_items/create_menu_item.
+        """
+        menu = menu_bar.addMenu(_("Window"))
+        create_menu_item(
+            parent=self,
+            menu=menu,
+            icon=None,
+            checkable=False,
+            text=_("Minimize"),
+            tooltip=_("Minimize"),
+            key="Ctrl+M",
+            action=self.showMinimized,
+        )
+        create_menu_item(
+            parent=self,
+            menu=menu,
+            icon=None,
+            checkable=False,
+            text=_("Zoom"),
+            tooltip=_("Zoom"),
+            key=None,
+            action=self._on_zoom,
+        )
 
     #: Cocoa's own selectors for Hide and Quit - reliable regardless of
     #: title, since neither is backed by a QAction of ours and both keep
@@ -1651,6 +1733,23 @@ class MainWindow(QMainWindow):
             applogger.exception("Failed to open database: %s", exc)
             show_message(self, "database.open_failed", error=exc)
 
+    def _on_save(self) -> None:
+        """Fold the WAL into the .dhub file on disk, right now.
+
+        Not "there is unsaved work": every change already committed through
+        SQLite's WAL as it happened. But Cmd+S/Ctrl+S is a reflex, and this
+        is the honest thing an already-live database can do under it -
+        guarantee the file on disk is not waiting on a WAL checkpoint SQLite
+        would otherwise fold in on its own schedule. See SqliteRepo.checkpoint.
+        """
+        if self._repo is None:
+            return
+        try:
+            self._repo.checkpoint()
+            self.statusBar().showMessage(_("Database saved."), 4_000)
+        except Exception as exc:  # noqa: BLE001
+            applogger.exception("Checkpoint failed: %s", exc)
+
     def _on_save_as(self) -> None:
         """Save a copy of the current database under a new name, and switch to it.
 
@@ -1862,6 +1961,40 @@ class MainWindow(QMainWindow):
         dialog = QueryBuilderDialog(self._repo, parent=self)
         dialog.exec()
         self._table_panel.reload()
+
+    def _on_database_info(self) -> None:
+        """Open the Database Info dialog, then refresh in case a table
+        was exported or a link updated the data underneath the table list."""
+        if self._repo is None:
+            return
+        dialog = DatabaseInfoDialog(self._repo, parent=self)
+        dialog.exec()
+        self._table_panel.reload()
+
+    def _on_copy_chart(self) -> None:
+        """Copy the current chart tab's figure to the clipboard.
+
+        A no-op when the current tab is not a chart - decided here, on
+        click, rather than by disabling the menu item: the native macOS menu
+        bar caches each item's enabled state from the last full rebuild
+        (see _refresh_undo_item) and rebuilding the whole bar on every tab
+        switch just to keep one item current is not worth it for an action
+        that already knows to do nothing when there is nothing to copy.
+        """
+        panel = self._current_chart_panel()
+        if panel is not None:
+            panel.copy_chart_to_clipboard()
+
+    def _on_zoom(self) -> None:
+        """Toggle the window between its normal and maximized size.
+
+        The nearest cross-platform equivalent to clicking a Mac window's
+        green Zoom button, which has no direct Qt API of its own.
+        """
+        if self.isMaximized():
+            self.showNormal()
+        else:
+            self.showMaximized()
 
     # ------------------------------------------------------------------
     # Helpers

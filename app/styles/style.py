@@ -43,7 +43,7 @@ from PySide6.QtGui import (
     QPixmap,
     QTextOption,
 )
-from PySide6.QtWidgets import QAbstractScrollArea, QApplication, QBoxLayout, QCheckBox, QComboBox, QFormLayout, QFrame, QLineEdit, QMenu, QPlainTextEdit, QScrollArea, QSizePolicy, QToolButton, QWidget, QPushButton
+from PySide6.QtWidgets import QApplication, QBoxLayout, QCheckBox, QComboBox, QFormLayout, QFrame, QLineEdit, QMenu, QPlainTextEdit, QScrollArea, QSizePolicy, QToolButton, QWidget, QPushButton
 from app.logs.logger import applogger
 from app.styles.palettes import themed_qss
 from app.utils.config import get_constant, get_section, get_value
@@ -1408,7 +1408,7 @@ def apply_fusion_for_item_view_styling(view: QWidget) -> None:
         # area has these. Nothing else needs putting back.
         scrollbar = getattr(view, reader, None)
         bar = scrollbar() if callable(scrollbar) else None
-        if bar is not None and isinstance(bar, QAbstractScrollArea): 
+        if bar is not None:
             bar.setStyle(application_style)
 
 
@@ -1607,6 +1607,15 @@ def create_menu_item(
         qaction.setIcon(icon)
     elif icon:
         qaction.setIcon(load_icon(icon))
+    elif IS_MACOS:
+        # macOS's native menu does not reserve an icon gutter for an item
+        # that carries none, the way Fusion/Windows menus always do - so an
+        # icon-less item's text sits flush left while its siblings' text
+        # starts after their icon, out of line with the rest of the menu. A
+        # blank icon the same size as a real one keeps the column reserved.
+        blank = QPixmap(20, 20)
+        blank.fill(Qt.GlobalColor.transparent)
+        qaction.setIcon(QIcon(blank))
 
     if action_id is not None:
         qaction.setData(action_id)

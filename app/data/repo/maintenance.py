@@ -62,6 +62,25 @@ class MaintenanceMixin:
         return report
 
     @ensure_connection_wrapper
+    def checkpoint(self) -> None:
+        """Fold the WAL into the .dhub file itself, on disk, right now.
+
+        Every change is already committed through SQLite's WAL as it
+        happens - there is no "unsaved" state for ``Save`` to flush the way
+        there would be for a document editor. What TRUNCATE actually buys is
+        the .dhub file being the *whole* database on its own again (WAL mode
+        otherwise leaves recent writes in the -wal side file until SQLite
+        checkpoints on its own schedule) and that side file shrunk back to
+        empty - useful before copying the file, backing it up, or handing it
+        to a tool that only reads the .dhub. Safe inside an open transaction,
+        unlike VACUUM: a checkpoint does not rewrite the file, only merges
+        into it.
+        """
+        assert self._con is not None
+        self._con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        applogger.info("Checkpointed: WAL folded into the database file.")
+
+    @ensure_connection_wrapper
     def save_as(self, target_path: Path) -> Path:
         """Write a compacted copy of this database to *target_path*.
 

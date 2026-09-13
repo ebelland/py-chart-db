@@ -157,6 +157,14 @@ def test_check_runs_before_vacuum(repo: SqliteRepo) -> None:
     assert "spare" in report.unreferenced_tables
 
 
+def test_checkpoint_folds_the_wal_without_error(repo: SqliteRepo) -> None:
+    """The Save menu item's whole job: no exception, and the database stays
+    usable and holds what was written before it ran."""
+    repo.checkpoint()
+    assert repo.query_df("SELECT 1 AS a").iloc[0]["a"] == 1
+    assert repo.query_df('SELECT COUNT(*) AS n FROM "good_table"').iloc[0]["n"] == 1
+
+
 def test_report_logging_does_not_raise(repo: SqliteRepo) -> None:
     repo.query_df("DROP TABLE good_table")
     repo.check_database().log()  # must not raise

@@ -1088,7 +1088,10 @@ QLabel[operationTileTitle="true"] {
    ---------------------------------------------------------- */
 
 QLabel#operationHint {
+    background: palette(base);
     border-top: 1px solid rgba(@SHADOW_RGB@, 0.08);
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
     padding: 8px 10px;
 }
 `

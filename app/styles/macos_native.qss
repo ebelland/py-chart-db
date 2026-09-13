@@ -29,9 +29,11 @@
      saturated accent fill used on Windows: macOS list/table
      hover is conventionally subtle, reserving full accent color
      for the actual :selected state.
-   - Header captions use muted palette(mid), not full-contrast
-     text, matching Apple's HIG caption convention for table
-     header labels. Don't "fix" this to match Windows.
+   - Header captions were muted palette(mid), matching Apple's HIG
+     caption convention for table header labels - but that read as
+     barely-there grey-on-grey in practice, so TableListPanel's and
+     TablePreviewPanel's headers below now use rgba(@SHADOW_RGB@, 0.65)
+     instead: still lighter than body text, legible at a glance.
    - All sizes use pt, matching how AppKit/HIG specifies type
      sizes (the previous px values were inconsistent with that
      and with the Windows file's own pt convention).
@@ -617,14 +619,19 @@ QSplitter::handle:vertical {
 }
 
 /* -------------------------------
-   TableListPanel — the sidebar list
+   TableListPanel — the table list
 
-   No frame, no grid, no alternating rows: a Finder sidebar is a
-   plain list on the sidebar surface.  Selection is the capsule.
+   Banded white/grey rows and the same header treatment as
+   TablePreviewPanel below: the two lists sit side by side in the
+   same window and are read as one visual language, not a sidebar
+   and a content pane in two different styles. Selection is still
+   the capsule, not a flat highlight - that part of the Finder
+   metaphor stays.
 -------------------------------- */
 
 TableListPanel QTableView {
-  background: transparent;
+  background: palette(base);
+  alternate-background-color: rgba(@SHADOW_RGB@, 0.03);
   color: palette(text);
   border: none;
   border-radius: 0;
@@ -660,11 +667,13 @@ TableListPanel QTableView::item:selected:!active {
   color: palette(highlighted-text);
 }
 
-/* Finder's sidebar section captions: small, semibold, muted, and
-   *not* uppercase - "Favorites", not "FAVORITES". */
+/* Column captions: small, semibold, legible - not uppercase
+   ("Favorites", not "FAVORITES"), and not so muted they wash out
+   against the header strip. Same treatment as TablePreviewPanel's
+   header just below, for the same reason the row bands now match. */
 TableListPanel QHeaderView::section {
   background: transparent;
-  color: palette(mid);
+  color: rgba(@SHADOW_RGB@, 0.65);
   font-size: 11pt;
   font-weight: 600;
   letter-spacing: 0;
@@ -675,9 +684,10 @@ TableListPanel QHeaderView::section {
 /* -------------------------------
    TablePreviewPanel — the file list
 
-   The content side of Finder: alternating rows, no vertical grid,
-   a flat header with hairline dividers that reads as a column
-   header rather than as a button strip.
+   Alternating rows, no vertical grid, a flat header with hairline
+   dividers that reads as a column header rather than as a button
+   strip. Same row banding and header treatment as TableListPanel
+   above, so the two lists read as one visual language.
 -------------------------------- */
 
 TablePreviewPanel QTableView {
@@ -712,18 +722,15 @@ TablePreviewPanel QTableView::item:selected {
 }
 
 TablePreviewPanel QHeaderView::section {
-  /* transparent, not palette(window): palette(mid) is a muted tone meant to
-     sit on palette(base) (what the table body itself uses, right below this
-     header) or on nothing at all - not on palette(window), which on macOS
-     sits close enough to palette(mid) in luminance to read as barely-there
-     grey text on grey. TableListPanel's header already gets this right with
-     the same transparent + palette(mid) pairing; this now matches it, which
-     also fixes the two headers looking like two different colours side by
-     side in the same window. */
+  /* transparent, not palette(window): the header sits on palette(base)
+     (what the table body itself uses, right below it) or on nothing at
+     all - not on palette(window), which on macOS is close enough to this
+     text colour in luminance to look wrong behind it. Same colour and
+     weight as TableListPanel's header, so the two match side by side. */
   background: transparent;
-  color: palette(mid);
+  color: rgba(@SHADOW_RGB@, 0.65);
   font-size: 11pt;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0;
   padding: 4px 8px;
   border: none;
@@ -818,7 +825,10 @@ QLabel[operationTileTitle="true"] {
    ---------------------------------------------------------- */
 
 QLabel#operationHint {
+    background: palette(base);
     border-top: 1px solid rgba(@SHADOW_RGB@, 0.08);
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
     padding: 8px 10px;
 }
 `

@@ -457,6 +457,28 @@ def test_a_line_with_an_unusable_kwarg_costs_only_itself() -> None:
     assert len(axes.lines) == 1
 
 
+def test_switching_an_annotation_from_arrow_to_text_does_not_crash() -> None:
+    """The Overlay panel edits one kwargs dict per annotation, so switching
+    an annotation's type from arrow to text/boxed text leaves xytext/
+    textcoords/arrowprops sitting in it - and Axes.text(), unlike annotate(),
+    raises AttributeError if one of those is still there."""
+    _figure, axes = _drawn(
+        {
+            "annotations": [
+                {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "type": "text",
+                    "text": "peak",
+                    "kwargs": {"xytext": [10, 10], "textcoords": "offset points"},
+                }
+            ]
+        }
+    )
+
+    assert [text.get_text() for text in axes.texts] == ["peak"]
+
+
 def test_every_renderer_draws_lines_because_annotations_do(
     repo: SqliteRepo, figure_with_axis
 ) -> None:

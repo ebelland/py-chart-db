@@ -5200,3 +5200,56 @@ msgstr "Linee di corrente tracciate attraverso un campo vettoriale, per vedere d
 
 msgid "A barb per point showing the direction and strength of a vector field, read from u and v components. Barbs encode speed in flags, so they stay readable where a field of arrows does not."
 msgstr "Una barba per punto che mostra direzione e intensità di un campo vettoriale, lette dalle componenti u e v. Le barbe codificano la velocità con le bandierine, quindi restano leggibili dove un campo di frecce non lo sarebbe."
+
+msgid "Database Info"
+msgstr "Informazioni database"
+
+
+msgid "Tables, size and import links for the current database"
+msgstr "Tabelle, dimensione e collegamenti di importazione del database corrente"
+
+
+msgid "Path:"
+msgstr "Percorso:"
+
+
+msgid "Size on disk:"
+msgstr "Dimensione su disco:"
+
+
+msgid "unknown"
+msgstr "sconosciuta"
+
+
+msgid "Yes"
+msgstr "Sì"
+
+
+msgid "Refresh the selected table from its import link"
+msgstr "Aggiorna la tabella selezionata dal suo collegamento di importazione"
+
+
+msgid "Window"
+msgstr "Finestra"
+
+
+msgid "Minimize"
+msgstr "Riduci a icona"
+
+
+msgid "Zoom"
+msgstr "Zoom"
+
+
+msgid "Copy the current chart to the clipboard"
+msgstr "Copia il grafico corrente negli appunti"
+
+msgid "Database saved."
+msgstr "Database salvato."
+
+msgid "Help"
+msgstr "Aiuto"
+
+
+msgid "Linked"
+msgstr "Collegata"

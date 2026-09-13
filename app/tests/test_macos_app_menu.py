@@ -88,81 +88,104 @@ def _rail_tooltips(window: MainWindow) -> list[str]:
 
 # ----------------------------------------------------------------------
 # The macOS menu bar
+#
+# _menu_named returns (top_actions, menu): top_actions is menu_bar.actions(),
+# a real list the caller must keep assigned to a name for as long as menu is
+# used. menu is one QAction inside that list's own .menu() - not a fresh,
+# unanchored list of its own - so losing the name "top_actions" would free
+# the list, and with it the QAction menu is a child of. See the file
+# docstring on Qt object lifetime; this is that trap by another route.
 # ----------------------------------------------------------------------
-def test_the_menu_bar_carries_one_top_level_menu(window: MainWindow) -> None:
+def _menu_named(window: MainWindow, title: str):
     menu_bar = window.menuBar()
     top_actions = menu_bar.actions()
+    top_action = next(action for action in top_actions if action.text() == title)
+    return top_actions, top_action.menu()
 
-    assert len(top_actions) == 1
+
+def test_the_menu_bar_carries_one_menu_per_group(window: MainWindow) -> None:
+    menu_bar = window.menuBar()
+    top_actions = menu_bar.actions()
+    titles = [action.text() for action in top_actions]
+
     # "File", not "Menu": a Mac user looks for New/Open/Import under File,
     # and the rail button this replaced is not on screen to be echoed.
-    assert top_actions[0].text() == "File"
+    # Window sits between the app's own menus and Help - the usual place on
+    # a Mac - even though it holds no MenuItem of its own (see
+    # _build_macos_window_menu).
+    assert titles == ["File", "Edit", "Database", "Window", "Help"]
 
 
-def test_the_menu_holds_every_item_the_popup_has(window: MainWindow) -> None:
-    menu_bar = window.menuBar()
-    top_actions = menu_bar.actions()
-    top_action = top_actions[0]
-    menu = top_action.menu()
+def test_file_holds_the_file_group(window: MainWindow) -> None:
+    _top_actions, menu = _menu_named(window, "File")
     items = menu.actions()
 
     ids = [action.data() for action in items if not action.isSeparator()]
     # Open recent carries no action id: it is a submenu, not an action, and
     # its entries are file paths rather than catalogue ids.
     assert [action.text() for action in items if action.menu()] == ["Open recent"]
-    assert ids == [
-        "new",
-        "open",
-        None,
-        "save_as",
-        "import",
-        "query_builder",
-        "load_demo",
-        "undo",
-        "optimize_db",
-        "settings",
-        "log_viewer",
-        "user_manual",
-        "credits",
-    ]
+    assert ids == ["new", "open", None, "import", "save", "save_as"]
+
+
+def test_edit_holds_undo_and_copy(window: MainWindow) -> None:
+    _top_actions, menu = _menu_named(window, "Edit")
+    items = menu.actions()
+    ids = [action.data() for action in items if not action.isSeparator()]
+    assert ids == ["undo", "copy"]
+
+
+def test_database_holds_the_database_group(window: MainWindow) -> None:
+    _top_actions, menu = _menu_named(window, "Database")
+    items = menu.actions()
+    ids = [action.data() for action in items if not action.isSeparator()]
+    assert ids == ["query_builder", "optimize_db", "database_info"]
+
+
+def test_help_holds_the_help_group(window: MainWindow) -> None:
+    _top_actions, menu = _menu_named(window, "Help")
+    items = menu.actions()
+    ids = [action.data() for action in items if not action.isSeparator()]
+    assert ids == ["settings", "log_viewer", "user_manual", "load_demo", "credits"]
+
+
+def test_window_holds_minimize_and_zoom(window: MainWindow) -> None:
+    _top_actions, menu = _menu_named(window, "Window")
+    items = menu.actions()
+    texts = [action.text() for action in items]
+    assert texts == ["Minimize", "Zoom"]
 
 
 def test_settings_carries_the_preferences_role(window: MainWindow) -> None:
     """This, not the menu it sits in, is what actually moves it next to the
     apple - Cocoa relocates a role-marked action wherever it was declared."""
-    menu_bar = window.menuBar()
-    top_actions = menu_bar.actions()
-    top_action = top_actions[0]
-    menu = top_action.menu()
+    _top_actions, menu = _menu_named(window, "Help")
     items = menu.actions()
-
     settings_action = next(action for action in items if action.data() == "settings")
     assert settings_action.menuRole() == QAction.MenuRole.PreferencesRole
 
 
 def test_credits_carries_the_about_role(window: MainWindow) -> None:
-    menu_bar = window.menuBar()
-    top_actions = menu_bar.actions()
-    top_action = top_actions[0]
-    menu = top_action.menu()
+    _top_actions, menu = _menu_named(window, "Help")
     items = menu.actions()
-
     credits_action = next(action for action in items if action.data() == "credits")
     assert credits_action.menuRole() == QAction.MenuRole.AboutRole
 
 
 def test_nothing_else_is_given_a_role_it_did_not_ask_for(window: MainWindow) -> None:
-    """Only Settings and Credits are meant to be pulled out of this menu."""
+    """Only Settings and Credits are meant to be pulled out of any menu."""
     menu_bar = window.menuBar()
     top_actions = menu_bar.actions()
-    top_action = top_actions[0]
-    menu = top_action.menu()
-    items = menu.actions()
 
-    ordinary = [
-        action for action in items
-        if not action.isSeparator() and action.data() not in ("settings", "credits")
-    ]
+    ordinary = []
+    for top_action in top_actions:
+        menu = top_action.menu()
+        if menu is None:
+            continue
+        for action in menu.actions():
+            if action.isSeparator() or action.data() in ("settings", "credits"):
+                continue
+            ordinary.append(action)
+
     assert ordinary
     assert all(
         action.menuRole() == QAction.MenuRole.TextHeuristicRole for action in ordinary
@@ -252,7 +275,9 @@ def test_off_macos_page_switching_is_unaffected(
 # One list feeds both
 # ----------------------------------------------------------------------
 def test_the_popup_and_the_menu_bar_share_one_item_list(window: MainWindow) -> None:
-    """They cannot drift apart the way two hand-kept copies would."""
+    """They cannot drift apart the way two hand-kept copies would: the popup
+    is every group's items flattened into one list (_flatten_menu_groups),
+    and the bar is the same groups split back out into one QMenu each."""
     popup_ids = [
         action.data()
         for action in window._app_menu.actions()
@@ -261,11 +286,20 @@ def test_the_popup_and_the_menu_bar_share_one_item_list(window: MainWindow) -> N
 
     menu_bar = window.menuBar()
     top_actions = menu_bar.actions()
-    top_action = top_actions[0]
-    bar_menu = top_action.menu()
-    bar_ids = [
-        action.data() for action in bar_menu.actions() if not action.isSeparator()
-    ]
+
+    bar_ids = []
+    for top_action in top_actions:
+        # Window is not one of the shared groups - it holds no MenuItem the
+        # popup could show, only two Cocoa window operations built directly
+        # against the bar (see _build_macos_window_menu).
+        if top_action.text() == "Window":
+            continue
+        menu = top_action.menu()
+        if menu is None:
+            continue
+        for action in menu.actions():
+            if not action.isSeparator():
+                bar_ids.append(action.data())
 
     assert popup_ids == bar_ids
 
@@ -277,4 +311,4 @@ def test_rebuilding_the_menu_does_not_duplicate_the_bar(window: MainWindow) -> N
     window._build_app_menu()
 
     menu_bar = window.menuBar()
-    assert len(menu_bar.actions()) == 1
+    assert len(menu_bar.actions()) == 5

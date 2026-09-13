@@ -5,10 +5,11 @@ participation), ordering, deletion, and the series SQL query.
 """
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QTextOption
+from PySide6.QtCore import QPointF, Qt, Signal
+from PySide6.QtGui import QBrush, QColor, QIcon, QPainter, QPen, QTextOption
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -23,11 +24,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from matplotlib import rcParams
+
 from app.charts.kwarg_spec import DEFAULT
 from app.styles.style import (
     MARGIN_PANEL,
     create_action_button,
     create_card_widget,
+    create_hidpi_pixmap,
     create_section_title,
     stdSizeAndlayout,
 )
@@ -45,6 +49,58 @@ AxisDescriptorLike = Any
 SeriesDescriptorLike = Any
 
 SQL_QUERY_VISIBLE_LINES = get_constant("sql_query_visible_lines", 6)
+
+_SWATCH_W, _SWATCH_H = 28, 14
+
+#: Matplotlib linestyle code -> Qt pen style, same mapping LineStyleCombo
+#: uses. Anything not in here (an unrecognised code, "none") falls back to
+#: a plain solid line - "none" is handled separately, as a dot.
+_SWATCH_PEN_STYLES: dict[str, Qt.PenStyle] = {
+    "-": Qt.PenStyle.SolidLine,
+    "--": Qt.PenStyle.DashLine,
+    "-.": Qt.PenStyle.DashDotLine,
+    ":": Qt.PenStyle.DotLine,
+}
+
+
+@lru_cache(maxsize=None)
+def _series_swatch_icon(color: str, linestyle: str) -> QIcon:
+    """A small colour/line-style preview for one row of the series combo.
+
+    Best-effort, not a render: an explicit colour and linestyle are drawn
+    exactly, but a series left on "whatever the cycle/style sheet decides"
+    is approximated by the caller (the active property cycle, indexed by
+    the series' position in the combo) rather than replicated stroke for
+    stroke - the renderer that actually draws the chart may cycle
+    differently per chart type. Enough to recognise "this is the blue
+    dashed one" without opening the series first, which is the point.
+    """
+    pixmap = create_hidpi_pixmap(_SWATCH_W, _SWATCH_H)
+    qcolor = QColor(color)
+    if not qcolor.isValid():
+        qcolor = QColor("#808080")
+
+    painter = QPainter(pixmap)
+    try:
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        mid_y = _SWATCH_H / 2
+
+        if linestyle == "none":
+            # Marker-only series: a dot reads as "no line" better than an
+            # empty icon, which looks like the swatch failed to draw.
+            painter.setBrush(QBrush(qcolor))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawEllipse(QPointF(_SWATCH_W / 2, mid_y), 3, 3)
+        else:
+            pen = QPen(qcolor)
+            pen.setWidth(2)
+            pen.setStyle(_SWATCH_PEN_STYLES.get(linestyle, Qt.PenStyle.SolidLine))
+            painter.setPen(pen)
+            painter.drawLine(QPointF(2, mid_y), QPointF(_SWATCH_W - 2, mid_y))
+    finally:
+        painter.end()
+
+    return QIcon(pixmap)
 
 
 class SeriesPropertiesWidget(BaseProperties):
@@ -387,9 +443,33 @@ class SeriesPropertiesWidget(BaseProperties):
             series_id = int(series_desc.id)
             self._series_map[series_id] = series_desc
             self._series_combo.addItem(
+                self._series_swatch_icon_for(series_desc),
                 self._series_display_label(series_desc),
                 series_id,
             )
+
+    def _series_swatch_icon_for(self, series_desc: SeriesDescriptorLike) -> QIcon:
+        """Resolve the colour/linestyle swatch icon for one combo row."""
+        style = self._series_style(series_desc)
+
+        color = str(style.get("color", "") or "").strip()
+        if not color:
+            try:
+                cycle = rcParams["axes.prop_cycle"].by_key().get("color") or []
+            except (KeyError, AttributeError, TypeError):
+                cycle = []
+            cycle = list(cycle) or ["#1f77b4"]
+            # The combo is built in display order, so its current item
+            # count is this series' position in it - the same index the
+            # renderer's own cycle would be at if nothing else on this axis
+            # set an explicit colour either.
+            color = str(cycle[self._series_combo.count() % len(cycle)])
+
+        linestyle = str(style.get("linestyle", "") or "").strip().lower()
+        if linestyle in ("", DEFAULT):
+            linestyle = "-"
+
+        return _series_swatch_icon(color, linestyle)
 
     def _select_series(self, preferred_series_id: int | None) -> None:
         """Select the previous series when possible, otherwise first."""

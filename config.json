@@ -64,6 +64,13 @@
       "SegoeFluent": "E703",
       "ThemeIcon": "network-transmit-receive"
     },
+    "database_info": {
+      "text": "Database Info",
+      "description": "Tables, size and import links for the current database",
+      "SFSymbol": "cylinder.split.1x2",
+      "SegoeFluent": "EDA2",
+      "ThemeIcon": "x-office-database"
+    },
     "copy": {
       "text": "Copy",
       "description": "Copy to the clipboard",
